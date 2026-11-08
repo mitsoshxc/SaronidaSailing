@@ -55,7 +55,7 @@ Phases are the build order; the whole site goes live once, after all phases are 
 - [ ] Admin rendering: `data-cms-*` attributes, dimmed inactive items, admin toolbar (edit mode on/off, Save page, Discard, unsaved counter, logout)
 - [ ] Pending-changes model in `cms-edit.js` + unsaved-changes warning
 - [ ] Save-page API: all pending changes in one request, one transaction, one cache eviction; antiforgery, HtmlSanitizer, link URL validation
-- [ ] Modals (`<dialog>`): rich text (editor library TBD), link, history, Page settings
+- [ ] Modals (`<dialog>`): rich text (Quill 2, self-hosted), link, history, Page settings
 - [ ] List editing: add, delete, drag-to-reorder (SortableJS) + up/down buttons, active/inactive toggle
 - [ ] Section active/inactive toggle (hides section and its menu links)
 - [ ] Undo from `ContentHistory`
