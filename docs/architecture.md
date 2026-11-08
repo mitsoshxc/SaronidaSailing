@@ -11,20 +11,27 @@ Status: **agreed design, not yet implemented.** Update as phases land.
 | Database | SQLite (WAL mode) | One admin, rare writes, tiny data set; no DB server to run. Swap to Postgres/SQL Server later via EF Core if needed |
 | Auth | ASP.NET Core Identity, cookie auth, TOTP 2FA | Single admin account |
 | Caching | ASP.NET Core Output Caching (in-memory, in the app process) | Visitors are served rendered pages from memory; DB is hit only after a cache miss |
-| Media | Files on the droplet disk, served by nginx, cached by Cloudflare | Zero extra cost; no object storage subscription |
-| Hosting | DigitalOcean Basic droplet, Docker | See `docs/deployment.md` |
+| Background jobs | Hangfire, SQLite storage (`Hangfire.Storage.SQLite`, community package) in its own file | Recurring jobs: Instagram fetch, token refresh, nightly DB backup copy |
+| Image processing | SkiaSharp (MIT) | Resize, fix orientation, strip metadata, encode WebP |
+| Media | Files on the droplet disk, served by nginx, cached by Cloudflare | Zero extra cost |
+| Analytics | Cloudflare Web Analytics | Free, cookieless — no cookie banner needed |
+| Hosting | DigitalOcean Basic droplet (FRA1), Docker | See `docs/deployment.md` |
 | Reverse proxy / TLS | nginx + Let's Encrypt (certbot) on the host | |
-| DNS / CDN | Cloudflare Free | DNS, edge caching of static files, DDoS protection, no cost |
+| DNS / CDN | Cloudflare Free | DNS, edge caching of static files, DDoS protection |
 
 **Explicitly rejected**
 
 | Option | Reason |
 |---|---|
-| Elasticsearch | Second datastore to sync; needs ≥1 GB RAM on its own (forces a bigger droplet). Output caching already avoids DB reads |
+| Elasticsearch | Second datastore to sync; needs ≥1 GB RAM on its own. Output caching already avoids DB reads |
 | SQL Server | SQL Server on Linux needs ≥2 GB RAM. Not needed for this data volume |
 | Redis | Only useful with multiple app instances; we run one |
-| DigitalOcean Spaces | Paid subscription; local disk + Cloudflare is enough at this scale |
-| CI/CD pipeline | Deploys run from the developer's PC via `deploy.ps1` (see `docs/deployment.md`) |
+| DigitalOcean Spaces | Paid; local disk + Cloudflare is enough |
+| Own booking system | Bookings happen on external platforms; the site links out |
+| Contact form / email provider | Contact page has no form (phone, email link, Instagram DM) |
+| Cookie banner | Not needed: no cookies besides the admin login and language, cookieless analytics, static map image instead of an embedded Google map |
+| Google Fonts CDN | Fonts are self-hosted (sending visitor IPs to Google was ruled a GDPR violation by a Munich court, 2022) |
+| CI/CD pipeline | Deploys run from the developer's PC (see `docs/deployment.md`) |
 
 ## Solution Structure (planned)
 
@@ -32,7 +39,7 @@ Status: **agreed design, not yet implemented.** Update as phases land.
 SaronidaSailing.slnx
 src/
   SaronidaSailing.Core/            entities, interfaces, services (no EF, no ASP.NET)
-  SaronidaSailing.Infrastructure/  AppDbContext, EF configurations, migrations, repositories, media storage
+  SaronidaSailing.Infrastructure/  AppDbContext, EF configurations, migrations, repositories, media, Instagram client, jobs
   SaronidaSailing.Web/             Razor Pages, tag helpers, admin API endpoints, wwwroot, Program.cs
 tests/
   SaronidaSailing.Tests/           xUnit, SQLite in-memory
@@ -42,6 +49,27 @@ Dockerfile
 ```
 
 `Core` references nothing. `Infrastructure` references `Core`. `Web` references both.
+
+## Pages (from the "Saronida Sailing Redesign" design canvas)
+
+| Page | Greek URL | English URL | Sections |
+|---|---|---|---|
+| Home | `/` | `/en/` | Hero · At a glance · Trips teaser · Boat teaser · Why with a skipper · Instagram feed · Departure point |
+| Trips | `/ekdromes` (slug TBD) | `/en/trips` | Intro · 3 trip tabs (day cruise / islands / weekly charter) · Useful info · Booking box (links to booking platforms) |
+| Boat | `/skafos` (slug TBD) | `/en/boat` | Gallery · Intro · Specs · Life on board · Included · Charter details |
+| Contact | `/epikoinonia` (slug TBD) | `/en/contact` | Contact tiles · Map image + directions · Useful details · Call to action |
+| Terms, Privacy, Accessibility | slugs TBD | slugs TBD | Rich-text sections |
+| Shared | — | — | Header (logo, menu, language switch, Book button) · Footer |
+
+The design's cookie-consent artboard and footer "Cookie settings" link are **not built** (no banner needed).
+
+## Localization
+
+- Languages: Greek (`el`, default) and English (`en`).
+- URLs: Greek has no prefix (`/`, `/skafos`); English lives under `/en/...`. Adding a language later = a new prefix.
+- Language switcher in the header links to the same page in the other language.
+- Every page emits `<html lang>`, `hreflang` alternates and a canonical URL.
+- `sitemap.xml` lists every page in both languages with `hreflang` alternates; `robots.txt` points to it and disallows `/admin`.
 
 ## Request Flow
 
@@ -59,29 +87,53 @@ Cloudflare by default caches static file types (images, CSS, JS), not HTML, so H
 ## Output Caching
 
 - Named policy `CmsPage`: expiration **1 hour**, tag `pages:all`.
-- Each page adds its own tag `page:{pageKey}` (e.g. `page:home`) via `[OutputCache(PolicyName = "CmsPage", Tags = new[] { "page:home" })]`.
-- On admin save of a field on page X: `IOutputCacheStore.EvictByTagAsync("page:X")`.
-- On admin save of shared content (header, footer — page key `shared`): evict `pages:all`.
+- Each page adds its own tag `page:{pageKey}` (e.g. `page:home`).
+- Any content write (field, list item add/remove/reorder/activate) on page X evicts `page:X`.
+- Writes to shared content (page key `shared`: header, footer) evict `pages:all`.
+- A successful Instagram fetch evicts `page:home`.
 - Authenticated requests (the admin) are neither served from nor stored in the cache — built-in default policy behaviour. Requires `UseOutputCache()` **after** `UseAuthentication()`/`UseAuthorization()`.
-- Responses that set cookies are not cached (default policy). Antiforgery sets a cookie, so pages with forms (contact form) need a workaround — decided when the contact form is built.
 - Cache is lost on restart/redeploy; pages rebuild on first request.
 
 ## CMS Editing Flow
 
-1. Razor templates mark each editable spot with a tag helper: `<cms key="home.hero.title" />` (text) or `<cms-image key="home.hero.image" />`.
-2. For visitors the tag helper renders the stored value only.
-3. When the admin is signed in, it additionally renders `data-cms-key` / `data-cms-type` attributes, and the layout loads `wwwroot/js/cms-edit.js`.
-4. `cms-edit.js` makes marked elements editable (inline for text, modal for rich text / images) and saves through admin-only minimal API endpoints (`/admin/api/content`, `/admin/api/media`), with antiforgery tokens.
-5. Save → write `ContentItem` + append `ContentHistory` row → evict the page's output-cache tag.
+1. Razor templates mark editable spots with tag helpers: `<cms key="home.hero.title" />` (text / rich text), `<cms-link key="..." />` (URL + label), `<cms-image key="..." />`, and `<cms-list key="home.highlights">` for repeating blocks.
+2. For visitors, tag helpers render stored values only; inactive list items are not rendered.
+3. When the admin is signed in, they also render `data-cms-*` attributes, inactive list items are shown dimmed, and the layout loads `wwwroot/js/cms-edit.js`.
+4. `cms-edit.js` provides: inline text editing, a modal for rich text / links / images, and for lists: add, delete, drag-to-reorder, active/inactive toggle. It saves through admin-only minimal API endpoints with antiforgery tokens.
+5. Save → write content + append history → evict the page's output-cache tag.
 6. Rich-text HTML is sanitized server-side (HtmlSanitizer library) before storage.
 
-## Media Pipeline
+## Media Pipeline (SkiaSharp)
 
-1. Admin uploads an image through `/admin/api/media`.
-2. The app resizes it to a fixed set of widths and converts to WebP (library: see Open Decisions).
-3. Files are written as `{slug}-{contentHash}-{width}.webp` under the media root (`Media:RootPath`, production `/var/saronida/media`, bind-mounted into the container).
-4. A `MediaAsset` row records the file set; the `ContentItem` of type `Image` references it.
-5. nginx serves `/media/` directly with `Cache-Control: public, max-age=31536000, immutable` (safe because a changed image gets a new filename). In development the app serves the same folder via static files.
+1. Admin uploads an image through the admin media endpoint.
+2. Validation: decode the file to confirm it is an image (not by extension); reject over the configured file size or pixel dimensions, with a clear error.
+3. Apply the EXIF orientation (SkiaSharp does not do this automatically), then re-encode — which drops all metadata, including GPS location.
+4. Generate a fixed set of widths (e.g. 480 / 960 / 1600; never upscale) as WebP at a fixed quality.
+5. Files are written as `{slug}-{contentHash}-{width}.webp` under `Media:RootPath` (production `/var/saronida/media`).
+6. A `MediaAsset` row records the file set; image content references it.
+7. nginx serves `/media/` with `Cache-Control: public, max-age=31536000, immutable`. In development the app serves the folder via static files.
+
+Linux native assets: `SkiaSharp.NativeAssets.Linux.NoDependencies` (nothing to install in the container).
+
+## Instagram Feed
+
+- Uses the official Instagram API for Business/Creator accounts (the old Basic Display API was shut down in December 2024). The owner's account must be Business or Creator.
+- Long-lived access token (expires after ~60 days) stored in the database.
+- Hangfire recurring jobs: **fetch latest posts twice a day**; **refresh the token weekly**.
+- Thumbnails are downloaded and processed through the media pipeline, so the page never depends on Instagram's image URLs.
+- If a fetch fails, the last good posts stay on the page.
+
+## Background Jobs (Hangfire)
+
+| Job | Schedule |
+|---|---|
+| Instagram fetch | Twice a day |
+| Instagram token refresh | Weekly |
+| Database backup copy (`VACUUM INTO`) | Nightly |
+
+- Storage: `Hangfire.Storage.SQLite` in a separate file (`hangfire.db`) so job polling never locks the content database.
+- Dashboard at `/admin/jobs`, admin-only.
+- Every job must be safe to run twice.
 
 ## Security
 
@@ -89,18 +141,20 @@ Cloudflare by default caches static file types (images, CSS, JS), not HTML, so H
 |---|---|
 | Admin login | Identity cookie auth + TOTP 2FA; built-in rate limiter on the login endpoint |
 | Real client IP | nginx `realip` module sets the client IP from `CF-Connecting-IP` (Cloudflare ranges only); app uses `UseForwardedHeaders` trusting nginx (127.0.0.1) |
-| CSRF | Antiforgery tokens on all admin write endpoints and forms |
-| XSS | Razor encoding by default; rich text sanitized with HtmlSanitizer before storage |
+| CSRF | Antiforgery tokens on all admin write endpoints |
+| XSS | Razor encoding by default; rich text sanitized with HtmlSanitizer before storage; link URLs restricted to `https:`, `tel:`, `mailto:` |
 | Transport | Cloudflare SSL mode **Full (strict)**; Let's Encrypt cert on the origin |
-| Uploads | Admin-only; validate type by decoding the image, not by extension; size limit |
+| Uploads | Admin-only; validated by decoding; size limits |
 
-## Open Decisions
+## Accessibility
 
-| Decision | Status |
-|---|---|
-| Online bookings / payments | **Open** — affects domain model and scope |
-| Languages (Greek + English?) | **Open** — `ContentItem.Locale` exists from day one regardless |
-| Image library (ImageSharp vs SkiaSharp vs NetVips) | **Open** — check ImageSharp's license terms before choosing it |
-| Contact form email provider | **Open** |
-| Backups (DO droplet backups vs nightly off-server copy) | **Open** — see `docs/deployment.md` |
-| Image transfer for deploys (container registry vs `docker save \| ssh docker load`) | **Open** — default: no registry |
+Target **WCAG 2.2 AA** (per the design notes): real buttons/links, keyboard focus outline (3 px), text contrast ≥ 4.5:1, touch targets ≥ 44 px, alt text on every content image (alt text is editable content), accessibility statement page.
+
+## Open Items (owner-provided, not blocking development)
+
+- Booking platform names and URLs
+- Prices, max guests, cabins, email, contact hours, season
+- Photos / video
+- English texts
+- Legal texts reviewed (ideally by a lawyer) before go-live
+- Greek URL slugs

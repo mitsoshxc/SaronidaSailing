@@ -2,7 +2,9 @@
 
 Public website for a sailing business in Saronida, Greece, with a custom built-in CMS. Page layouts and sections are fixed in code; the **content** of each section (texts, images) is data entered by the admin. A single admin logs in, sees the site exactly as a visitor does, and edits each section in place.
 
-Stack: ASP.NET Core 10 Razor Pages · Entity Framework Core 10 · SQLite · ASP.NET Core Identity · Output Caching · Docker · nginx · DigitalOcean · Cloudflare (Free)
+Stack: ASP.NET Core 10 Razor Pages · Entity Framework Core 10 · SQLite · ASP.NET Core Identity · Output Caching · Hangfire (SQLite storage) · SkiaSharp · Docker · nginx · DigitalOcean · Cloudflare (Free)
+
+Languages: Greek (default, no URL prefix) and English (`/en/`). Pages and sections come from the "Saronida Sailing Redesign" design canvas.
 
 Project status: **pre-code**. Docs describe the agreed design; `PLAN.md` tracks the build.
 
@@ -46,7 +48,7 @@ Project status: **pre-code**. Docs describe the agreed design; `PLAN.md` tracks 
 
 | Doc | Contents |
 |---|---|
-| [`docs/architecture.md`](docs/architecture.md) | Tech stack and why, solution structure, layers, caching, CMS editing flow, media pipeline, security, open decisions |
+| [`docs/architecture.md`](docs/architecture.md) | Tech stack and why, pages, localization, caching, CMS editing flow, media pipeline, Instagram feed, background jobs, security, accessibility, owner-provided open items |
 | [`docs/domain-model.md`](docs/domain-model.md) | Entities, fields, keys, indexes, content key format |
 | [`docs/conventions.md`](docs/conventions.md) | Layering, naming, EF Core / SQLite portability rules, caching rules, views, CSS, JS |
 | [`docs/deployment.md`](docs/deployment.md) | Production infrastructure: droplet, Docker, nginx, Let's Encrypt, Cloudflare, deploy script, backups |

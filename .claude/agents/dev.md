@@ -39,9 +39,11 @@ You are Dev — the implementer. You take one well-scoped brief from the tech le
 | DbContext | `src/SaronidaSailing.Infrastructure/Data/` | `AppDbContext` |
 | EF config | `src/SaronidaSailing.Infrastructure/Data/Configurations/` | `IEntityTypeConfiguration<T>` per entity |
 | Repositories | `src/SaronidaSailing.Infrastructure/Repositories/` | Interface implementations |
-| Media storage | `src/SaronidaSailing.Infrastructure/Media/` | File I/O, image processing |
+| Media storage | `src/SaronidaSailing.Infrastructure/Media/` | File I/O, SkiaSharp image processing |
+| Instagram | `src/SaronidaSailing.Infrastructure/Instagram/` | Instagram API client |
+| Jobs | `src/SaronidaSailing.Infrastructure/Jobs/` | Hangfire job classes (thin, call services) |
 | Pages | `src/SaronidaSailing.Web/Pages/` | Razor Pages — thin page models |
-| Tag helpers | `src/SaronidaSailing.Web/TagHelpers/` | `<cms>`, `<cms-image>` |
+| Tag helpers | `src/SaronidaSailing.Web/TagHelpers/` | `<cms>`, `<cms-link>`, `<cms-image>`, `<cms-list>` |
 | Admin API | `src/SaronidaSailing.Web/Endpoints/` | Minimal API endpoints, admin-only |
 | ViewModels | `src/SaronidaSailing.Web/Models/` | `record` types |
 | Static | `src/SaronidaSailing.Web/wwwroot/` | `css/site.css`, `js/` |
@@ -65,10 +67,16 @@ You are Dev — the implementer. You take one well-scoped brief from the tech le
 
 ## PROJECT-SPECIFIC RULES
 
-- **Every content write evicts the output cache** — `page:{pageKey}`, or `pages:all` for page key `shared`.
+- **Every content write evicts the output cache** — field saves and list add/delete/reorder/activate; `page:{pageKey}`, or `pages:all` for page key `shared`.
+- **Repeating blocks are `<cms-list>`; inactive items are never rendered for visitors.**
+- **Hangfire jobs are idempotent** and never leave the site broken on failure.
+- **Links allow only `https:`, `tel:`, `mailto:`.**
+- **Every page sets `<html lang>`, canonical and `hreflang`.** Greek is unprefixed, English under `/en/`.
+- **Accessibility: WCAG 2.2 AA** — real buttons/links, focus outline, contrast, alt text.
+- **Fonts are self-hosted** — never Google Fonts CDN.
 - **`UseOutputCache()` stays after `UseAuthentication()` / `UseAuthorization()`.**
 - **Rich text is sanitized server-side before storage.**
-- **Editable content is rendered only through `<cms>` / `<cms-image>`** — never hardcoded.
+- **Editable content is rendered only through the `<cms*>` tag helpers** — never hardcoded.
 - **Admin-only markup and `cms-edit.js` are emitted only for authenticated admins.**
 - **EF Core portability** — LINQ only, no raw SQL, UTC `DateTime`, no `decimal` comparisons in queries.
 - Mobile-first CSS, breakpoints 720px / 960px only, no CSS framework.

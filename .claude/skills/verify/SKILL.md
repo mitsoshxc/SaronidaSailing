@@ -31,10 +31,16 @@ Read `docs/conventions.md` and check, where applicable:
 - [ ] No `AppDbContext` access outside `Infrastructure`
 - [ ] EF Core portability: LINQ only, UTC `DateTime`, no `decimal` comparisons in queries
 - [ ] New/changed entities have a migration
-- [ ] Every content write evicts `page:{pageKey}` (or `pages:all` for `shared`)
+- [ ] Every content write (fields and list operations) evicts `page:{pageKey}` (or `pages:all` for `shared`)
+- [ ] Repeating blocks use `<cms-list>`; inactive items hidden from visitors
+- [ ] Hangfire jobs idempotent; failures keep the last good state
+- [ ] Pages set `<html lang>`, canonical, `hreflang`; Greek unprefixed, English `/en/`
+- [ ] Link URLs limited to `https:`, `tel:`, `mailto:`
+- [ ] Accessibility (WCAG 2.2 AA): real buttons/links, focus outline, contrast, alt text, `aria-label` on icon buttons
+- [ ] Fonts self-hosted
 - [ ] `UseOutputCache()` still after `UseAuthentication()` / `UseAuthorization()`
 - [ ] Rich text sanitized before storage
-- [ ] Editable content rendered via `<cms>` / `<cms-image>`, not hardcoded
+- [ ] Editable content rendered via the `<cms*>` tag helpers, not hardcoded
 - [ ] Admin-only markup/scripts gated on authentication; antiforgery on write endpoints
 - [ ] CSS mobile-first (no `max-width` queries, breakpoints 720/960); JS has no `var`
 - [ ] No "what" comments, debug logs, or commented-out code
