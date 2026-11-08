@@ -10,7 +10,11 @@ Status: **agreed design, not yet implemented.** Scripts and configs land in the 
 | **Bring the site back (maintenance mode OFF)** | `rm /var/saronida/maintenance.on` |
 | Check app health | `curl -i http://127.0.0.1:5000/health` |
 | Restart the app | `cd /opt/saronida && docker compose restart` |
-| App logs | `cd /opt/saronida && docker compose logs --tail 200 -f` |
+| App logs | `/var/saronida/logs/app-YYYY-MM-DD.log` (console: `cd /opt/saronida && docker compose logs --tail 200 -f`) |
+| Audit log (logins, admin actions) | `/var/saronida/logs/audit-YYYY-MM-DD.log` |
+| Add an admin | `saronida-admin add <email>` (prompts for the password) |
+| Reset an admin's password | `saronida-admin reset-password <email>` |
+| List / remove admins | `saronida-admin list` · `saronida-admin remove <email>` |
 
 Maintenance mode takes effect immediately — no restart, no deploy. Details under nginx → Maintenance Mode.
 
@@ -36,6 +40,9 @@ Maintenance mode takes effect immediately — no restart, no deploy. Details und
 | `/var/saronida/data/hangfire.db` | Hangfire job storage |
 | `/var/saronida/data/backup/` | Nightly `VACUUM INTO` copy of the content database |
 | `/var/saronida/media/` | Generated images (bind mount → container; served directly by nginx) |
+| `/var/saronida/data/keys/` | ASP.NET Core Data Protection keys (keep admins logged in across deploys) |
+| `/var/saronida/logs/` | NLog files, 90-day retention |
+| `/usr/local/bin/saronida-admin` | Wrapper for the admin CLI commands |
 | `/etc/nginx/sites-available/saronida` | Site config (from `deploy/nginx/`) |
 
 The .NET container images run as the non-root `app` user (UID 1654) and listen on port 8080. The bind-mounted folders must be writable by UID 1654. The container port is published on loopback only: `127.0.0.1:5000:8080`.
@@ -73,7 +80,9 @@ PowerShell 7 (Windows, macOS, Linux). Run from the developer's PC. The droplet n
 5. Poll `/health` on the droplet (`127.0.0.1:5000`); on non-200, switch back to the previous tag.
 6. `docker image prune` on the droplet, keeping the current and previous tags; delete the temp folder locally.
 
-EF Core migrations are applied at app startup.
+EF Core migrations are applied at app startup. After the very first deploy, create the first admin with `saronida-admin add <email>`.
+
+The compose file caps Docker's container console log (json-file `max-size` / `max-file`).
 
 ## Backups
 

@@ -70,6 +70,14 @@ The database must stay swappable (Postgres / SQL Server) with only a provider an
 
 ---
 
+## Logging
+
+- NLog only. Audit events (logins, admin actions, content changes) go to the audit logger; warnings/errors to the app log.
+- Never log passwords, 2FA codes, recovery codes, tokens or cookies.
+- Logs go to files, never to the database.
+
+---
+
 ## Background Jobs
 
 - Every job is idempotent (safe to run twice).

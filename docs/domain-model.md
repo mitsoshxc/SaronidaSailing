@@ -109,4 +109,4 @@ Key/value store for integration state, e.g. the Instagram access token and its e
 
 ### ApplicationUser
 
-Extends `IdentityUser` (string PK). One admin account, created by a seed step from configuration on first run.
+Extends `IdentityUser` (string PK). One or more admins, created only with the `admin add` command (see `docs/architecture.md` → Admin Accounts). No registration page, no seeding from configuration.

@@ -35,9 +35,11 @@ Phases are the build order; the whole site goes live once, after all phases are 
 
 ## Phase 2 — Admin Authentication
 
-- [ ] ASP.NET Core Identity (cookie auth), admin seeded from configuration
-- [ ] Login page + TOTP 2FA
-- [ ] Login rate limiting; forwarded headers
+- [ ] ASP.NET Core Identity (cookie auth): 12h sliding session, `Secure`/`HttpOnly`/`SameSite=Strict`, Data Protection keys persisted
+- [ ] Admin CLI commands: `admin add` / `reset-password` / `list` / `remove` (password prompted, hidden)
+- [ ] `/admin/login` + mandatory TOTP 2FA setup with recovery codes; logout
+- [ ] Lockout (5 tries → 15 min) + per-IP login rate limiting; forwarded headers
+- [ ] NLog: `audit-*.log` + `app-*.log` in `/var/saronida/logs`, 90-day retention
 - [ ] Hangfire dashboard at `/admin/jobs`, admin-only
 
 ## Phase 3 — CMS Core
@@ -85,6 +87,6 @@ Phases are the build order; the whole site goes live once, after all phases are 
 - [ ] nginx maintenance mode: `/var/saronida/maintenance.on` → 503 + `deploy/nginx/maintenance.html`
 - [ ] `deploy/deploy.ps1`
 - [ ] Nightly `VACUUM INTO` backup job
-- [ ] Droplet setup: hardening, swap, Docker, nginx, certbot, firewall
+- [ ] Droplet setup: hardening, swap, Docker, nginx, certbot, firewall, `saronida-admin` wrapper script
 - [ ] Cloudflare: DNS, Full (strict) SSL, Web Analytics
 - [ ] Enable DO weekly backups

@@ -9,7 +9,8 @@ Status: **agreed design, not yet implemented.** Update as phases land.
 | Web framework | ASP.NET Core 10, Razor Pages | Team's main stack; fixed page templates fit Razor Pages well |
 | ORM | EF Core 10 | Keeps the app independent of the database engine |
 | Database | SQLite (WAL mode) | One admin, rare writes, tiny data set; no DB server to run. Swap to Postgres/SQL Server later via EF Core if needed |
-| Auth | ASP.NET Core Identity, cookie auth, TOTP 2FA | Single admin account |
+| Auth | ASP.NET Core Identity, cookie auth, mandatory TOTP 2FA | One or more admins, managed by CLI commands |
+| Logging | NLog to files, 90-day retention | Audit log (logins, admin actions) + app log |
 | Caching | ASP.NET Core Output Caching (in-memory, in the app process) | Visitors are served rendered pages from memory; DB is hit only after a cache miss |
 | Background jobs | Hangfire, SQLite storage (`Hangfire.Storage.SQLite`, community package) in its own file | Recurring jobs: Instagram fetch, token refresh, nightly DB backup copy |
 | Image processing | SkiaSharp (MIT) | Resize, fix orientation, strip metadata, encode WebP |
@@ -151,11 +152,44 @@ Returns **200 "Healthy"** only if every check passes, otherwise **503 "Unhealthy
 
 Reachable only from the droplet itself — nginx denies `/health` from the internet. Used by `deploy.ps1` after every deploy.
 
+## Admin Accounts
+
+- No registration page. Admins are managed only with CLI commands built into the web app, run on the droplet (they go through Identity, so password hashes and stamps are always valid — never insert users with SQL):
+
+| Command | Does |
+|---|---|
+| `admin add <email>` | Prompts for the password (hidden input, typed twice, checked against the password policy) and creates the admin |
+| `admin reset-password <email>` | Prompts for a new password the same way; also clears lockout |
+| `admin list` | Lists admins |
+| `admin remove <email>` | Deletes an admin |
+
+  Run as `docker compose exec web dotnet SaronidaSailing.Web.dll admin <command>`, wrapped by a host script `saronida-admin`. Passwords are never passed as arguments (they would end up in shell history).
+- The first admin is created with `admin add` after the first deploy — no passwords in config or environment variables.
+- Login at `/admin/login`; not linked from the public site.
+- **2FA mandatory**: first login forces authenticator-app (TOTP) setup and shows recovery codes. A lost phone is recovered with a recovery code; a forgotten password with `admin reset-password`.
+- Session: 12 hours, sliding; no "remember me". Cookie `Secure`, `HttpOnly`, `SameSite=Strict`.
+- Lockout: 5 failed attempts → 15 minutes. Plus a per-IP rate limit on the login endpoint.
+- **Data Protection keys persisted** to `/var/saronida/data/keys` — otherwise every deploy logs admins out and invalidates antiforgery tokens.
+- Several admins may edit at once; concurrent saves to the same field: last save wins. `ContentHistory` records who changed what.
+- Hangfire dashboard `/admin/jobs`: admin-only authorization filter.
+
+## Logging (NLog)
+
+| File | Contents |
+|---|---|
+| `audit-YYYY-MM-DD.log` | Logins (success/failure), lockouts, 2FA setup, admin CLI commands, content changes — time, user, IP |
+| `app-YYYY-MM-DD.log` | Warnings and errors |
+
+- Location `/var/saronida/logs` (bind mount, survives deploys). Never in the database.
+- **Retention 90 days**, deleted by NLog's own archive cleanup when files roll over (no Hangfire job needed). Exact NLog settings verified at implementation; if NLog's cleanup doesn't fit the file naming, fall back to a daily Hangfire cleanup job.
+- Docker's console log for the container is size-capped (json-file `max-size` / `max-file`).
+- IP addresses in logs are personal data: the Privacy page must mention the logs and the 90-day retention.
+
 ## Security
 
 | Concern | Measure |
 |---|---|
-| Admin login | Identity cookie auth + TOTP 2FA; built-in rate limiter on the login endpoint |
+| Admin login | Identity cookie auth + mandatory TOTP 2FA; lockout; per-IP rate limiter on login (see Admin Accounts) |
 | Real client IP | nginx `realip` module sets the client IP from `CF-Connecting-IP` (Cloudflare ranges only); app uses `UseForwardedHeaders` trusting nginx (127.0.0.1) |
 | CSRF | Antiforgery tokens on all admin write endpoints |
 | XSS | Razor encoding by default; rich text sanitized with HtmlSanitizer before storage; link URLs restricted to `https:`, `tel:`, `mailto:` |
