@@ -1,9 +1,12 @@
 using SaronidaSailing.Infrastructure;
 using SaronidaSailing.Infrastructure.Data;
+using SaronidaSailing.Web.Localization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddRazorPages();
+builder.Services.AddRazorPages(options => options.Conventions.Add(new LocalizedPageRouteConvention()));
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ILocalizedUrlService, LocalizedUrlService>();
 builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
@@ -14,6 +17,15 @@ if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
 }
+
+app.UseRequestLocalization(options =>
+{
+    options.SetDefaultCulture(SiteCultures.Default);
+    options.AddSupportedCultures([.. SiteCultures.Supported]);
+    options.AddSupportedUICultures([.. SiteCultures.Supported]);
+    options.RequestCultureProviders.Clear();
+    options.RequestCultureProviders.Add(new UrlPrefixRequestCultureProvider());
+});
 
 app.UseRouting();
 
