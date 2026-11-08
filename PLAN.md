@@ -30,7 +30,7 @@ Phases are the build order; the whole site goes live once, after all phases are 
 - [ ] EF Core + SQLite: `AppDbContext`, `BaseEntity` timestamps, WAL mode, migrations applied at startup
 - [ ] Localization: routing (`el` unprefixed, `en` under `/en/`), request culture, helper for the other-language URL
 - [ ] Hangfire with `Hangfire.Storage.SQLite` (`hangfire.db`)
-- [ ] `/health` endpoint
+- [ ] `/health` endpoint: DB + Greek home content, Hangfire storage, media folder writable, home page GET (see `docs/architecture.md` → Health Check)
 - [ ] `Dockerfile` (multi-stage, pinned base images, non-root)
 
 ## Phase 2 — Admin Authentication
@@ -81,7 +81,8 @@ Phases are the build order; the whole site goes live once, after all phases are 
 
 ## Phase 8 — Production
 
-- [ ] `deploy/docker-compose.yml`, `deploy/nginx/` site config
+- [ ] `deploy/docker-compose.yml`, `deploy/nginx/` site config (incl. `/health` denied externally)
+- [ ] nginx maintenance mode: `/var/saronida/maintenance.on` → 503 + `deploy/nginx/maintenance.html`
 - [ ] `deploy/deploy.ps1`
 - [ ] Nightly `VACUUM INTO` backup job
 - [ ] Droplet setup: hardening, swap, Docker, nginx, certbot, firewall

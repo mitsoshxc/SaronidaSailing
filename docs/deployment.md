@@ -2,6 +2,18 @@
 
 Status: **agreed design, not yet implemented.** Scripts and configs land in the Production phase of `PLAN.md`.
 
+## Quick Actions (run on the droplet)
+
+| Need | Command |
+|---|---|
+| **Take the site offline (maintenance mode ON)** | `touch /var/saronida/maintenance.on` |
+| **Bring the site back (maintenance mode OFF)** | `rm /var/saronida/maintenance.on` |
+| Check app health | `curl -i http://127.0.0.1:5000/health` |
+| Restart the app | `cd /opt/saronida && docker compose restart` |
+| App logs | `cd /opt/saronida && docker compose logs --tail 200 -f` |
+
+Maintenance mode takes effect immediately — no restart, no deploy. Details under nginx → Maintenance Mode.
+
 ## Infrastructure
 
 | Item | Choice | Notes |
@@ -34,6 +46,14 @@ The .NET container images run as the non-root `app` user (UID 1654) and listen o
 - Everything else → `proxy_pass http://127.0.0.1:5000;` with `X-Forwarded-For` / `X-Forwarded-Proto`.
 - Real client IP: `real_ip_header CF-Connecting-IP;` plus `set_real_ip_from` for each Cloudflare IP range (published at cloudflare.com/ips; update when they change).
 - `client_max_body_size` set for image uploads.
+- `location /health` → `deny all;` from the internet (only reachable on the droplet via `127.0.0.1:5000`).
+
+### Maintenance Mode
+
+- While `/var/saronida/maintenance.on` exists, nginx answers **every public request** with **503** and a static "Back soon" page (Greek + English, no external assets), plus `Retry-After: 3600`.
+- Page source: `deploy/nginx/maintenance.html`, installed to `/var/www/saronida/maintenance.html`.
+- 503 tells search engines the outage is temporary, so rankings are not affected.
+- Independent of `/health` and the app: you can deploy and test on `127.0.0.1:5000` while maintenance mode is on.
 
 ## Server Hardening
 
@@ -50,7 +70,7 @@ PowerShell 7 (Windows, macOS, Linux). Run from the developer's PC. The droplet n
 2. `docker build --platform linux/amd64 -t saronida-web:<commit-sha> .`
 3. `docker save saronida-web:<commit-sha> | ssh deploy@<host> docker load`
 4. Over SSH: point the compose file at the new tag, `docker compose up -d`.
-5. Poll `/health`; on failure, switch back to the previous tag.
+5. Poll `/health` on the droplet (`127.0.0.1:5000`); on non-200, switch back to the previous tag.
 6. `docker image prune` on the droplet, keeping the current and previous tags; delete the temp folder locally.
 
 EF Core migrations are applied at app startup.

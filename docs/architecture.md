@@ -135,6 +135,22 @@ Linux native assets: `SkiaSharp.NativeAssets.Linux.NoDependencies` (nothing to i
 - Dashboard at `/admin/jobs`, admin-only.
 - Every job must be safe to run twice.
 
+## Health Check — `/health`
+
+Returns **200 "Healthy"** only if every check passes, otherwise **503 "Unhealthy"** (ASP.NET Core defaults). Body is the status word only — no details.
+
+| Check | How |
+|---|---|
+| App started | Endpoint answers (migrations run before the app accepts requests, so a failed migration means no answer) |
+| Content DB + seed data | At least one Greek `ContentItem` for page `home` exists (e.g. `home.hero.title`) |
+| Hangfire storage | Query against `hangfire.db` via Hangfire's storage API |
+| Media folder writable | Write and delete a temp file under `Media:RootPath` |
+| Home page renders | In-process HTTP GET `http://127.0.0.1:8080/` returns 200 |
+
+**Not checked:** Instagram (an outage there must not fail health and roll back a good deploy) and maintenance mode (handled by nginx, see `docs/deployment.md`).
+
+Reachable only from the droplet itself — nginx denies `/health` from the internet. Used by `deploy.ps1` after every deploy.
+
 ## Security
 
 | Concern | Measure |

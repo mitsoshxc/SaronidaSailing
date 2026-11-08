@@ -8,6 +8,10 @@ Languages: Greek (default, no URL prefix) and English (`/en/`). Pages and sectio
 
 Project status: **pre-code**. Docs describe the agreed design; `PLAN.md` tracks the build.
 
+## Emergency: take the site offline
+
+On the droplet: `touch /var/saronida/maintenance.on` (ON) · `rm /var/saronida/maintenance.on` (OFF). nginx serves a 503 "Back soon" page immediately. More in [`docs/deployment.md`](docs/deployment.md) → Quick Actions.
+
 ## Team — READ FIRST
 
 | Agent | Role | Color | Model |
