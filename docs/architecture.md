@@ -128,7 +128,11 @@ Linux native assets: `SkiaSharp.NativeAssets.Linux.NoDependencies` (nothing to i
 ## Instagram Feed
 
 - Uses the official Instagram API for Business/Creator accounts (the old Basic Display API was shut down in December 2024). The owner's account must be Business or Creator.
-- Long-lived access token (expires after ~60 days) stored in the database.
+- **Connect Instagram** button in the admin: the owner logs in to Instagram once (OAuth); the app exchanges the code for a long-lived token (expires after ~60 days) and stores it in `IntegrationSetting`. Nobody copies tokens by hand.
+- Meta app ID in configuration; **app secret only in the environment file on the droplet**, never in the repo. Whether the app can stay in development mode (owner's account as tester, no app review) is confirmed when creating the app.
+- **Number of posts shown: set by the admin** (field `home.instagram.post-count`, 1–12, default 6 — the design shows 6). The fetch job always stores the latest 12, so changing the number needs no refetch.
+- Video posts and reels show their cover image; carousels show the first photo. Every tile links to the post on Instagram.
+- **Disconnected warning:** if the token refresh fails or the token has expired, the admin toolbar shows "Instagram disconnected — reconnect" (links to Connect Instagram). Visitors keep seeing the last good posts.
 - Hangfire recurring jobs: **fetch latest posts twice a day**; **refresh the token weekly**.
 - Thumbnails are downloaded and processed through the media pipeline, so the page never depends on Instagram's image URLs.
 - If a fetch fails, the last good posts stay on the page.

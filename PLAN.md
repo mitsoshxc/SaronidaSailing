@@ -73,9 +73,11 @@ Phases are the build order; the whole site goes live once, after all phases are 
 ## Phase 6 — Instagram Feed
 
 - [ ] `InstagramPost`, `IntegrationSetting` entities; Instagram API client
+- [ ] "Connect Instagram" OAuth flow (admin), long-lived token stored; app secret from droplet environment only
 - [ ] Token storage + weekly refresh job
-- [ ] Fetch job twice a day: store posts, download thumbnails through the media pipeline, evict `page:home`
-- [ ] Feed section rendering (last good posts on failure)
+- [ ] Fetch job twice a day: store latest 12 posts (cover image for video/reels, first photo for carousels), download thumbnails through the media pipeline, evict `page:home`
+- [ ] Feed section rendering: admin-set post count (1–12, default 6), last good posts on failure
+- [ ] "Instagram disconnected — reconnect" warning in the admin toolbar
 - [ ] Section switch: deactivating `home.instagram` removes the recurring jobs, activating re-registers them; startup registers them only when active
 
 ## Phase 7 — Public Pages
