@@ -40,6 +40,7 @@ Maintenance mode takes effect immediately — no restart, no deploy. Details und
 | `/var/saronida/data/hangfire.db` | Hangfire job storage |
 | `/var/saronida/data/backup/` | Nightly `VACUUM INTO` copy of the content database |
 | `/var/saronida/media/` | Generated images (bind mount → container; served directly by nginx) |
+| `/var/saronida/data/originals/` | Original uploads (private, never served; used to regenerate sizes) |
 | `/var/saronida/data/keys/` | ASP.NET Core Data Protection keys (keep admins logged in across deploys) |
 | `/var/saronida/logs/` | NLog files, 90-day retention |
 | `/usr/local/bin/saronida-admin` | Wrapper for the admin CLI commands |

@@ -65,8 +65,10 @@ Phases are the build order; the whole site goes live once, after all phases are 
 ## Phase 5 — Media
 
 - [ ] `MediaAsset` entity, `IMediaService`, storage under `Media:RootPath`
-- [ ] SkiaSharp pipeline: validate, EXIF orientation, strip metadata, widths, WebP, content-hash file names
-- [ ] `<cms-image>` tag helper (`srcset`) + editor image upload/picker
+- [ ] SkiaSharp pipeline: validate (JPEG/PNG/WebP, 25 MB, 50 MP), EXIF orientation, strip metadata, WebP 480/960/1600/2400 q~80, content-hash file names; original kept privately
+- [ ] `<cms-image>` tag helper (`srcset`, `alt-source`)
+- [ ] Image modal: upload new / choose existing (media library), required alt text pre-filled from the nearest title
+- [ ] Test an upload from a real iPhone (HEIC → JPEG conversion)
 
 ## Phase 6 — Instagram Feed
 

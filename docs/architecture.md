@@ -111,15 +111,19 @@ Cloudflare by default caches static file types (images, CSS, JS), not HTML, so H
 
 ## Media Pipeline (SkiaSharp)
 
-1. Admin uploads an image through the admin media endpoint.
-2. Validation: decode the file to confirm it is an image (not by extension); reject over the configured file size or pixel dimensions, with a clear error.
+1. Admin uploads an image from the image modal ("Upload new"), or picks a past upload ("Choose existing" — media library grid).
+2. Validation: accepted formats **JPEG, PNG, WebP**; max **25 MB** and **50 megapixels**; the file is decoded to confirm it is an image (not by extension). Rejections show a clear error. (HEIC from iPhones: expected to arrive as JPEG via the browser — to be tested on a real iPhone.)
 3. Apply the EXIF orientation (SkiaSharp does not do this automatically), then re-encode — which drops all metadata, including GPS location.
-4. Generate a fixed set of widths (e.g. 480 / 960 / 1600; never upscale) as WebP at a fixed quality.
-5. Files are written as `{slug}-{contentHash}-{width}.webp` under `Media:RootPath` (production `/var/saronida/media`).
-6. A `MediaAsset` row records the file set; image content references it.
-7. nginx serves `/media/` with `Cache-Control: public, max-age=31536000, immutable`. In development the app serves the folder via static files.
+4. Generate widths **480 / 960 / 1600 / 2400** (never upscaled) as **WebP, quality ~80**. Whatever the upload format, the public files are always WebP.
+5. Public files: `{slug}-{contentHash}-{width}.webp` under `Media:RootPath` (production `/var/saronida/media`).
+6. **The original upload is kept privately** in `/var/saronida/data/originals/` (never served by nginx — it still has GPS metadata), so all sizes can be regenerated if the design changes. Included in backups.
+7. A `MediaAsset` row records the file set; image content references it.
+8. **Alt text is required**: an image can't be saved without Greek alt text (English falls back to Greek). The modal pre-fills a **proposed alt text from the nearest title** — the template names it, e.g. `<cms-image key="home.trips.image" alt-source="title" />` uses the list item's title. The admin should refine it to describe the photo (an alt text identical to the visible title adds little for screen-reader users).
+9. nginx serves `/media/` with `Cache-Control: public, max-age=31536000, immutable`. In development the app serves the folder via static files.
 
 Linux native assets: `SkiaSharp.NativeAssets.Linux.NoDependencies` (nothing to install in the container).
+
+**Video: not at launch.** The hero uses a photo. Self-hosted video would need pre-compressed uploads (no ffmpeg on the small droplet) and a check of Cloudflare's CDN terms on serving video. Revisit with the owner later.
 
 ## Instagram Feed
 

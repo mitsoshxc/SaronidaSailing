@@ -84,6 +84,7 @@ One uploaded image and its generated files.
 | `Slug` | string | Part of the generated file names |
 | `Widths` | string | Generated widths, e.g. `480,960,1600` |
 | `Width` / `Height` | int | Dimensions after orientation fix |
+| `OriginalPath` | string | Private original under `/var/saronida/data/originals/` |
 
 Alt text is a separate `Text` content field (e.g. `home.hero.image-alt`), so it is localized.
 
