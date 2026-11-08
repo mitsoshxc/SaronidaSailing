@@ -14,7 +14,7 @@ Things we need from the owner before or during the build. Answers go next to eac
 
 ## Boat and trips
 
-8. The old site describes a **Bavaria 44**; the new design is built around a **Lagoon 500**. Which boat(s) does the business operate now?
+8. ~~Which boat(s) does the business operate now?~~ **Answered:** the Bavaria 44 is being retired; the Lagoon 500 replaces it. The new site covers only the Lagoon 500.
 9. Boat details to confirm: cabins (number and layout), max guests per trip, engines, year. The design uses Lagoon 500 factory figures.
 10. Prices: day cruise, islands trip, weekly charter, charter package, deposit, fuel.
 11. Cancellation rules per trip type.
