@@ -1,6 +1,6 @@
 # Domain Model
 
-Status: **planned, not yet implemented.** Exact uniqueness/index details are settled in the Phase 3 brief.
+Status: **`BaseEntity` is implemented (Phase 1); all other entities are planned, not yet implemented.** Exact uniqueness/index details are settled in the Phase 3 brief.
 
 ## Content Keys
 
@@ -18,7 +18,7 @@ Page key `shared` is reserved for content on every page (header, footer). Writin
 
 ## Entities
 
-All entities except `ApplicationUser` inherit `BaseEntity`: `Id` (Guid), `CreatedAt` (DateTime, UTC), `UpdatedAt` (DateTime, UTC).
+All entities except `ApplicationUser` inherit `BaseEntity` (`Core/Entities/BaseEntity.cs`, implemented): `Id` (Guid, `init`, defaults to `Guid.CreateVersion7()`), `CreatedAt` (DateTime, UTC, private setter), `UpdatedAt` (DateTime, UTC, private setter). The timestamps are stamped automatically by `AppDbContext.SaveChanges*` (`CreatedAt` and `UpdatedAt` on insert, `UpdatedAt` on update) and are never set by hand.
 
 ### ContentItem
 

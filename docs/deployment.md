@@ -1,6 +1,6 @@
 # Deployment
 
-Status: **agreed design, not yet implemented.** Scripts and configs land in the Production phase of `PLAN.md`.
+Status: **the `Dockerfile` and app configuration are implemented (Phase 1); the droplet, nginx, compose file and deploy script are agreed design, not yet built.** They land in the Preview & Production phase of `PLAN.md`.
 
 ## Quick Actions (run on the droplet)
 
@@ -46,7 +46,34 @@ Maintenance mode takes effect immediately — no restart, no deploy. Details und
 | `/usr/local/bin/saronida-admin` | Wrapper for the admin CLI commands |
 | `/etc/nginx/sites-available/saronida` | Site config (from `deploy/nginx/`) |
 
-The .NET container images run as the non-root `app` user (UID 1654) and listen on port 8080. The bind-mounted folders must be writable by UID 1654. The container port is published on loopback only: `127.0.0.1:5000:8080`.
+The .NET container images run as the non-root `app` user (UID 1654) and listen on port 8080. The bind-mounted folders (`/var/saronida/data`, `/var/saronida/media`, later `/var/saronida/logs`) **must be owned by or writable for UID 1654** (e.g. `chown -R 1654:1654`). The container port is published on loopback only: `127.0.0.1:5000:8080`.
+
+## Dockerfile
+
+Implemented (`Dockerfile`, `.dockerignore` at the repo root); the compose file is still planned.
+
+| Fact | Detail |
+|---|---|
+| Stages | `build` on `mcr.microsoft.com/dotnet/sdk:10.0.403-noble`, `final` on `mcr.microsoft.com/dotnet/aspnet:10.0.14-noble` (both pinned to exact versions) |
+| Why full Noble, not chiseled | The Greek culture needs ICU, which the chiseled images do not ship |
+| Restore layer | Root build files and the three `.csproj` files are copied first and restored, so source changes do not re-download packages. `nuget.config` is copied too, so Docker restores from nuget.org only |
+| Publish | `dotnet publish src/SaronidaSailing.Web -c Release --no-restore`; `tests/`, `docs/`, `deploy/`, the dev data folder `src/SaronidaSailing.Web/data`, `*.db*` and `*.md` are excluded by `.dockerignore` |
+| User / port | `USER $APP_UID` (1654), `EXPOSE 8080`; entrypoint `dotnet SaronidaSailing.Web.dll` |
+| No `HEALTHCHECK` | Health is checked by `deploy.ps1` against `/health` |
+| No `/var/saronida` folders in the image | They are bind mounts created and owned on the host |
+
+## Configuration
+
+Production values are in `src/SaronidaSailing.Web/appsettings.json`; environment variables (compose) override them.
+
+| Key | Production value | Notes |
+|---|---|---|
+| `ConnectionStrings:Content` | `Data Source=/var/saronida/data/saronida.db` | SQLite connection string; the folder is created at startup if missing |
+| `ConnectionStrings:Hangfire` | `/var/saronida/data/hangfire.db` | Plain file path (not a connection string) |
+| `Media:RootPath` | `/var/saronida/media` | Must exist and be writable; outside Development it is **not** created by the app, and `/health` fails if it is missing |
+| `Health:HomePageUrl` | `http://127.0.0.1:8080/` | URL the `home-page` health check requests from inside the container |
+
+A missing `ConnectionStrings:Content`, `ConnectionStrings:Hangfire` or `Media:RootPath` fails startup.
 
 ## nginx
 

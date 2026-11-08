@@ -1,6 +1,6 @@
 # Architecture
 
-Status: **agreed design, not yet implemented.** Update as phases land.
+Status: **Phases 0-1 (decisions, foundation) are implemented; everything else is agreed design, not yet built.** Update as phases land.
 
 ## Tech Stack
 
@@ -39,22 +39,41 @@ Status: **agreed design, not yet implemented.** Update as phases land.
 | Google Fonts CDN | Fonts are self-hosted (sending visitor IPs to Google was ruled a GDPR violation by a Munich court, 2022) |
 | CI/CD pipeline | Deploys run from the developer's PC (see `docs/deployment.md`) |
 
-## Solution Structure (planned)
+## Solution Structure
 
 ```
 SaronidaSailing.slnx
+global.json, Directory.Build.props, Directory.Packages.props, nuget.config
+.config/dotnet-tools.json          dotnet-ef local tool
 src/
-  SaronidaSailing.Core/            entities, interfaces, services (no EF, no ASP.NET)
-  SaronidaSailing.Infrastructure/  AppDbContext, EF configurations, migrations, repositories, media, Instagram client, jobs
-  SaronidaSailing.Web/             Razor Pages, tag helpers, admin API endpoints, wwwroot, Program.cs
+  SaronidaSailing.Core/            entities (BaseEntity), interfaces, services (no EF, no ASP.NET)
+  SaronidaSailing.Infrastructure/  Data/ (AppDbContext, DatabaseInitializer, Migrations), Health/, Media/, DependencyInjection.cs
+  SaronidaSailing.Web/             Program.cs, Localization/, Health/, Pages/, wwwroot, appsettings*.json
 tests/
-  SaronidaSailing.Tests/           xUnit, SQLite in-memory
-deploy/
-  deploy.ps1, docker-compose.yml, nginx/ (site config)
-Dockerfile
+  SaronidaSailing.Tests/           xUnit; temp-file databases (see docs/conventions.md -> Tests)
+Dockerfile, .dockerignore
+deploy/                            planned (Phase 8): deploy.ps1, docker-compose.yml, nginx/
 ```
 
 `Core` references nothing. `Infrastructure` references `Core`. `Web` references both.
+
+Root build files:
+
+| File | Purpose |
+|---|---|
+| `global.json` | SDK 10.0.100, `rollForward: latestFeature` |
+| `Directory.Build.props` | `net10.0`, nullable, implicit usings, `TreatWarningsAsErrors` for every project |
+| `Directory.Packages.props` | Central package management: every package version lives here |
+| `nuget.config` | `nuget.org` is the only source (machine-level feeds are cleared), so local and Docker restores behave the same |
+| `.config/dotnet-tools.json` | `dotnet-ef` 10.0.14 (restore with `dotnet tool restore`) |
+
+`Web` has no in-app HTTPS redirect and no HSTS: TLS ends at nginx / Cloudflare and the container only speaks HTTP on 8080.
+
+Data layer (`Infrastructure/Data/`):
+
+- `AppDbContext` stamps `CreatedAt` / `UpdatedAt` on every `SaveChanges*` from the injected `TimeProvider` (see `docs/domain-model.md` -> Entities). A convention converter makes every `DateTime` come back from SQLite as UTC.
+- `DatabaseInitializer.InitializeDatabaseAsync` runs in `Web/Program.cs` before the app accepts requests: creates the database folder, applies migrations, then sets `PRAGMA journal_mode=WAL`. The only migration so far is an empty `InitialCreate` (no entities yet).
+- Connection string `ConnectionStrings:Content`; a missing value fails startup.
 
 ## Pages (from the "Saronida Sailing Redesign" design canvas)
 
@@ -80,6 +99,9 @@ The cookie-consent banner and the footer "Cookie settings" link from the design 
 - Languages: Greek (`el`, default) and English (`en`).
 - URLs: Greek has no prefix (`/`, `/skafos`); English lives under `/en/...`. Adding a language later = a new prefix.
 - Language switcher in the header links to the same page in the other language.
+- **Routing:** `Web/Localization/SitePages.cs` is the single table of the 7 pages (key, Razor page path, Greek slug, English slug). `LocalizedPageRouteConvention` replaces each listed page's routes with exactly two: the Greek slug and `/en/{english slug}`. The default `/Index`, `/Trips` ... routes are not routable. Adding a page = a row in `SitePages` plus the Razor page.
+- **Culture:** `UrlPrefixRequestCultureProvider` is the only request-culture provider (the default cookie and `Accept-Language` providers are removed): a path starting with `/en` is English, anything else Greek. Supported cultures and the prefix are constants in `SiteCultures.cs`. The layout sets `<html lang>` from the request UI culture.
+- **URL helper:** `ILocalizedUrlService` (`LocalizedUrlService`, scoped) builds the path of a page key in a given culture (`GetPath`), finds the current page from the route (`GetCurrentPage`) and returns the current page's path in the other language (`GetAlternatePath`, for the language switcher).
 - Every page emits `<html lang>`, `hreflang` alternates and a canonical URL.
 - **Missing translation fallback:** if a field has no English value, English visitors see the Greek value. The admin sees a "missing EN" marker on that field in edit mode.
 - `sitemap.xml` lists every page in both languages with `hreflang` alternates; `robots.txt` points to it and disallows `/admin`.
@@ -185,26 +207,38 @@ Linux native assets: `SkiaSharp.NativeAssets.Linux.NoDependencies` (nothing to i
 | Instagram token refresh | Weekly |
 | Database backup copy (`VACUUM INTO`) | Nightly |
 
-- Storage: `Hangfire.Storage.SQLite` in a separate file (`hangfire.db`) so job polling never locks the content database.
-- Dashboard at `/admin/jobs`, admin-only.
+- Storage: `Hangfire.Storage.SQLite` 0.4.3 in a separate file (`hangfire.db`; `ConnectionStrings:Hangfire` is a plain file path, not a connection string) so job polling never locks the content database.
+- Server: Hangfire 1.8.25, **2 workers**, registered in `Infrastructure/DependencyInjection.cs` (`AddInfrastructure`). **Implemented so far: storage and server only** - no jobs and no dashboard yet.
+- **Known defect:** `SQLiteStorage.Dispose()` in 0.4.3 can hang or crash. Production disposes it only at process exit; the test factory therefore retries deleting its temp folder instead of relying on a clean dispose.
+- Dashboard at `/admin/jobs`, admin-only (Phase 2).
 - Every job must be safe to run twice.
 - Possible later job: delete media files never referenced by any content or history (uploads discarded before Save). Not in scope until needed.
 
 ## Health Check — `/health`
 
-Returns **200 "Healthy"** only if every check passes, otherwise **503 "Unhealthy"** (ASP.NET Core defaults). Body is the status word only — no details.
+Returns **200 "Healthy"** only if every check passes, otherwise **503 "Unhealthy"** (ASP.NET Core defaults). Body is the status word only — no details. Mapped in `Web/Program.cs`. Migrations run before the app accepts requests, so a failed migration means no answer at all.
 
-| Check | How |
-|---|---|
-| App started | Endpoint answers (migrations run before the app accepts requests, so a failed migration means no answer) |
-| Content DB + seed data | At least one Greek `ContentItem` for page `home` exists (e.g. `home.hero.title`) |
-| Hangfire storage | Query against `hangfire.db` via Hangfire's storage API |
-| Media folder writable | Write and delete a temp file under `Media:RootPath` |
-| Home page renders | In-process HTTP GET `http://127.0.0.1:8080/` returns 200 |
+| Check (name) | Where | How |
+|---|---|---|
+| `database` | `Infrastructure/Health/DatabaseHealthCheck.cs` | `CanConnectAsync` on the content database |
+| `hangfire` | `Infrastructure/Health/HangfireStorageHealthCheck.cs` | `GetMonitoringApi().GetStatistics()` against `hangfire.db` |
+| `media` | `Infrastructure/Health/MediaFolderHealthCheck.cs` | Write and delete a temp file under `Media:RootPath` |
+| `home-page` | `Web/Health/HomePageHealthCheck.cs` | GET of `Health:HomePageUrl` through a named `HttpClient` (5 s timeout, redirects not followed); must return exactly 200 |
+
+**Planned, Phase 7:** a fifth check, "at least one Greek `ContentItem` for page `home` exists (e.g. `home.hero.title`)". It needs the seed data, so it is deferred (recorded in `PLAN.md`).
+
+Configuration keys:
+
+| Key | Production (`appsettings.json`) | Development |
+|---|---|---|
+| `Health:HomePageUrl` | `http://127.0.0.1:8080/` (the container's own port) | `http://localhost:5132/` |
+| `Media:RootPath` | `/var/saronida/media` | `data/media` |
+
+The media folder is created at startup **only in Development** (`MediaFolder.EnsureExists` in `Web/Program.cs`). Elsewhere it is a bind mount, and a missing or unwritable folder must fail `/health` rather than be silently created inside the container.
 
 **Not checked:** Instagram (an outage there must not fail health and roll back a good deploy) and maintenance mode (handled by nginx, see `docs/deployment.md`).
 
-Reachable only from the droplet itself — nginx denies `/health` from the internet. Used by `deploy.ps1` after every deploy.
+Reachable only from the droplet itself — nginx denies `/health` from the internet (nginx config planned, Phase 8). Used by `deploy.ps1` after every deploy.
 
 ## Admin Accounts
 

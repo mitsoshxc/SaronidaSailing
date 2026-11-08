@@ -4,6 +4,17 @@ These rules apply to every file in the codebase. The Dev agent enforces them on 
 
 ---
 
+## Build
+
+| Rule | Detail |
+|---|---|
+| Package versions live only in `Directory.Packages.props` | Central package management: `<PackageReference>` in a `.csproj` has no `Version`. |
+| Warnings are errors | `TreatWarningsAsErrors` is set for every project in `Directory.Build.props`; fix the warning, do not suppress it. |
+| `nuget.config` keeps `nuget.org` as the only source | Machine-level feeds are cleared so restores are the same locally and in Docker. |
+| Shared settings (`net10.0`, nullable, implicit usings) live in `Directory.Build.props` | Not repeated in project files. |
+
+---
+
 ## Layering
 
 | Rule | Detail |
@@ -53,11 +64,13 @@ The database must stay swappable (Postgres / SQL Server) with only a provider an
 
 | Rule | Reason |
 |---|---|
-| LINQ only — no raw SQL, no SQLite-specific functions | Provider portability |
+| LINQ only — no raw SQL, no SQLite-specific functions. **Single exception:** the startup `PRAGMA journal_mode=WAL` in `Infrastructure/Data/DatabaseInitializer.cs` | Provider portability |
 | Money (if ever needed) as `long` cents, or display-only | SQLite provider can't compare/order `decimal` in queries |
 | Dates as `DateTime`, always UTC — not `DateTimeOffset` | SQLite provider has limited `DateTimeOffset` query support |
 | Migrations are provider-specific | A provider switch means a fresh initial migration |
-| Enable WAL mode at startup (`PRAGMA journal_mode=WAL`) | Concurrent readers while the admin writes |
+| Enable WAL mode at startup (`PRAGMA journal_mode=WAL`, done by `DatabaseInitializer` after migrations) | Concurrent readers while the admin writes |
+| `CreatedAt` / `UpdatedAt` are stamped by `AppDbContext.SaveChanges*` from `TimeProvider` — never set by hand, never read `DateTime.UtcNow` for them | One clock, testable with a fake `TimeProvider`; the setters on `BaseEntity` are private |
+| Every `DateTime` is read back as UTC by a convention converter in `AppDbContext` | SQLite stores no time zone or `Kind` |
 | Backups via `VACUUM INTO`, never a raw file copy while running | Avoid corrupt copies |
 
 ---
@@ -75,6 +88,15 @@ The database must stay swappable (Postgres / SQL Server) with only a provider an
 - NLog only. Audit events (logins, admin actions, content changes) go to the audit logger; warnings/errors to the app log.
 - Never log passwords, 2FA codes, recovery codes, tokens or cookies.
 - Logs go to files, never to the database.
+
+---
+
+## Tests
+
+- xUnit in `tests/SaronidaSailing.Tests/`.
+- Tests that need the web host use `TempDatabaseWebApplicationFactory`: a temp folder per factory holding the content database, `hangfire.db` and the media folder, plus the home-page health client routed to the in-memory test server. The folder is deleted on dispose (the delete is retried because Hangfire's SQLite storage releases its file late).
+- Every test class that uses the factory is marked `[Collection(WebHostCollection.Name)]`. Hangfire's `JobStorage.Current` is static, so web-host tests must not run in parallel.
+- Tests that only need the `DbContext` (e.g. `BaseEntityTimestampTests`) use a plain SQLite in-memory connection and a fake `TimeProvider`.
 
 ---
 
