@@ -55,11 +55,15 @@ Dockerfile
 | Page | Greek URL | English URL | Sections |
 |---|---|---|---|
 | Home | `/` | `/en/` | Hero · At a glance · Trips teaser · Boat teaser · Why with a skipper · Instagram feed · Departure point |
-| Trips | `/ekdromes` (slug TBD) | `/en/trips` | Intro · 3 trip tabs (day cruise / islands / weekly charter) · Useful info · Booking box (links to booking platforms) |
-| Boat | `/skafos` (slug TBD) | `/en/boat` | Gallery · Intro · Specs · Life on board · Included · Charter details |
-| Contact | `/epikoinonia` (slug TBD) | `/en/contact` | Contact tiles · Google Map (after consent; static image otherwise) + directions · Useful details · Call to action |
-| Terms, Privacy, Accessibility | slugs TBD | slugs TBD | Rich-text sections |
+| Trips | `/ekdromes` | `/en/trips` | Intro · 3 trip tabs (day cruise / islands / weekly charter) · Useful info · Booking box (links to booking platforms) |
+| Boat | `/skafos` | `/en/boat` | Gallery · Intro · Specs · Life on board · Included · Charter details |
+| Contact | `/epikoinonia` | `/en/contact` | Contact tiles · Google Map (after consent; static image otherwise) + directions · Useful details · Call to action |
+| Terms | `/oroi` | `/en/terms` | Rich-text sections |
+| Privacy | `/aporrito` | `/en/privacy` | Rich-text sections |
+| Accessibility | `/prosvasimotita` | `/en/accessibility` | Rich-text sections |
 | Shared | — | — | Header (logo, menu, language switch, Book button) · Footer |
+
+Greek slugs are Latin transliterations (Greek letters get percent-encoded when URLs are shared). Slugs are **fixed in code**, not admin-editable — changing a URL later hurts search rankings.
 
 The cookie-consent banner and the footer "Cookie settings" link from the design **are built** (needed for the Google Map — see Cookies & Privacy). The banner's "Statistics" category is dropped.
 
@@ -71,6 +75,32 @@ The cookie-consent banner and the footer "Cookie settings" link from the design 
 - Every page emits `<html lang>`, `hreflang` alternates and a canonical URL.
 - **Missing translation fallback:** if a field has no English value, English visitors see the Greek value. The admin sees a "missing EN" marker on that field in edit mode.
 - `sitemap.xml` lists every page in both languages with `hreflang` alternates; `robots.txt` points to it and disallows `/admin`.
+
+## SEO
+
+- `<title>`, meta description, Open Graph tags per page and language from `{page}.seo.*`; canonical URL and `hreflang` alternates on every page.
+- `sitemap.xml` (both languages, `hreflang` alternates) and `robots.txt`.
+- **Structured data:** JSON-LD `LocalBusiness` on every page, built from existing content (business name, phones, email, address, season, Instagram link) — the admin keeps it current by editing the normal content.
+- **Old-site redirects (301).** The old site (Joomla, crawled 2026-11-08) serves the same pages on `saronidasailing.gr` and `www.saronidasailing.gr` under `/index.php/{el|en}/...`. Since the domain moves to the new server, the app maps old paths (any host, any query string) with a redirect table in middleware, early in the pipeline:
+
+| Old path | New |
+|---|---|
+| `/index.php/el/`, `/index.php` | `/` |
+| `/index.php/en/` | `/en/` |
+| `/index.php/el/yacht-charter-gr`, `/index.php/el/daily-excursions-gr` | `/ekdromes` |
+| `/index.php/en/yacht-charter`, `/index.php/en/daily-excursions` | `/en/trips` |
+| `/index.php/el/sailing-yacht-2` | `/skafos` |
+| `/index.php/en/sailing-yacht` | `/en/boat` |
+| `/index.php/el/contacts-gr` (incl. `?format=vcf`) | `/epikoinonia` |
+| `/index.php/en/contacts` (incl. `?format=vcf`) | `/en/contact` |
+| `/index.php/el/privacy-policy` (contains the charter terms) | `/oroi` |
+| `/index.php/en/privacy-policy` | `/en/terms` |
+| `/index.php/el/friends-gr` | `/` |
+| `/index.php/en/friends-en` | `/en/` |
+| `/index.php/{el,en}/component/users/...` (Joomla login/registration) | **410 Gone** |
+| any other `/index.php/el/...` / `/index.php/en/...` | `/` / `/en/` |
+
+- **One canonical host**; the other host 301-redirects to it (nginx). Choice: see Open Items.
 
 ## Request Flow
 
@@ -251,4 +281,5 @@ Target **WCAG 2.2 AA** (per the design notes): real buttons/links, keyboard focu
 - Photos / video
 - English texts
 - Legal texts reviewed (ideally by a lawyer) before go-live
-- Greek URL slugs
+- Canonical host: `saronidasailing.gr` or `www.saronidasailing.gr`
+- English texts: Claude drafts translations of the seed content; owner reviews
