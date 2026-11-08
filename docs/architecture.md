@@ -100,11 +100,14 @@ Cloudflare by default caches static file types (images, CSS, JS), not HTML, so H
 1. Razor templates mark editable spots with tag helpers: `<cms key="home.hero.title" />` (text / rich text), `<cms-link key="..." />` (URL + label), `<cms-image key="..." />`, and `<cms-list key="home.highlights">` for repeating blocks.
 2. For visitors, tag helpers render stored values only; inactive list items and inactive sections are not rendered.
 3. When the admin is signed in, they also render `data-cms-*` attributes, inactive list items are shown dimmed, and the layout loads `wwwroot/js/cms-edit.js`.
-4. `cms-edit.js` provides: inline text editing, a modal for rich text / links / images, for lists: add, delete, drag-to-reorder, active/inactive toggle; and an active/inactive toggle per section. Menu links to an inactive section are hidden too. It saves through admin-only minimal API endpoints with antiforgery tokens.
-5. Save → write content + append history → evict the page's output-cache tag.
-6. Rich-text HTML is sanitized server-side (HtmlSanitizer library) before storage.
-7. **Edit history is kept forever** (every previous value in `ContentHistory`); undo restores any earlier version.
-8. **Page settings panel** (edit mode): per page and language, the SEO fields `{page}.seo.title` (browser tab / search result title), `{page}.seo.description` (search result snippet) and `{page}.seo.image` (link-preview image for Facebook, WhatsApp, etc. via Open Graph tags).
+4. **Admin toolbar** (top of the page): Edit mode on/off (off = see the page exactly as a visitor), **Save page**, Discard, unsaved-changes counter, Page settings, language switch, jobs dashboard link, logout.
+5. `cms-edit.js` provides: inline text editing; **modals** (native `<dialog>`) for rich text, links, images, history and Page settings; for lists: add, delete (with confirmation), drag-to-reorder (SortableJS, self-hosted) **plus up/down buttons** (keyboard and phone), active/inactive toggle; an active/inactive toggle per section. Menu links to an inactive section are hidden too.
+6. **One save per page:** every change (fields, list operations, section toggles) is kept in the browser as pending until the admin clicks **Save page**. Save sends all pending changes in **one request**, written in **one database transaction**, followed by **one** cache eviction. The page warns before navigating away with unsaved changes. Save publishes immediately (no draft/publish workflow) — history makes every change undoable. Only changed fields are sent, so two admins editing different fields of a page don't overwrite each other; the same field: last save wins.
+7. Image files are uploaded and processed when chosen (the file must be processed anyway); assigning the image to the field is a pending change like any other.
+8. Save → write content + append history → evict the page's output-cache tag (`pages:all` if shared content changed).
+9. Rich-text HTML is sanitized server-side (HtmlSanitizer library) before storage. Allowed formatting: bold, italic, links, bullet and numbered lists, subheadings. Editor library: **open decision** (Quill / Trix / TinyMCE — TinyMCE's license must be checked first).
+10. **Edit history is kept forever** (every previous value in `ContentHistory`); a field's History modal restores any earlier version (as a pending change, saved with Save page).
+11. **Page settings modal**: per page and language, the SEO fields `{page}.seo.title` (browser tab / search result title), `{page}.seo.description` (search result snippet) and `{page}.seo.image` (link-preview image for Facebook, WhatsApp, etc. via Open Graph tags).
 
 ## Media Pipeline (SkiaSharp)
 
@@ -138,6 +141,7 @@ Linux native assets: `SkiaSharp.NativeAssets.Linux.NoDependencies` (nothing to i
 - Storage: `Hangfire.Storage.SQLite` in a separate file (`hangfire.db`) so job polling never locks the content database.
 - Dashboard at `/admin/jobs`, admin-only.
 - Every job must be safe to run twice.
+- Possible later job: delete media files never referenced by any content or history (uploads discarded before Save). Not in scope until needed.
 
 ## Health Check — `/health`
 
@@ -223,6 +227,10 @@ The site embeds a **Google Map** (boat location), which sends visitor data to Go
 - Map location is admin-editable: an embed URL, accepted only if it starts with `https://www.google.com/maps/embed`. The basic embed is free and needs no API key.
 
 The Privacy page must cover Cloudflare (hosting/CDN, analytics), Google Maps, and the server logs. Owner/lawyer review before go-live. Any new third-party embed or tracker needs its own consent category.
+
+## Admin Devices
+
+Edit mode is designed for **laptop/desktop**. On phones it must work for quick text fixes: toolbar collapses, modals go full-screen, up/down buttons instead of dragging.
 
 ## Accessibility
 

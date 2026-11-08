@@ -52,12 +52,15 @@ Phases are the build order; the whole site goes live once, after all phases are 
 
 ## Phase 4 — Inline Editing
 
-- [ ] Admin rendering: `data-cms-*` attributes, dimmed inactive items, `cms-edit.js`
-- [ ] Admin content API: fields (text / rich text / link) with antiforgery, HtmlSanitizer, link URL validation
-- [ ] List editing: add, delete, drag-to-reorder, active/inactive toggle
+- [ ] Admin rendering: `data-cms-*` attributes, dimmed inactive items, admin toolbar (edit mode on/off, Save page, Discard, unsaved counter, logout)
+- [ ] Pending-changes model in `cms-edit.js` + unsaved-changes warning
+- [ ] Save-page API: all pending changes in one request, one transaction, one cache eviction; antiforgery, HtmlSanitizer, link URL validation
+- [ ] Modals (`<dialog>`): rich text (editor library TBD), link, history, Page settings
+- [ ] List editing: add, delete, drag-to-reorder (SortableJS) + up/down buttons, active/inactive toggle
 - [ ] Section active/inactive toggle (hides section and its menu links)
 - [ ] Undo from `ContentHistory`
-- [ ] "Missing EN" markers; Page settings panel for `{page}.seo.*`
+- [ ] "Missing EN" markers; Page settings modal for `{page}.seo.*`
+- [ ] Phone layout for quick fixes (collapsed toolbar, full-screen modals)
 
 ## Phase 5 — Media
 
