@@ -18,8 +18,8 @@ Phases are the build order; the whole site goes live once, after all phases are 
 - [x] Backups: DO weekly backups (FRA1) + nightly `VACUUM INTO`
 - [x] Deploys: build on the developer's PC, `docker save | ssh docker load`
 - [x] Pages and sections: the "Saronida Sailing Redesign" design canvas
-- [x] Repeating blocks: editable lists (add / delete / reorder / active-inactive)
-- [x] Analytics: Cloudflare Web Analytics; no cookie banner
+- [x] Repeating blocks: editable lists (add / delete / reorder / active-inactive); sections can be deactivated too
+- [x] Analytics: Cloudflare Web Analytics; no cookie banner (no non-essential cookies or third-party embeds for visitors)
 - [x] Instagram feed included at launch; fetch twice a day
 - [x] Background jobs: Hangfire with SQLite storage
 
@@ -41,8 +41,8 @@ Phases are the build order; the whole site goes live once, after all phases are 
 
 ## Phase 3 — CMS Core
 
-- [ ] Entities + configurations + repositories: `ContentItem`, `ContentListItem`, `ContentHistory`
-- [ ] `IContentService`: read by key + locale, save field with history, list operations (add / delete / reorder / activate)
+- [ ] Entities + configurations + repositories: `ContentItem`, `ContentListItem`, `ContentSection`, `ContentHistory`
+- [ ] `IContentService`: read by key + locale, save field with history, list operations (add / delete / reorder / activate), section activate/deactivate
 - [ ] Tag helpers: `<cms>`, `<cms-link>`, `<cms-list>` (visitor rendering)
 - [ ] Output cache policy `CmsPage` (1h) + tag eviction on every write
 
@@ -51,6 +51,7 @@ Phases are the build order; the whole site goes live once, after all phases are 
 - [ ] Admin rendering: `data-cms-*` attributes, dimmed inactive items, `cms-edit.js`
 - [ ] Admin content API: fields (text / rich text / link) with antiforgery, HtmlSanitizer, link URL validation
 - [ ] List editing: add, delete, drag-to-reorder, active/inactive toggle
+- [ ] Section active/inactive toggle (hides section and its menu links)
 - [ ] Undo from `ContentHistory`
 
 ## Phase 5 — Media
@@ -65,6 +66,7 @@ Phases are the build order; the whole site goes live once, after all phases are 
 - [ ] Token storage + weekly refresh job
 - [ ] Fetch job twice a day: store posts, download thumbnails through the media pipeline, evict `page:home`
 - [ ] Feed section rendering (last good posts on failure)
+- [ ] Section switch: deactivating `home.instagram` removes the recurring jobs, activating re-registers them; startup registers them only when active
 
 ## Phase 7 — Public Pages
 

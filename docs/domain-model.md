@@ -49,6 +49,18 @@ One entry of a repeating block (a highlight, a trip card, a gallery photo...). I
 
 Deleting a list item deletes its `ContentItem` rows.
 
+### ContentSection
+
+Visibility of a whole page section (e.g. hide the Instagram section).
+
+| Field | Type | Notes |
+|---|---|---|
+| `PageKey` | string | |
+| `SectionKey` | string | Unique together with `PageKey` |
+| `IsActive` | bool | Inactive sections are hidden from visitors (and their menu links), shown dimmed to the admin |
+
+Toggling `home.instagram` also removes / re-registers the Instagram recurring jobs (see `docs/architecture.md` → Instagram Feed).
+
 ### ContentHistory
 
 Append-only log of previous values, used for undo.

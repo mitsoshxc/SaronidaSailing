@@ -82,6 +82,8 @@ The database must stay swappable (Postgres / SQL Server) with only a provider an
 
 - Every admin-editable value is rendered through `<cms>`, `<cms-link>`, `<cms-image>` or `<cms-list>`. Never hardcode content the admin is meant to edit.
 - Repeating blocks are always `<cms-list>`; visitors never see inactive items.
+- Every page section is wrapped so it can be deactivated; visitors never see inactive sections or menu links pointing to them.
+- No third-party embeds, trackers or cookies for visitors (see `docs/architecture.md` → Cookies & Privacy). Anything that would need consent is a tech-lead decision.
 - Never render `RichText` values that did not pass the sanitizer.
 - Link URLs allowed: `https:`, `tel:`, `mailto:` only. Links to external sites (booking platforms) open in a new tab and say so.
 - Admin-only markup (`data-cms-*`, edit script, inactive items) is emitted only for the authenticated admin.

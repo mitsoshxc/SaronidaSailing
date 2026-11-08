@@ -29,7 +29,7 @@ Status: **agreed design, not yet implemented.** Update as phases land.
 | DigitalOcean Spaces | Paid; local disk + Cloudflare is enough |
 | Own booking system | Bookings happen on external platforms; the site links out |
 | Contact form / email provider | Contact page has no form (phone, email link, Instagram DM) |
-| Cookie banner | Not needed: no cookies besides the admin login and language, cookieless analytics, static map image instead of an embedded Google map |
+| Cookie banner | Not needed — visitors get no non-essential cookies (see Cookies & Privacy) |
 | Google Fonts CDN | Fonts are self-hosted (sending visitor IPs to Google was ruled a GDPR violation by a Munich court, 2022) |
 | CI/CD pipeline | Deploys run from the developer's PC (see `docs/deployment.md`) |
 
@@ -97,9 +97,9 @@ Cloudflare by default caches static file types (images, CSS, JS), not HTML, so H
 ## CMS Editing Flow
 
 1. Razor templates mark editable spots with tag helpers: `<cms key="home.hero.title" />` (text / rich text), `<cms-link key="..." />` (URL + label), `<cms-image key="..." />`, and `<cms-list key="home.highlights">` for repeating blocks.
-2. For visitors, tag helpers render stored values only; inactive list items are not rendered.
+2. For visitors, tag helpers render stored values only; inactive list items and inactive sections are not rendered.
 3. When the admin is signed in, they also render `data-cms-*` attributes, inactive list items are shown dimmed, and the layout loads `wwwroot/js/cms-edit.js`.
-4. `cms-edit.js` provides: inline text editing, a modal for rich text / links / images, and for lists: add, delete, drag-to-reorder, active/inactive toggle. It saves through admin-only minimal API endpoints with antiforgery tokens.
+4. `cms-edit.js` provides: inline text editing, a modal for rich text / links / images, for lists: add, delete, drag-to-reorder, active/inactive toggle; and an active/inactive toggle per section. Menu links to an inactive section are hidden too. It saves through admin-only minimal API endpoints with antiforgery tokens.
 5. Save → write content + append history → evict the page's output-cache tag.
 6. Rich-text HTML is sanitized server-side (HtmlSanitizer library) before storage.
 
@@ -122,6 +122,7 @@ Linux native assets: `SkiaSharp.NativeAssets.Linux.NoDependencies` (nothing to i
 - Hangfire recurring jobs: **fetch latest posts twice a day**; **refresh the token weekly**.
 - Thumbnails are downloaded and processed through the media pipeline, so the page never depends on Instagram's image URLs.
 - If a fetch fails, the last good posts stay on the page.
+- **Section switch:** deactivating the `home.instagram` section removes both recurring jobs (`RecurringJob.RemoveIfExists`); activating it registers them again. At startup the jobs are registered **only if the section is active**, so a restart never brings them back while the section is off.
 
 ## Background Jobs (Hangfire)
 
@@ -145,6 +146,22 @@ Linux native assets: `SkiaSharp.NativeAssets.Linux.NoDependencies` (nothing to i
 | XSS | Razor encoding by default; rich text sanitized with HtmlSanitizer before storage; link URLs restricted to `https:`, `tel:`, `mailto:` |
 | Transport | Cloudflare SSL mode **Full (strict)**; Let's Encrypt cert on the origin |
 | Uploads | Admin-only; validated by decoding; size limits |
+
+## Cookies & Privacy
+
+Consent is required (EU ePrivacy rules, Greek Law 3471/2006) only for cookies/storage that are not strictly necessary. The site avoids all of them, so no banner:
+
+| Item | Why it needs no consent |
+|---|---|
+| Language | Chosen by URL (`/` vs `/en/`), no cookie |
+| Admin login + antiforgery cookies | Strictly necessary; only the admin gets them |
+| Cloudflare Web Analytics | Cookieless |
+| Cloudflare security cookies (e.g. `__cf_bm`, when set) | Classified by Cloudflare as strictly necessary |
+| Instagram feed | Thumbnails served from our server; no Instagram embed |
+| Map | Static image stored on our server; no Google Maps embed or API call from the browser |
+| Fonts, hero video | Self-hosted; no YouTube/Vimeo embeds |
+
+Adding any third-party embed, analytics with cookies, or marketing pixels **requires bringing back the consent banner** (the design canvas has one ready). The Privacy page is still required (GDPR information duties) and must mention Cloudflare (hosting/CDN/analytics) and the server logs; owner/lawyer review before go-live.
 
 ## Accessibility
 
