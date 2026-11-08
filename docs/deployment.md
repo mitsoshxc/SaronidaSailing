@@ -74,11 +74,18 @@ The .NET container images run as the non-root `app` user (UID 1654) and listen o
 - 503 tells search engines the outage is temporary, so rankings are not affected.
 - Independent of `/health` and the app: you can deploy and test on `127.0.0.1:5000` while maintenance mode is on.
 
+## Security Headers (nginx)
+
+- `Content-Security-Policy`: own origin only, plus `frame-src https://www.google.com` for the Maps embed (after consent). No other third-party sources.
+- `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `frame-ancestors 'self'` (in the CSP) so other sites can't frame ours.
+- `Strict-Transport-Security`: enabled **after launch is verified**, starting with a short `max-age` (e.g. 1 day), raised step by step (to 6–12 months). No preload list for now.
+
 ## Server Hardening
 
 - SSH key login only; password login and root login disabled.
 - A dedicated `deploy` user in the `docker` group. Membership in `docker` is effectively root — protect that SSH key accordingly.
 - Firewall: only 22, 80, 443 open.
+- Automatic security updates (`unattended-upgrades`), with an automatic reboot at night when an update requires one. The container uses `restart: unless-stopped`, so the site comes back on its own.
 - Base images pinned to exact versions in the `Dockerfile`.
 
 ## Deploy Script — `deploy/deploy.ps1`
@@ -95,6 +102,19 @@ PowerShell 7 (Windows, macOS, Linux). Run from the developer's PC. The droplet n
 EF Core migrations are applied at app startup. After the very first deploy, create the first admin with `saronida-admin add <email>`.
 
 The compose file caps Docker's container console log (json-file `max-size` / `max-file`).
+
+## Monitoring
+
+- **UptimeRobot** (free) checks `https://www.saronidasailing.gr/` every few minutes and emails the developer if it goes down.
+
+## Go-Live (switchover)
+
+1. Deploy to the droplet and test everything **before** touching DNS: on the developer's PC, a hosts-file entry points `www.saronidasailing.gr` (and the no-www name) to the droplet's IP. Certificates at this stage: issue them right after DNS points to the droplet, or test over HTTP/self-signed until then.
+2. Copy **every** existing DNS record (MX, SPF, DKIM, verification records, subdomains) into Cloudflare — see `OWNER-QUESTIONS.md` 1–4.
+3. A day before: lower the DNS TTL.
+4. Switch: point DNS to the droplet (via Cloudflare), issue the Let's Encrypt certificate, check pages, redirects (old URLs, http, no-www), admin login, Instagram, map, backups.
+5. Keep the old site running a few days as a fallback, then cancel it.
+6. Submit the new `sitemap.xml` in Google Search Console / Bing Webmaster Tools; enable HSTS once everything is verified.
 
 ## Backups
 

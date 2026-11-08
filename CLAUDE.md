@@ -57,3 +57,4 @@ On the droplet: `touch /var/saronida/maintenance.on` (ON) · `rm /var/saronida/m
 | [`docs/conventions.md`](docs/conventions.md) | Layering, naming, EF Core / SQLite portability rules, caching rules, views, CSS, JS |
 | [`docs/deployment.md`](docs/deployment.md) | Production infrastructure: droplet, Docker, nginx, Let's Encrypt, Cloudflare, deploy script, backups |
 | [`docs/workflow.md`](docs/workflow.md) | Team structure, mandatory step sequence, skills, branch strategy, doc cadence |
+| [`OWNER-QUESTIONS.md`](OWNER-QUESTIONS.md) | Open questions for the business owner (domain, prices, photos, legal, Instagram) |

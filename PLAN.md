@@ -104,3 +104,7 @@ Phases are the build order; the whole site goes live once, after all phases are 
 - [ ] Cloudflare: DNS (apex + www, proxied), Full (strict) SSL, Always Use HTTPS, Web Analytics
 - [ ] Canonical redirects: http → https and no-www → `https://www.saronidasailing.gr` in one hop (nginx); certificate for both names
 - [ ] Enable DO weekly backups
+- [ ] Security headers (CSP incl. Google Maps frame, nosniff, Referrer-Policy, frame-ancestors); HSTS after launch, short max-age first
+- [ ] `unattended-upgrades` with nightly auto-reboot; container `restart: unless-stopped`
+- [ ] UptimeRobot monitor (alerts to the developer's email)
+- [ ] Go-live: test via hosts file → copy all DNS records to Cloudflare → lower TTL → switch → verify → keep old site a few days → submit sitemap

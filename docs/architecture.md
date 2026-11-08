@@ -276,6 +276,9 @@ Target **WCAG 2.2 AA** (per the design notes): real buttons/links, keyboard focu
 
 ## Open Items (owner-provided, not blocking development)
 
+Full list to send the owner: [`OWNER-QUESTIONS.md`](../OWNER-QUESTIONS.md).
+
+
 - Booking platform names and URLs
 - Prices, max guests, cabins, email, contact hours, season
 - Photos / video
