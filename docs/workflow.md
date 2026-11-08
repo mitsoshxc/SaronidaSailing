@@ -48,6 +48,10 @@ Status legend: `[ ]` not started · `[x]` complete · `[~]` in progress.
 
 ---
 
+## Cloud Sessions
+
+Claude Code cloud sessions for this repo use the personal environment **"SaronidaSailing"**: Default network rules plus `saronidasailing.gr` / `www.saronidasailing.gr` (the old site, used for the redirect map).
+
 ## Branch Strategy
 
 Work is committed to `main`. Feature branches are not used at this stage. Deployment is manual via `deploy/deploy.ps1` (see `docs/deployment.md`).

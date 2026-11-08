@@ -52,6 +52,8 @@ Dockerfile
 
 ## Pages (from the "Saronida Sailing Redesign" design canvas)
 
+Canvas: https://claude.ai/artifact/RcU5iMfQSTJ34rH5gFB7MC
+
 | Page | Greek URL | English URL | Sections |
 |---|---|---|---|
 | Home | `/` | `/en/` | Hero · At a glance · Trips teaser · Boat teaser · Why with a skipper · Instagram feed · Departure point |

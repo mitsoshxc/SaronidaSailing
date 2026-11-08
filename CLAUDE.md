@@ -4,7 +4,7 @@ Public website for a sailing business in Saronida, Greece, with a custom built-i
 
 Stack: ASP.NET Core 10 Razor Pages · Entity Framework Core 10 · SQLite · ASP.NET Core Identity · Output Caching · Hangfire (SQLite storage) · SkiaSharp · Docker · nginx · DigitalOcean · Cloudflare (Free)
 
-Languages: Greek (default, no URL prefix) and English (`/en/`). Pages and sections come from the "Saronida Sailing Redesign" design canvas.
+Languages: Greek (default, no URL prefix) and English (`/en/`). Pages and sections come from the "Saronida Sailing Redesign" design canvas: https://claude.ai/artifact/RcU5iMfQSTJ34rH5gFB7MC (read it with the Artifact tool; desktop artboards `Desktop*.dc.html` hold the full layouts, the canvas notes hold design decisions).
 
 Project status: **pre-code**. Docs describe the agreed design; `PLAN.md` tracks the build.
 
