@@ -1,3 +1,5 @@
+using Hangfire;
+using Hangfire.Storage.SQLite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,8 +18,22 @@ public static class DependencyInjection
             throw new InvalidOperationException("Connection string 'ConnectionStrings:Content' is not configured.");
         }
 
+        var hangfirePath = configuration.GetConnectionString("Hangfire");
+        if (string.IsNullOrWhiteSpace(hangfirePath))
+        {
+            throw new InvalidOperationException("Connection string 'ConnectionStrings:Hangfire' is not configured.");
+        }
+
         services.TryAddSingleton(TimeProvider.System);
         services.AddDbContext<AppDbContext>(options => options.UseSqlite(connectionString));
+
+        DatabaseDirectory.EnsureExistsForFile(hangfirePath);
+        services.AddHangfire(config => config
+            .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+            .UseSimpleAssemblyNameTypeSerializer()
+            .UseRecommendedSerializerSettings()
+            .UseSQLiteStorage(hangfirePath));
+        services.AddHangfireServer(options => options.WorkerCount = 2);
 
         return services;
     }

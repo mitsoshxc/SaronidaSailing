@@ -14,7 +14,11 @@ public static class DatabaseInitializer
 
         if (isSqlite)
         {
-            EnsureDatabaseDirectory(db.Database.GetConnectionString());
+            var connectionString = db.Database.GetConnectionString();
+            if (!string.IsNullOrWhiteSpace(connectionString))
+            {
+                DatabaseDirectory.EnsureExistsForFile(new SqliteConnectionStringBuilder(connectionString).DataSource);
+            }
         }
 
         await db.Database.MigrateAsync();
@@ -22,28 +26,6 @@ public static class DatabaseInitializer
         if (isSqlite)
         {
             await db.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;");
-        }
-    }
-
-    private static void EnsureDatabaseDirectory(string? connectionString)
-    {
-        if (string.IsNullOrWhiteSpace(connectionString))
-        {
-            return;
-        }
-
-        var dataSource = new SqliteConnectionStringBuilder(connectionString).DataSource;
-        if (string.IsNullOrWhiteSpace(dataSource)
-            || dataSource == ":memory:"
-            || dataSource.StartsWith("file:", StringComparison.OrdinalIgnoreCase))
-        {
-            return;
-        }
-
-        var directory = Path.GetDirectoryName(Path.GetFullPath(dataSource));
-        if (!string.IsNullOrEmpty(directory))
-        {
-            Directory.CreateDirectory(directory);
         }
     }
 }

@@ -2,6 +2,7 @@ using System.Net;
 
 namespace SaronidaSailing.Tests;
 
+[Collection(WebHostCollection.Name)]
 public class HomePageTests(TempDatabaseWebApplicationFactory factory) : IClassFixture<TempDatabaseWebApplicationFactory>
 {
     [Fact]

@@ -6,6 +6,7 @@ using SaronidaSailing.Web.Localization;
 
 namespace SaronidaSailing.Tests;
 
+[Collection(WebHostCollection.Name)]
 public class LocalizationHttpTests(TempDatabaseWebApplicationFactory factory) : IClassFixture<TempDatabaseWebApplicationFactory>
 {
     [Fact]

@@ -2,6 +2,7 @@ using Microsoft.Data.Sqlite;
 
 namespace SaronidaSailing.Tests;
 
+[Collection(WebHostCollection.Name)]
 public class DatabaseInitializerTests(TempDatabaseWebApplicationFactory factory) : IClassFixture<TempDatabaseWebApplicationFactory>
 {
     [Fact]
