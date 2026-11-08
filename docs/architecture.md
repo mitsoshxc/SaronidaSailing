@@ -19,6 +19,12 @@ Status: **agreed design, not yet implemented.** Update as phases land.
 | Hosting | DigitalOcean Basic droplet (FRA1), Docker | See `docs/deployment.md` |
 | Reverse proxy / TLS | nginx + Let's Encrypt (certbot) on the host | |
 | DNS / CDN | Cloudflare Free | DNS, edge caching of static files, DDoS protection |
+| Rich-text editor | Quill 2 (BSD-3), self-hosted | Small, limited to our formats; TinyMCE rejected (GPLv2+) |
+| List reordering | SortableJS (MIT), self-hosted | Drag-and-drop, plus up/down buttons |
+| HTML sanitizing | HtmlSanitizer | Rich text cleaned server-side before storage |
+| Frontend | Plain JS and custom CSS, no frameworks; self-hosted Commissioner font | Small, matches the design canvas |
+| Tests | xUnit (SQLite in-memory); Playwright + axe-core for accessibility | |
+| Deploy | PowerShell 7 script (`deploy/deploy.ps1`), `docker save \| ssh` | No CI, no registry |
 
 **Explicitly rejected**
 

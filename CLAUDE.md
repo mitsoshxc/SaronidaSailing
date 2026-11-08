@@ -2,7 +2,7 @@
 
 Public website for a sailing business in Saronida, Greece, with a custom built-in CMS. Page layouts and sections are fixed in code; the **content** of each section (texts, images) is data entered by the admin. An admin logs in, sees the site exactly as a visitor does, and edits each section in place (one or more admins, created with the `saronida-admin` CLI).
 
-Stack: ASP.NET Core 10 Razor Pages · Entity Framework Core 10 · SQLite · ASP.NET Core Identity · Output Caching · Hangfire (SQLite storage) · SkiaSharp · Docker · nginx · DigitalOcean · Cloudflare (Free)
+Stack: ASP.NET Core 10 Razor Pages · Entity Framework Core 10 · SQLite · ASP.NET Core Identity · Output Caching · Hangfire (SQLite storage) · SkiaSharp · NLog · HtmlSanitizer · Quill 2 · SortableJS · plain JS/CSS (no frameworks) · xUnit · Playwright + axe-core · Docker · nginx · DigitalOcean · Cloudflare (Free). Full table with reasons: `docs/architecture.md` → Tech Stack.
 
 Languages: Greek (default, no URL prefix) and English (`/en/`). Pages and sections come from the "Saronida Sailing Redesign" design canvas: https://claude.ai/artifact/RcU5iMfQSTJ34rH5gFB7MC (read it with the Artifact tool; desktop artboards `Desktop*.dc.html` hold the full layouts, the canvas notes hold design decisions).
 
