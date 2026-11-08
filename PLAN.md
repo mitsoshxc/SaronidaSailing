@@ -2,7 +2,7 @@
 
 Status legend: `[ ]` not started · `[x]` complete · `[~]` in progress
 
-**DRAFT — under review with the owner, phase by phase.**
+Reviewed phase by phase and agreed on 2026-11-08. Open owner-provided items: [`OWNER-QUESTIONS.md`](OWNER-QUESTIONS.md) — they do not block development.
 
 Phases are the build order; the whole site goes live once, after all phases are done. Every `/dev` brief is followed by `/verify`. A task is flipped to `[x]` only after `/verify` returns APPROVED. `/doc` runs once per phase, after all its tasks are `[x]`. The tech lead breaks each task into concrete briefs before starting the phase.
 

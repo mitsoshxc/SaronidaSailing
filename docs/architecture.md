@@ -8,7 +8,7 @@ Status: **agreed design, not yet implemented.** Update as phases land.
 |---|---|---|
 | Web framework | ASP.NET Core 10, Razor Pages | Team's main stack; fixed page templates fit Razor Pages well |
 | ORM | EF Core 10 | Keeps the app independent of the database engine |
-| Database | SQLite (WAL mode) | One admin, rare writes, tiny data set; no DB server to run. Swap to Postgres/SQL Server later via EF Core if needed |
+| Database | SQLite (WAL mode) | Few admins, rare writes, tiny data set; no DB server to run. Swap to Postgres/SQL Server later via EF Core if needed |
 | Auth | ASP.NET Core Identity, cookie auth, mandatory TOTP 2FA | One or more admins, managed by CLI commands |
 | Logging | NLog to files, 90-day retention | Audit log (logins, admin actions) + app log |
 | Caching | ASP.NET Core Output Caching (in-memory, in the app process) | Visitors are served rendered pages from memory; DB is hit only after a cache miss |

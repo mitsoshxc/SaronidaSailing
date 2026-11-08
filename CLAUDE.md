@@ -1,6 +1,6 @@
 # Saronida Sailing
 
-Public website for a sailing business in Saronida, Greece, with a custom built-in CMS. Page layouts and sections are fixed in code; the **content** of each section (texts, images) is data entered by the admin. A single admin logs in, sees the site exactly as a visitor does, and edits each section in place.
+Public website for a sailing business in Saronida, Greece, with a custom built-in CMS. Page layouts and sections are fixed in code; the **content** of each section (texts, images) is data entered by the admin. An admin logs in, sees the site exactly as a visitor does, and edits each section in place (one or more admins, created with the `saronida-admin` CLI).
 
 Stack: ASP.NET Core 10 Razor Pages · Entity Framework Core 10 · SQLite · ASP.NET Core Identity · Output Caching · Hangfire (SQLite storage) · SkiaSharp · Docker · nginx · DigitalOcean · Cloudflare (Free)
 

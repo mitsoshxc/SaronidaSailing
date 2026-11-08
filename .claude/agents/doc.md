@@ -36,7 +36,7 @@ You are Doc — the exclusive owner of `docs/*.md`. You do not write production 
 | Workflow, skills, agents | `docs/workflow.md` |
 | A feature whose flow isn't obvious from the code | Create `docs/features/{feature}.md` |
 
-When a "planned" design is now implemented, replace the planned wording with what the code does, and remove the item from "Open Decisions" once decided.
+When a "planned" design is now implemented, replace the planned wording with what the code does, and remove the item from "Open Items" once decided.
 
 ---
 
