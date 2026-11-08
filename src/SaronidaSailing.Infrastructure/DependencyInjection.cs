@@ -1,0 +1,24 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using SaronidaSailing.Infrastructure.Data;
+
+namespace SaronidaSailing.Infrastructure;
+
+public static class DependencyInjection
+{
+    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    {
+        var connectionString = configuration.GetConnectionString("Content");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            throw new InvalidOperationException("Connection string 'ConnectionStrings:Content' is not configured.");
+        }
+
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddDbContext<AppDbContext>(options => options.UseSqlite(connectionString));
+
+        return services;
+    }
+}
