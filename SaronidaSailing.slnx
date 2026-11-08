@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SaronidaSailing.Core/SaronidaSailing.Core.csproj" />
+    <Project Path="src/SaronidaSailing.Infrastructure/SaronidaSailing.Infrastructure.csproj" />
+    <Project Path="src/SaronidaSailing.Web/SaronidaSailing.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SaronidaSailing.Tests/SaronidaSailing.Tests.csproj" />
+  </Folder>
+</Solution>

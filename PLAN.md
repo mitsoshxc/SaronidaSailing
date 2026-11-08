@@ -27,11 +27,11 @@ Phases are the build order; the whole site goes live once, after all phases are 
 
 ## Phase 1 — Foundation
 
-- [ ] Solution `SaronidaSailing.slnx`: `Core`, `Infrastructure`, `Web`, `Tests` projects and references
+- [x] Solution `SaronidaSailing.slnx`: `Core`, `Infrastructure`, `Web`, `Tests` projects and references
 - [ ] EF Core + SQLite: `AppDbContext`, `BaseEntity` timestamps, WAL mode, migrations applied at startup
 - [ ] Localization: routing (`el` unprefixed, `en` under `/en/`), request culture, helper for the other-language URL
 - [ ] Hangfire with `Hangfire.Storage.SQLite` (`hangfire.db`)
-- [ ] `/health` endpoint: DB + Greek home content, Hangfire storage, media folder writable, home page GET (see `docs/architecture.md` → Health Check)
+- [ ] `/health` endpoint: DB reachable, Hangfire storage, media folder writable, home page GET (see `docs/architecture.md` → Health Check). The "Greek home content exists" check is added in Phase 7 with the seed data (decided 2026-11-08)
 - [ ] `Dockerfile` (multi-stage, pinned base images, non-root)
 
 ## Phase 2 — Admin Authentication
@@ -87,7 +87,7 @@ Phases are the build order; the whole site goes live once, after all phases are 
 - [ ] Site CSS from the design canvas; self-hosted Commissioner font
 - [ ] Pages: Home, Trips (tabs remember the chosen trip), Boat, Contact, Terms, Privacy, Accessibility
 - [ ] Cookie consent banner (client-side, `localStorage`), footer "Cookie settings", Google Map loaded only after consent with static-image fallback
-- [ ] Seed initial content from the design (Greek) + drafted English translations for owner review
+- [ ] Seed initial content from the design (Greek) + drafted English translations for owner review; add the `/health` check "at least one Greek `home` `ContentItem` exists"
 - [ ] Routes with fixed slugs (`/ekdromes`, `/skafos`, `/epikoinonia`, `/oroi`, `/aporrito`, `/prosvasimotita`; `/en/trips`, `/en/boat`, `/en/contact`, `/en/terms`, `/en/privacy`, `/en/accessibility`)
 - [ ] `sitemap.xml`, `robots.txt`, canonical + `hreflang`, 404 / 500 pages
 - [ ] JSON-LD `LocalBusiness` from content
