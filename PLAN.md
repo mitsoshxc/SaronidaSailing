@@ -94,7 +94,9 @@ Phases are the build order; the whole site goes live once, after all phases are 
 - [ ] Old-site 301 redirect table (see `docs/architecture.md` → SEO) + canonical-host redirect
 - [ ] Accessibility: axe-core checks via Playwright on every page in both languages; manual keyboard pass
 
-## Phase 8 — Production
+## Phase 8 — Preview & Production
+
+- [ ] Preview droplet on a `visualpivot.net` subdomain: Basic Auth, `X-Robots-Tag: noindex, nofollow`, `robots.txt` disallow-all, no sitemap, `Site:BaseUrl` = preview URL
 
 - [ ] `deploy/docker-compose.yml`, `deploy/nginx/` site config (incl. `/health` denied externally)
 - [ ] nginx maintenance mode: `/var/saronida/maintenance.on` → 503 + `deploy/nginx/maintenance.html`

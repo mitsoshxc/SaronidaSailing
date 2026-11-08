@@ -107,6 +107,22 @@ The compose file caps Docker's container console log (json-file `max-size` / `ma
 
 - **UptimeRobot** (free) checks `https://www.saronidasailing.gr/` every few minutes and emails the developer if it goes down.
 
+## Preview (owner demo)
+
+After local development and testing, the site is shown to the owner on a **separate DigitalOcean droplet** at a subdomain of the developer's domain `visualpivot.net` (A record → droplet IP). Same Docker image and setup as production, with these differences:
+
+| Concern | Preview |
+|---|---|
+| Host name | `<subdomain>.visualpivot.net` — name TBD |
+| TLS | Let's Encrypt certificate for that subdomain |
+| **Not crawlable** | (1) nginx **HTTP Basic Auth** on the whole site (crawlers only ever get 401), (2) `X-Robots-Tag: noindex, nofollow` on every response, (3) `robots.txt` → `Disallow: /`, no `sitemap.xml`. Basic Auth pending developer confirmation |
+| App config | `ASPNETCORE_ENVIRONMENT=Preview`; `Site:BaseUrl` = the preview URL, used for canonical, `hreflang`, Open Graph and JSON-LD URLs |
+| Redirects | No canonical `www.saronidasailing.gr` redirect and no old-site redirects |
+| Instagram | The Meta app needs the preview URL as an allowed OAuth redirect URI too |
+| Monitoring / DO backups | Not needed |
+
+Open: whether the preview droplet later **becomes production** (content entered by the owner during the preview carries over) or is thrown away.
+
 ## Go-Live (switchover)
 
 1. Deploy to the droplet and test everything **before** touching DNS: on the developer's PC, a hosts-file entry points `www.saronidasailing.gr` (and the no-www name) to the droplet's IP. Certificates at this stage: issue them right after DNS points to the droplet, or test over HTTP/self-signed until then.

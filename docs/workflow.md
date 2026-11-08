@@ -48,10 +48,14 @@ Status legend: `[ ]` not started · `[x]` complete · `[~]` in progress.
 
 ---
 
+## Where Work Happens
+
+Development and testing run on the developer's PC (`dotnet run`, local Docker). Then: preview droplet for the owner → production. See `docs/deployment.md`.
+
 ## Cloud Sessions
 
-Claude Code cloud sessions for this repo use the personal environment **"SaronidaSailing"**: Default network rules plus `saronidasailing.gr` / `www.saronidasailing.gr` (the old site, used for the redirect map).
+Claude Code cloud sessions for this repo use the personal environment **"SaronidaSailing"**: Default network rules plus `saronidasailing.gr` / `www.saronidasailing.gr` (the old site, used for the redirect map). Its setup script installs the .NET 10 SDK (Ubuntu package `dotnet-sdk-10.0`). No Docker daemon is available in cloud sessions.
 
 ## Branch Strategy
 
-Work is committed to `main`. Feature branches are not used at this stage. Deployment is manual via `deploy/deploy.ps1` (see `docs/deployment.md`).
+Work is committed and pushed directly to `main`. No feature branches, no PRs unless the developer asks. Deployment is manual via `deploy/deploy.ps1` (see `docs/deployment.md`).

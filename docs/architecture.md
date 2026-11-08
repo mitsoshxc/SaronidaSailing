@@ -87,7 +87,8 @@ The cookie-consent banner and the footer "Cookie settings" link from the design 
 ## SEO
 
 - `<title>`, meta description, Open Graph tags per page and language from `{page}.seo.*`; canonical URL and `hreflang` alternates on every page.
-- `sitemap.xml` (both languages, `hreflang` alternates) and `robots.txt`.
+- `sitemap.xml` (both languages, `hreflang` alternates) and `robots.txt`. All absolute URLs come from `Site:BaseUrl` (local / preview / production).
+- **Preview environment** (`ASPNETCORE_ENVIRONMENT=Preview`): `robots.txt` disallows everything, no `sitemap.xml`, `X-Robots-Tag: noindex, nofollow` on every response (see `docs/deployment.md` → Preview).
 - **Structured data:** JSON-LD `LocalBusiness` on every page, built from existing content (business name, phones, email, address, season, Instagram link) — the admin keeps it current by editing the normal content.
 - **Old-site redirects (301).** The old site (Joomla, crawled 2026-11-08) serves the same pages on `saronidasailing.gr` and `www.saronidasailing.gr` under `/index.php/{el|en}/...`. Since the domain moves to the new server, the app maps old paths (any host, any query string) with a redirect table in middleware, early in the pipeline:
 

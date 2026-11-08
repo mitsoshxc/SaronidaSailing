@@ -8,6 +8,15 @@ Languages: Greek (default, no URL prefix) and English (`/en/`). Pages and sectio
 
 Project status: **pre-code**. Docs describe the agreed design; `PLAN.md` tracks the build.
 
+## Before You Start (working agreements)
+
+- **People:** the developer (senior .NET back-end dev, works with Claude as tech lead) and the business owner (answers in [`OWNER-QUESTIONS.md`](OWNER-QUESTIONS.md)).
+- **Commit and push directly to `main`.** No feature branches, no PRs unless the developer asks.
+- **Never decide on your own** what hasn't been agreed — propose, ask, then record the decision in `docs/` / `PLAN.md`.
+- **Development and testing happen on the developer's PC.** Cloud sessions: the "SaronidaSailing" environment installs the .NET 10 SDK via its setup script; there is no Docker daemon in the cloud, so the `Dockerfile`/compose are only built and run locally.
+- **Environments:** local → **preview** (a separate droplet on a `visualpivot.net` subdomain, password-protected and never crawlable, for showing the owner) → production (`https://www.saronidasailing.gr`). See `docs/deployment.md` → Preview.
+- **Verify during implementation** (flagged in the docs): unique index with nullable `ListItemId` (Phase 3), `Hangfire.Storage.SQLite` still maintained (Phase 1), NLog 90-day cleanup with dated file names (Phase 2), iPhone HEIC upload (Phase 5), Meta app development mode (Phase 6).
+
 ## Emergency: take the site offline
 
 On the droplet: `touch /var/saronida/maintenance.on` (ON) · `rm /var/saronida/maintenance.on` (OFF). nginx serves a 503 "Back soon" page immediately. More in [`docs/deployment.md`](docs/deployment.md) → Quick Actions.
