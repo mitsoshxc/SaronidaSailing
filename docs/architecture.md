@@ -100,7 +100,7 @@ The cookie-consent banner and the footer "Cookie settings" link from the design 
 | `/index.php/{el,en}/component/users/...` (Joomla login/registration) | **410 Gone** |
 | any other `/index.php/el/...` / `/index.php/en/...` | `/` / `/en/` |
 
-- **One canonical host**; the other host 301-redirects to it (nginx). Choice: see Open Items.
+- **Canonical address: `https://www.saronidasailing.gr`.** Every `http://` request and every request to `saronidasailing.gr` (no www) gets a 301 straight to `https://www.saronidasailing.gr` + same path, in one hop (see `docs/deployment.md` → nginx). Canonical tags, `sitemap.xml` and `hreflang` always use the www HTTPS address.
 
 ## Request Flow
 
@@ -281,5 +281,4 @@ Target **WCAG 2.2 AA** (per the design notes): real buttons/links, keyboard focu
 - Photos / video
 - English texts
 - Legal texts reviewed (ideally by a lawyer) before go-live
-- Canonical host: `saronidasailing.gr` or `www.saronidasailing.gr`
 - English texts: Claude drafts translations of the seed content; owner reviews

@@ -50,6 +50,17 @@ The .NET container images run as the non-root `app` user (UID 1654) and listen o
 
 ## nginx
 
+**Canonical address: `https://www.saronidasailing.gr`.**
+
+| Request | Response |
+|---|---|
+| `http://saronidasailing.gr/...` or `http://www.saronidasailing.gr/...` | 301 → `https://www.saronidasailing.gr/...` |
+| `https://saronidasailing.gr/...` | 301 → `https://www.saronidasailing.gr/...` |
+| `https://www.saronidasailing.gr/...` | Served |
+
+- Let's Encrypt certificate covers **both** names (`certbot --nginx -d www.saronidasailing.gr -d saronidasailing.gr`), so the no-www HTTPS request can be redirected without a certificate warning.
+- Cloudflare: DNS records for both `saronidasailing.gr` and `www` proxied; "Always Use HTTPS" on. nginx enforces the same rules, so they hold even if Cloudflare settings change.
+
 - `location /media/` → `alias /var/saronida/media/;` with `Cache-Control: public, max-age=31536000, immutable`.
 - Everything else → `proxy_pass http://127.0.0.1:5000;` with `X-Forwarded-For` / `X-Forwarded-Proto`.
 - Real client IP: `real_ip_header CF-Connecting-IP;` plus `set_real_ip_from` for each Cloudflare IP range (published at cloudflare.com/ips; update when they change).

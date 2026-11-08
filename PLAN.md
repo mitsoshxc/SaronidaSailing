@@ -101,5 +101,6 @@ Phases are the build order; the whole site goes live once, after all phases are 
 - [ ] `deploy/deploy.ps1`
 - [ ] Nightly `VACUUM INTO` backup job
 - [ ] Droplet setup: hardening, swap, Docker, nginx, certbot, firewall, `saronida-admin` wrapper script
-- [ ] Cloudflare: DNS, Full (strict) SSL, Web Analytics
+- [ ] Cloudflare: DNS (apex + www, proxied), Full (strict) SSL, Always Use HTTPS, Web Analytics
+- [ ] Canonical redirects: http → https and no-www → `https://www.saronidasailing.gr` in one hop (nginx); certificate for both names
 - [ ] Enable DO weekly backups
