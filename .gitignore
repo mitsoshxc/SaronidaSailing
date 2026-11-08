@@ -427,7 +427,8 @@ FodyWeavers.xsd
 # Official VS Code C# Dev Kit Extension exclusion
 #*.lscache
 
-# SQLite databases
+# Local data (dev databases, media)
 *.db
 *.db-shm
 *.db-wal
+src/SaronidaSailing.Web/data/

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using SaronidaSailing.Infrastructure.Data;
+using SaronidaSailing.Infrastructure.Media;
 
 namespace SaronidaSailing.Infrastructure;
 
@@ -23,6 +24,11 @@ public static class DependencyInjection
         {
             throw new InvalidOperationException("Connection string 'ConnectionStrings:Hangfire' is not configured.");
         }
+
+        services.AddOptions<MediaOptions>()
+            .Configure(options => options.RootPath = configuration[$"{MediaOptions.SectionName}:{nameof(MediaOptions.RootPath)}"] ?? "")
+            .Validate(options => !string.IsNullOrWhiteSpace(options.RootPath), "Media:RootPath is not configured.")
+            .ValidateOnStart();
 
         services.TryAddSingleton(TimeProvider.System);
         services.AddDbContext<AppDbContext>(options => options.UseSqlite(connectionString));

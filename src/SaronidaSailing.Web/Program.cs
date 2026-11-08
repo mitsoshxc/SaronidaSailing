@@ -1,5 +1,9 @@
+using Microsoft.Extensions.Options;
 using SaronidaSailing.Infrastructure;
 using SaronidaSailing.Infrastructure.Data;
+using SaronidaSailing.Infrastructure.Health;
+using SaronidaSailing.Infrastructure.Media;
+using SaronidaSailing.Web.Health;
 using SaronidaSailing.Web.Localization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -8,10 +12,20 @@ builder.Services.AddRazorPages(options => options.Conventions.Add(new LocalizedP
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ILocalizedUrlService, LocalizedUrlService>();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddHttpClient(HomePageHealthCheck.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(5))
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+builder.Services.AddHealthChecks()
+    .AddInfrastructureHealthChecks()
+    .AddCheck<HomePageHealthCheck>("home-page");
 
 var app = builder.Build();
 
 await app.Services.InitializeDatabaseAsync();
+
+if (app.Environment.IsDevelopment())
+{
+    MediaFolder.EnsureExists(app.Services.GetRequiredService<IOptions<MediaOptions>>().Value.RootPath);
+}
 
 if (!app.Environment.IsDevelopment())
 {
@@ -29,6 +43,7 @@ app.UseRequestLocalization(options =>
 
 app.UseRouting();
 
+app.MapHealthChecks("/health");
 app.MapStaticAssets();
 app.MapRazorPages()
    .WithStaticAssets();

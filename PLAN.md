@@ -31,8 +31,8 @@ Phases are the build order; the whole site goes live once, after all phases are 
 - [x] EF Core + SQLite: `AppDbContext`, `BaseEntity` timestamps, WAL mode, migrations applied at startup
 - [x] Localization: routing (`el` unprefixed, `en` under `/en/`), request culture, helper for the other-language URL
 - [x] Hangfire with `Hangfire.Storage.SQLite` (`hangfire.db`)
-- [ ] `/health` endpoint: DB reachable, Hangfire storage, media folder writable, home page GET (see `docs/architecture.md` → Health Check). The "Greek home content exists" check is added in Phase 7 with the seed data (decided 2026-11-08)
-- [ ] `Dockerfile` (multi-stage, pinned base images, non-root)
+- [x] `/health` endpoint: DB reachable, Hangfire storage, media folder writable, home page GET (see `docs/architecture.md` → Health Check). The "Greek home content exists" check is added in Phase 7 with the seed data (decided 2026-11-08)
+- [ ] `Dockerfile` (multi-stage, pinned base images, non-root) + repo `nuget.config` with nuget.org as the only source (decided 2026-11-09; makes local and Docker restores independent of machine-level feeds)
 
 ## Phase 2 — Admin Authentication
 

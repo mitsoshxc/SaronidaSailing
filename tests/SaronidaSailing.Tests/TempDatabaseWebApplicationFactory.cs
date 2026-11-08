@@ -1,5 +1,9 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using SaronidaSailing.Web.Health;
 
 namespace SaronidaSailing.Tests;
 
@@ -11,10 +15,20 @@ public sealed class TempDatabaseWebApplicationFactory : WebApplicationFactory<Pr
 
     public string HangfirePath => Path.Combine(_directory, "hangfire.db");
 
+    public string MediaPath => Path.Combine(_directory, "media");
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        Directory.CreateDirectory(MediaPath);
+
         builder.UseSetting("ConnectionStrings:Content", $"Data Source={DatabasePath};Pooling=False");
         builder.UseSetting("ConnectionStrings:Hangfire", HangfirePath);
+        builder.UseSetting("Media:RootPath", MediaPath);
+        builder.UseSetting("Health:HomePageUrl", "http://localhost/");
+
+        builder.ConfigureTestServices(services => services
+            .AddHttpClient(HomePageHealthCheck.HttpClientName)
+            .ConfigurePrimaryHttpMessageHandler(sp => ((TestServer)sp.GetRequiredService<IServer>()).CreateHandler()));
     }
 
     protected override void Dispose(bool disposing)
