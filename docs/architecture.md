@@ -69,6 +69,7 @@ The cookie-consent banner and the footer "Cookie settings" link from the design 
 - URLs: Greek has no prefix (`/`, `/skafos`); English lives under `/en/...`. Adding a language later = a new prefix.
 - Language switcher in the header links to the same page in the other language.
 - Every page emits `<html lang>`, `hreflang` alternates and a canonical URL.
+- **Missing translation fallback:** if a field has no English value, English visitors see the Greek value. The admin sees a "missing EN" marker on that field in edit mode.
 - `sitemap.xml` lists every page in both languages with `hreflang` alternates; `robots.txt` points to it and disallows `/admin`.
 
 ## Request Flow
@@ -102,6 +103,8 @@ Cloudflare by default caches static file types (images, CSS, JS), not HTML, so H
 4. `cms-edit.js` provides: inline text editing, a modal for rich text / links / images, for lists: add, delete, drag-to-reorder, active/inactive toggle; and an active/inactive toggle per section. Menu links to an inactive section are hidden too. It saves through admin-only minimal API endpoints with antiforgery tokens.
 5. Save → write content + append history → evict the page's output-cache tag.
 6. Rich-text HTML is sanitized server-side (HtmlSanitizer library) before storage.
+7. **Edit history is kept forever** (every previous value in `ContentHistory`); undo restores any earlier version.
+8. **Page settings panel** (edit mode): per page and language, the SEO fields `{page}.seo.title` (browser tab / search result title), `{page}.seo.description` (search result snippet) and `{page}.seo.image` (link-preview image for Facebook, WhatsApp, etc. via Open Graph tags).
 
 ## Media Pipeline (SkiaSharp)
 

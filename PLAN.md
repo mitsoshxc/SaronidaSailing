@@ -45,8 +45,9 @@ Phases are the build order; the whole site goes live once, after all phases are 
 ## Phase 3 — CMS Core
 
 - [ ] Entities + configurations + repositories: `ContentItem`, `ContentListItem`, `ContentSection`, `ContentHistory`
-- [ ] `IContentService`: read by key + locale, save field with history, list operations (add / delete / reorder / activate), section activate/deactivate
+- [ ] `IContentService`: read by key + locale (English falls back to Greek when missing), save field with history (kept forever), list operations (add / delete / reorder / activate), section activate/deactivate
 - [ ] Tag helpers: `<cms>`, `<cms-link>`, `<cms-list>` (visitor rendering)
+- [ ] Page SEO rendering: `<title>`, meta description, Open Graph tags from `{page}.seo.*`
 - [ ] Output cache policy `CmsPage` (1h) + tag eviction on every write
 
 ## Phase 4 — Inline Editing
@@ -56,6 +57,7 @@ Phases are the build order; the whole site goes live once, after all phases are 
 - [ ] List editing: add, delete, drag-to-reorder, active/inactive toggle
 - [ ] Section active/inactive toggle (hides section and its menu links)
 - [ ] Undo from `ContentHistory`
+- [ ] "Missing EN" markers; Page settings panel for `{page}.seo.*`
 
 ## Phase 5 — Media
 

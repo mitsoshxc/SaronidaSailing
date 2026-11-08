@@ -12,6 +12,7 @@ Every editable spot has a key: `{page}.{section}.{field}` — lowercase, kebab-c
 | `home.hero.image` | Home page, hero section, image |
 | `shared.footer.phone-1` | Footer (on every page), first phone |
 | `home.highlights` | A list (no field segment) |
+| `home.seo.title` / `home.seo.description` / `home.seo.image` | Page SEO fields (section key `seo` is reserved) |
 
 Page key `shared` is reserved for content on every page (header, footer). Writing to it evicts the cache of all pages.
 
@@ -63,7 +64,7 @@ Toggling `home.instagram` also removes / re-registers the Instagram recurring jo
 
 ### ContentHistory
 
-Append-only log of previous values, used for undo.
+Append-only log of previous values, used for undo. Never pruned — all history is kept.
 
 | Field | Type | Notes |
 |---|---|---|
