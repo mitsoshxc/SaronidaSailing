@@ -96,7 +96,7 @@ Phases are the build order; the whole site goes live once, after all phases are 
 
 ## Phase 8 — Preview & Production
 
-- [ ] Preview droplet on a `visualpivot.net` subdomain: Basic Auth, `X-Robots-Tag: noindex, nofollow`, `robots.txt` disallow-all, no sitemap, `Site:BaseUrl` = preview URL
+- [ ] Preview on the future production droplet at `https://saronida.visualpivot.net`: Basic Auth (one owner login, htpasswd on the droplet), `X-Robots-Tag: noindex, nofollow`, `robots.txt` disallow-all, no sitemap, `Site:BaseUrl` = preview URL; DO backups on once the owner enters content
 
 - [ ] `deploy/docker-compose.yml`, `deploy/nginx/` site config (incl. `/health` denied externally)
 - [ ] nginx maintenance mode: `/var/saronida/maintenance.on` → 503 + `deploy/nginx/maintenance.html`
@@ -109,4 +109,4 @@ Phases are the build order; the whole site goes live once, after all phases are 
 - [ ] Security headers (CSP incl. Google Maps frame, nosniff, Referrer-Policy, frame-ancestors); HSTS after launch, short max-age first
 - [ ] `unattended-upgrades` with nightly auto-reboot; container `restart: unless-stopped`
 - [ ] UptimeRobot monitor (alerts to the developer's email)
-- [ ] Go-live: test via hosts file → copy all DNS records to Cloudflare → lower TTL → switch → verify → keep old site a few days → submit sitemap
+- [ ] Go-live: remove preview features (Basic Auth, noindex, Preview mode) → test via hosts file → copy all DNS records to Cloudflare → lower TTL → switch → verify → keep old site a few days → submit sitemap

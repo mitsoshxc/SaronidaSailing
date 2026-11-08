@@ -109,23 +109,24 @@ The compose file caps Docker's container console log (json-file `max-size` / `ma
 
 ## Preview (owner demo)
 
-After local development and testing, the site is shown to the owner on a **separate DigitalOcean droplet** at a subdomain of the developer's domain `visualpivot.net` (A record → droplet IP). Same Docker image and setup as production, with these differences:
+After local development and testing, the site is shown to the owner on the DigitalOcean droplet at **`https://saronida.visualpivot.net`** (A record on the developer's domain `visualpivot.net` → droplet IP). **This droplet later becomes production**: content the owner enters during the preview carries over. Same Docker image and setup as production, with these differences:
 
 | Concern | Preview |
 |---|---|
-| Host name | `<subdomain>.visualpivot.net` — name TBD |
+| Host name | `saronida.visualpivot.net` |
 | TLS | Let's Encrypt certificate for that subdomain |
-| **Not crawlable** | (1) nginx **HTTP Basic Auth** on the whole site (crawlers only ever get 401), (2) `X-Robots-Tag: noindex, nofollow` on every response, (3) `robots.txt` → `Disallow: /`, no `sitemap.xml`. Basic Auth pending developer confirmation |
+| **Not crawlable** | (1) nginx **HTTP Basic Auth** on the whole site (crawlers only ever get 401), (2) `X-Robots-Tag: noindex, nofollow` on every response, (3) `robots.txt` → `Disallow: /`, no `sitemap.xml`. One shared username/password for the owner, kept in an htpasswd file on the droplet (never in the repo) |
 | App config | `ASPNETCORE_ENVIRONMENT=Preview`; `Site:BaseUrl` = the preview URL, used for canonical, `hreflang`, Open Graph and JSON-LD URLs |
 | Redirects | No canonical `www.saronidasailing.gr` redirect and no old-site redirects |
 | Instagram | The Meta app needs the preview URL as an allowed OAuth redirect URI too |
-| Monitoring / DO backups | Not needed |
+| Monitoring | Not needed |
+| DO backups | Enable as soon as the owner starts entering content (that content goes live) |
+| Output cache | Effectively off: Basic Auth adds an `Authorization` header to every request, and the default cache policy skips such requests. Fine for a demo; caching is exercised locally and in production |
 
-Open: whether the preview droplet later **becomes production** (content entered by the owner during the preview carries over) or is thrown away.
 
 ## Go-Live (switchover)
 
-1. Deploy to the droplet and test everything **before** touching DNS: on the developer's PC, a hosts-file entry points `www.saronidasailing.gr` (and the no-www name) to the droplet's IP. Certificates at this stage: issue them right after DNS points to the droplet, or test over HTTP/self-signed until then.
+1. The preview droplet becomes production — **remove the preview features**: Basic Auth, the `X-Robots-Tag` header, `ASPNETCORE_ENVIRONMENT=Preview` → `Production`, `Site:BaseUrl` → `https://www.saronidasailing.gr`; add the canonical/old-site redirect server blocks; add the production host to the Meta app's redirect URIs. Test via a hosts-file entry on the developer's PC (`www.saronidasailing.gr` and the no-www name → droplet IP) **before** touching DNS. Certificates for the production names are issued right after DNS points to the droplet.
 2. Copy **every** existing DNS record (MX, SPF, DKIM, verification records, subdomains) into Cloudflare — see `OWNER-QUESTIONS.md` 1–4.
 3. A day before: lower the DNS TTL.
 4. Switch: point DNS to the droplet (via Cloudflare), issue the Let's Encrypt certificate, check pages, redirects (old URLs, http, no-www), admin login, Instagram, map, backups.

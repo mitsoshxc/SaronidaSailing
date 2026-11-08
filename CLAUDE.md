@@ -14,7 +14,7 @@ Project status: **pre-code**. Docs describe the agreed design; `PLAN.md` tracks 
 - **Commit and push directly to `main`.** No feature branches, no PRs unless the developer asks.
 - **Never decide on your own** what hasn't been agreed — propose, ask, then record the decision in `docs/` / `PLAN.md`.
 - **Development and testing happen on the developer's PC.** Cloud sessions: the "SaronidaSailing" environment installs the .NET 10 SDK via its setup script; there is no Docker daemon in the cloud, so the `Dockerfile`/compose are only built and run locally.
-- **Environments:** local → **preview** (a separate droplet on a `visualpivot.net` subdomain, password-protected and never crawlable, for showing the owner) → production (`https://www.saronidasailing.gr`). See `docs/deployment.md` → Preview.
+- **Environments:** local → **preview** at `https://saronida.visualpivot.net` (password-protected, never crawlable, for showing the owner) → production at `https://www.saronidasailing.gr` on **the same droplet** (preview features removed, DNS switched). See `docs/deployment.md` → Preview.
 - **Verify during implementation** (flagged in the docs): unique index with nullable `ListItemId` (Phase 3), `Hangfire.Storage.SQLite` still maintained (Phase 1), NLog 90-day cleanup with dated file names (Phase 2), iPhone HEIC upload (Phase 5), Meta app development mode (Phase 6).
 
 ## Emergency: take the site offline
