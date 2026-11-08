@@ -14,7 +14,7 @@ Status: **agreed design, not yet implemented.** Update as phases land.
 | Background jobs | Hangfire, SQLite storage (`Hangfire.Storage.SQLite`, community package) in its own file | Recurring jobs: Instagram fetch, token refresh, nightly DB backup copy |
 | Image processing | SkiaSharp (MIT) | Resize, fix orientation, strip metadata, encode WebP |
 | Media | Files on the droplet disk, served by nginx, cached by Cloudflare | Zero extra cost |
-| Analytics | Cloudflare Web Analytics | Free, cookieless — no cookie banner needed |
+| Analytics | Cloudflare Web Analytics | Free, cookieless — needs no consent category |
 | Hosting | DigitalOcean Basic droplet (FRA1), Docker | See `docs/deployment.md` |
 | Reverse proxy / TLS | nginx + Let's Encrypt (certbot) on the host | |
 | DNS / CDN | Cloudflare Free | DNS, edge caching of static files, DDoS protection |
@@ -29,7 +29,6 @@ Status: **agreed design, not yet implemented.** Update as phases land.
 | DigitalOcean Spaces | Paid; local disk + Cloudflare is enough |
 | Own booking system | Bookings happen on external platforms; the site links out |
 | Contact form / email provider | Contact page has no form (phone, email link, Instagram DM) |
-| Cookie banner | Not needed — visitors get no non-essential cookies (see Cookies & Privacy) |
 | Google Fonts CDN | Fonts are self-hosted (sending visitor IPs to Google was ruled a GDPR violation by a Munich court, 2022) |
 | CI/CD pipeline | Deploys run from the developer's PC (see `docs/deployment.md`) |
 
@@ -57,11 +56,11 @@ Dockerfile
 | Home | `/` | `/en/` | Hero · At a glance · Trips teaser · Boat teaser · Why with a skipper · Instagram feed · Departure point |
 | Trips | `/ekdromes` (slug TBD) | `/en/trips` | Intro · 3 trip tabs (day cruise / islands / weekly charter) · Useful info · Booking box (links to booking platforms) |
 | Boat | `/skafos` (slug TBD) | `/en/boat` | Gallery · Intro · Specs · Life on board · Included · Charter details |
-| Contact | `/epikoinonia` (slug TBD) | `/en/contact` | Contact tiles · Map image + directions · Useful details · Call to action |
+| Contact | `/epikoinonia` (slug TBD) | `/en/contact` | Contact tiles · Google Map (after consent; static image otherwise) + directions · Useful details · Call to action |
 | Terms, Privacy, Accessibility | slugs TBD | slugs TBD | Rich-text sections |
 | Shared | — | — | Header (logo, menu, language switch, Book button) · Footer |
 
-The design's cookie-consent artboard and footer "Cookie settings" link are **not built** (no banner needed).
+The cookie-consent banner and the footer "Cookie settings" link from the design **are built** (needed for the Google Map — see Cookies & Privacy). The banner's "Statistics" category is dropped.
 
 ## Localization
 
@@ -149,19 +148,28 @@ Linux native assets: `SkiaSharp.NativeAssets.Linux.NoDependencies` (nothing to i
 
 ## Cookies & Privacy
 
-Consent is required (EU ePrivacy rules, Greek Law 3471/2006) only for cookies/storage that are not strictly necessary. The site avoids all of them, so no banner:
+The site embeds a **Google Map** (boat location), which sends visitor data to Google and may set Google cookies. Under EU ePrivacy rules (Greek Law 3471/2006) that needs **prior consent**, so the site has a **cookie consent banner** (design canvas: "Συναίνεση cookies" artboards).
 
-| Item | Why it needs no consent |
+| Item | Consent? |
 |---|---|
-| Language | Chosen by URL (`/` vs `/en/`), no cookie |
+| Language | None needed — chosen by URL (`/` vs `/en/`), no cookie |
 | Admin login + antiforgery cookies | Strictly necessary; only the admin gets them |
-| Cloudflare Web Analytics | Cookieless |
+| Consent choice itself (`localStorage`) | Strictly necessary |
+| Cloudflare Web Analytics | Cookieless — no consent category |
 | Cloudflare security cookies (e.g. `__cf_bm`, when set) | Classified by Cloudflare as strictly necessary |
-| Instagram feed | Thumbnails served from our server; no Instagram embed |
-| Map | Static image stored on our server; no Google Maps embed or API call from the browser |
-| Fonts, hero video | Self-hosted; no YouTube/Vimeo embeds |
+| Google Maps embed | **"External content" category — loaded only after consent** |
+| Instagram feed, fonts, hero video | Served from our server; no third-party requests |
 
-Adding any third-party embed, analytics with cookies, or marketing pixels **requires bringing back the consent banner** (the design canvas has one ready). The Privacy page is still required (GDPR information duties) and must mention Cloudflare (hosting/CDN/analytics) and the server logs; owner/lawyer review before go-live.
+**Banner rules**
+- Categories: **Necessary** (always on, informational) and **External content** (Google Maps). No "Statistics" category — we set no analytics cookies.
+- "Reject" is as easy as "Accept" (same size and style), nothing pre-ticked, "Choose by category" view available.
+- The choice is changeable at any time from "Cookie settings" in every footer.
+- Without consent, the map spot shows a static map image (served from our server) and a button that opens the banner settings.
+- **Fully client-side**: the banner and the map are handled by JS reading `localStorage`, so every visitor gets the same cached HTML and the output cache is unaffected.
+- Banner texts are CMS content (`shared.cookies.*`), in both languages.
+- Map location is admin-editable: an embed URL, accepted only if it starts with `https://www.google.com/maps/embed`. The basic embed is free and needs no API key.
+
+The Privacy page must cover Cloudflare (hosting/CDN, analytics), Google Maps, and the server logs. Owner/lawyer review before go-live. Any new third-party embed or tracker needs its own consent category.
 
 ## Accessibility
 

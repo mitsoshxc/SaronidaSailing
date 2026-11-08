@@ -19,7 +19,8 @@ Phases are the build order; the whole site goes live once, after all phases are 
 - [x] Deploys: build on the developer's PC, `docker save | ssh docker load`
 - [x] Pages and sections: the "Saronida Sailing Redesign" design canvas
 - [x] Repeating blocks: editable lists (add / delete / reorder / active-inactive); sections can be deactivated too
-- [x] Analytics: Cloudflare Web Analytics; no cookie banner (no non-essential cookies or third-party embeds for visitors)
+- [x] Analytics: Cloudflare Web Analytics (cookieless)
+- [x] Google Map embed with a cookie consent banner (Necessary + External content)
 - [x] Instagram feed included at launch; fetch twice a day
 - [x] Background jobs: Hangfire with SQLite storage
 
@@ -73,6 +74,7 @@ Phases are the build order; the whole site goes live once, after all phases are 
 - [ ] Layout: header (logo, menu, language switch, Book button), footer — shared content
 - [ ] Site CSS from the design canvas; self-hosted Commissioner font
 - [ ] Pages: Home, Trips (tabs remember the chosen trip), Boat, Contact, Terms, Privacy, Accessibility
+- [ ] Cookie consent banner (client-side, `localStorage`), footer "Cookie settings", Google Map loaded only after consent with static-image fallback
 - [ ] Seed initial content from the design (Greek)
 - [ ] `sitemap.xml`, `robots.txt`, canonical + `hreflang`, 404 / 500 pages
 - [ ] Accessibility pass (WCAG 2.2 AA)
