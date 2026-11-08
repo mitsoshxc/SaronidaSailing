@@ -120,7 +120,7 @@ After local development and testing, the site is shown to the owner on the Digit
 | Redirects | No canonical `www.saronidasailing.gr` redirect and no old-site redirects |
 | Instagram | The Meta app needs the preview URL as an allowed OAuth redirect URI too |
 | Monitoring | Not needed |
-| DO backups | Enable as soon as the owner starts entering content (that content goes live) |
+| DO backups | Off during preview; enabled at go-live (developer's decision). Until then a lost droplet means re-entering the owner's content |
 | Output cache | Effectively off: Basic Auth adds an `Authorization` header to every request, and the default cache policy skips such requests. Fine for a demo; caching is exercised locally and in production |
 
 
