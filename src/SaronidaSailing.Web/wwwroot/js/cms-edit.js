@@ -1,32 +1,11 @@
-const storageKey = 'cms-edit-mode';
-const root = document.documentElement;
+import { createPending } from './cms/pending.js';
+import { createEditMode } from './cms/edit-mode.js';
+import { createInline } from './cms/inline.js';
+import { createToolbar } from './cms/toolbar.js';
 
-const readMode = () => {
-    try {
-        return sessionStorage.getItem(storageKey) === 'off' ? 'off' : 'on';
-    } catch {
-        return 'on';
-    }
-};
+const config = JSON.parse(document.getElementById('cms-config').textContent);
+const pending = createPending();
+const editMode = createEditMode();
 
-const writeMode = (mode) => {
-    try {
-        sessionStorage.setItem(storageKey, mode);
-    } catch {
-        // storage unavailable: the mode just is not remembered
-    }
-};
-
-const applyMode = (mode) => {
-    root.classList.toggle('cms-view', mode === 'off');
-    document.querySelector('[data-cms-action="toggle-edit"]')
-        ?.setAttribute('aria-pressed', mode === 'on' ? 'true' : 'false');
-};
-
-applyMode(readMode());
-
-document.querySelector('[data-cms-action="toggle-edit"]')?.addEventListener('click', () => {
-    const next = root.classList.contains('cms-view') ? 'on' : 'off';
-    writeMode(next);
-    applyMode(next);
-});
+createInline({ pending, locale: config.locale, editMode });
+createToolbar({ config, pending, editMode });

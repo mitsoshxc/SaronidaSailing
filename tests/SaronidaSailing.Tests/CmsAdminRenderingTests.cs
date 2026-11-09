@@ -65,6 +65,8 @@ public class CmsAdminRenderingTests(TempDatabaseWebApplicationFactory factory)
         Assert.Matches(@"data-cms-action=""save""\s+disabled", html);
         Assert.Matches(@"data-cms-action=""discard""\s+disabled", html);
         Assert.Contains("<span class=\"cms-toolbar-counter\" data-cms-counter aria-live=\"polite\">No unsaved changes</span>", html);
+        Assert.Contains("data-cms-status", html);
+        Assert.Contains("data-cms-errors", html);
         Assert.Contains("href=\"/en/\" lang=\"en\">English</a>", html);
         Assert.Contains("href=\"/admin/jobs\"", html);
 

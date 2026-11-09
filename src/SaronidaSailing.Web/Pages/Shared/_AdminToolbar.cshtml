@@ -11,6 +11,7 @@
     <button type="button" class="cms-toolbar-button" data-cms-action="save" disabled>Save page</button>
     <button type="button" class="cms-toolbar-button" data-cms-action="discard" disabled>Discard</button>
     <span class="cms-toolbar-counter" data-cms-counter aria-live="polite">No unsaved changes</span>
+    <p class="cms-toolbar-status" data-cms-status role="status" aria-live="polite"></p>
     @if (alternatePath is not null)
     {
         <a class="cms-toolbar-link" href="@alternatePath" lang="@(isEnglish ? SiteCultures.Greek : SiteCultures.English)">@(isEnglish ? "Ελληνικά" : "English")</a>
@@ -19,4 +20,5 @@
     <form method="post" action="/admin/logout" asp-antiforgery="true" class="cms-toolbar-form">
         <button type="submit" class="cms-toolbar-button">Log out</button>
     </form>
+    <div class="cms-toolbar-errors" data-cms-errors role="alert" hidden></div>
 </div>

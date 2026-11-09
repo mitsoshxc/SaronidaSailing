@@ -129,6 +129,45 @@ html:not(.cms-view) [data-cms-active="false"]::after {
 }
 
 html.cms-view [data-cms-empty],
+html.cms-view [data-cms-invalid],
 html.cms-view [data-cms-active="false"] {
     display: none;
+}
+
+html:not(.cms-view) [data-cms-type="text"] {
+    cursor: text;
+}
+
+html:not(.cms-view) [data-cms-key][data-cms-dirty] {
+    outline: 3px solid #b45309;
+    outline-offset: 2px;
+    background: rgba(255, 209, 102, 0.25);
+}
+
+html:not(.cms-view) [data-cms-type="text"]:focus {
+    outline: 3px solid #0b4f6c;
+    outline-offset: 2px;
+}
+
+.cms-toolbar-status {
+    margin: 0;
+}
+
+.cms-toolbar-errors {
+    flex: 1 0 100%;
+    box-sizing: border-box;
+    padding: 0.5rem 0.75rem;
+    border-left: 4px solid #a1171a;
+    border-radius: 0.25rem;
+    background: #fde8e8;
+    color: #5c0a0c;
+}
+
+.cms-toolbar-errors[hidden] {
+    display: none;
+}
+
+.cms-toolbar-errors ul {
+    margin: 0;
+    padding-inline-start: 1.25rem;
 }
