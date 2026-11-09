@@ -47,7 +47,7 @@ Approved design (2026-11-09): Identity tables live in `saronida.db` (`AppDbConte
 
 ## Phase 3 — CMS Core
 
-- [ ] Entities + configurations + repositories: `ContentItem`, `ContentListItem`, `ContentSection`, `ContentHistory`
+- [ ] Entities + configurations + repositories: `ContentItem`, `ContentListItem`, `ContentSection`, `ContentHistory`. `ContentItem.UpdatedBy` and `ContentHistory.ChangedBy` store the admin's **email** as plain text, no FK to `ApplicationUser` — history survives `admin remove` and continues when an admin is re-added with the same email (decided 2026-11-09; supersedes the FK in `docs/domain-model.md`, which Doc updates at the end of Phase 3)
 - [ ] `IContentService`: read by key + locale (English falls back to Greek when missing), save field with history (kept forever), list operations (add / delete / reorder / activate), section activate/deactivate
 - [ ] Tag helpers: `<cms>`, `<cms-link>`, `<cms-list>` (visitor rendering)
 - [ ] Page SEO rendering: `<title>`, meta description, Open Graph tags from `{page}.seo.*`
