@@ -14,6 +14,7 @@ using SaronidaSailing.Core.Services;
 using SaronidaSailing.Web;
 using SaronidaSailing.Web.Caching;
 using SaronidaSailing.Web.Cli;
+using SaronidaSailing.Web.Content;
 using SaronidaSailing.Web.Health;
 using SaronidaSailing.Web.Identity;
 using SaronidaSailing.Web.Localization;
@@ -38,6 +39,7 @@ builder.Services.AddRateLimiter(AdminLoginRateLimit.Configure);
 builder.Services.AddRazorPages(options => options.Conventions.Add(new LocalizedPageRouteConvention()));
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ILocalizedUrlService, LocalizedUrlService>();
+builder.Services.AddScoped<IPageContentAccessor, PageContentAccessor>();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddInfrastructureIdentity()
     .AddSignInManager()
