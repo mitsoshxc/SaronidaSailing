@@ -8,13 +8,13 @@ internal sealed class ContentBatch(
     IContentListItemRepository listItems,
     IContentSectionRepository sections,
     IContentHistoryRepository history,
+    IRichTextSanitizer sanitizer,
     string editorEmail)
 {
     private readonly List<string> _errors = [];
     private readonly HashSet<string> _touchedPages = [];
-    private readonly Dictionary<FieldRef, ContentItem> _fields = [];
-    private readonly List<ContentItem> _newFields = [];
-    private readonly List<(ContentItem Item, string Value)> _pendingHistory = [];
+    private readonly Dictionary<FieldRef, FieldState> _fields = [];
+    private readonly List<FieldState> _fieldOrder = [];
     private readonly Dictionary<Guid, ContentListItem> _knownListItems = [];
     private readonly List<ContentListItem> _newListItems = [];
     private readonly HashSet<Guid> _deletedIds = [];
@@ -25,6 +25,8 @@ internal sealed class ContentBatch(
     public IReadOnlyList<string> Errors => _errors;
 
     public IReadOnlyCollection<string> TouchedPages => _touchedPages;
+
+    public Guid SaveId { get; } = Guid.CreateVersion7();
 
     public int FieldsWritten { get; private set; }
 
@@ -66,6 +68,20 @@ internal sealed class ContentBatch(
         }
     }
 
+    public void Finish()
+    {
+        foreach (var state in _fieldOrder.Where(s => s.IsChanged))
+        {
+            if (state.Item.Value != state.Current)
+            {
+                state.Item.SetValue(state.Current, editorEmail);
+            }
+
+            FieldsWritten++;
+            _touchedPages.Add(state.Item.PageKey);
+        }
+    }
+
     public void Stage()
     {
         foreach (var listItem in _newListItems.Where(l => !_deletedIds.Contains(l.Id)))
@@ -73,14 +89,20 @@ internal sealed class ContentBatch(
             listItems.Add(listItem);
         }
 
-        foreach (var field in _newFields.Where(f => !BelongsToDeletedItem(f)))
+        foreach (var state in _fieldOrder.Where(s => s.IsChanged && !BelongsToDeletedItem(s.Item)))
         {
-            items.Add(field);
-        }
+            if (state.IsNew)
+            {
+                items.Add(state.Item);
+            }
 
-        foreach (var (item, value) in _pendingHistory.Where(h => !BelongsToDeletedItem(h.Item)))
-        {
-            history.Add(new ContentHistory { ContentItemId = item.Id, Value = value, ChangedBy = editorEmail });
+            history.Add(new ContentHistory
+            {
+                ContentItemId = state.Item.Id,
+                SaveId = SaveId,
+                Value = state.Current,
+                ChangedBy = editorEmail
+            });
         }
 
         foreach (var section in _newSections)
@@ -134,45 +156,46 @@ internal sealed class ContentBatch(
             }
         }
 
-        var reference = new FieldRef(page, section, field, change.Locale, change.ListItemId);
-        if (!_fields.TryGetValue(reference, out var existing))
+        var value = change.Value;
+        if (change.Type == ContentType.RichText)
         {
-            existing = change.ListItemId is { } id
+            value = sanitizer.Sanitize(value);
+        }
+        else if (change.Type == ContentType.Link && value.Length > 0 && !ContentLink.TryParse(value, out _))
+        {
+            _errors.Add(
+                $"Invalid link for '{change.Key}' ({change.Locale}): URL must be https:, mailto: or tel: and label is required.");
+            return;
+        }
+
+        var reference = new FieldRef(page, section, field, change.Locale, change.ListItemId);
+        if (!_fields.TryGetValue(reference, out var state))
+        {
+            var existing = change.ListItemId is { } id
                 ? await items.FindListFieldAsync(id, field, change.Locale, ct)
                 : await items.FindStandaloneAsync(page, section, field, change.Locale, ct);
-            if (existing is not null)
+            if (existing is null)
             {
-                _fields[reference] = existing;
+                var created = ContentItem.Create(
+                    page, section, field, change.Locale, change.ListItemId, change.Type, value, editorEmail);
+                state = new FieldState(created, null, value);
             }
+            else
+            {
+                state = new FieldState(existing, existing.Value, existing.Value);
+            }
+
+            _fields[reference] = state;
+            _fieldOrder.Add(state);
         }
 
-        if (existing is null)
+        if (state.Item.Type != change.Type)
         {
-            var created = ContentItem.Create(
-                page, section, field, change.Locale, change.ListItemId, change.Type, change.Value, editorEmail);
-            _fields[reference] = created;
-            _newFields.Add(created);
-            _pendingHistory.Add((created, change.Value));
-        }
-        else
-        {
-            if (existing.Type != change.Type)
-            {
-                _errors.Add($"'{change.Key}' ({change.Locale}) is {existing.Type}, not {change.Type}.");
-                return;
-            }
-
-            if (existing.Value == change.Value)
-            {
-                return;
-            }
-
-            existing.SetValue(change.Value, editorEmail);
-            _pendingHistory.Add((existing, change.Value));
+            _errors.Add($"'{change.Key}' ({change.Locale}) is {state.Item.Type}, not {change.Type}.");
+            return;
         }
 
-        FieldsWritten++;
-        _touchedPages.Add(page);
+        state.Current = value;
     }
 
     private async Task AddListItemAsync(AddListItem change, CancellationToken ct)
@@ -392,6 +415,17 @@ internal sealed class ContentBatch(
 
         _lists[(page, listKey)] = list;
         return list;
+    }
+
+    private sealed class FieldState(ContentItem item, string? original, string current)
+    {
+        public ContentItem Item { get; } = item;
+
+        public string Current { get; set; } = current;
+
+        public bool IsNew => original is null;
+
+        public bool IsChanged => IsNew || Current != original;
     }
 
     private readonly record struct FieldRef(string Page, string Section, string Field, string Locale, Guid? ListItemId);

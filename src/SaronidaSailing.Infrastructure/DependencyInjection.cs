@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using SaronidaSailing.Core.Entities;
+using SaronidaSailing.Infrastructure.Content;
 using SaronidaSailing.Infrastructure.Data;
 using SaronidaSailing.Core.Interfaces;
 using SaronidaSailing.Infrastructure.Logging;
@@ -37,6 +38,7 @@ public static class DependencyInjection
 
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<IAuditLog, AuditLog>();
+        services.AddSingleton<IRichTextSanitizer, RichTextSanitizer>();
         services.AddDbContext<AppDbContext>(options => options.UseSqlite(connectionString));
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();

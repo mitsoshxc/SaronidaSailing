@@ -15,6 +15,7 @@ public sealed class ContentHistoryConfiguration : IEntityTypeConfiguration<Conte
         builder.Property(x => x.ChangedBy).HasMaxLength(256).IsRequired();
 
         builder.HasIndex(x => x.ContentItemId).HasDatabaseName("IX_ContentHistory_ContentItemId");
+        builder.HasIndex(x => x.SaveId).HasDatabaseName("IX_ContentHistory_SaveId");
 
         builder.HasOne<ContentItem>()
             .WithMany()

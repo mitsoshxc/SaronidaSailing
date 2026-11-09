@@ -61,9 +61,11 @@ Tag helpers (decided 2026-11-09): attributes on real elements instead of `<cms>`
 
 ## Phase 4 — Inline Editing
 
+Agreed (2026-11-09): HtmlSanitizer and link-URL validation run **inside** `ContentService.ApplyChangesAsync`, so every writer (Save endpoint, Phase 7 seed, jobs) is covered. History is **per field, grouped by save**: every `ApplyChangesAsync` call gets one save id stored on its `ContentHistory` rows; a field gets at most one history row per save (the client merges pending edits per field, and a batch with two `SetField` for the same key/locale/list item keeps only the last). The History modal offers both "restore this field's version" and "undo this whole save" (field values only; list structure and section toggles are not in history). A template declares rich text with the `cms-rich` attribute (`<div cms="about.story.body" cms-rich>`); no attribute = plain text. No Playwright in Phase 4: the editing UI is verified by driving the Claude browser.
+
 - [ ] Admin rendering: `data-cms-*` attributes, dimmed inactive items, admin toolbar (edit mode on/off, Save page, Discard, unsaved counter, logout)
 - [ ] Pending-changes model in `cms-edit.js` + unsaved-changes warning
-- [ ] Save-page API: all pending changes in one request, one transaction, one cache eviction; antiforgery, HtmlSanitizer, link URL validation
+- [x] Save-page API: all pending changes in one request, one transaction, one cache eviction; antiforgery, HtmlSanitizer, link URL validation (plus history save ids and the history/save read endpoints)
 - [ ] Modals (`<dialog>`): rich text (Quill 2, self-hosted), link, history, Page settings
 - [ ] List editing: add, delete, drag-to-reorder (SortableJS) + up/down buttons, active/inactive toggle
 - [ ] Section active/inactive toggle (hides section and its menu links)

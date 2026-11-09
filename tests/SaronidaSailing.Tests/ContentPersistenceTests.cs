@@ -103,7 +103,7 @@ public sealed class ContentPersistenceTests : IDisposable
         {
             context.Add(list);
             context.Add(field);
-            context.Add(new ContentHistory { ContentItemId = field.Id, Value = "old", ChangedBy = Editor });
+            context.Add(new ContentHistory { SaveId = Guid.NewGuid(), ContentItemId = field.Id, Value = "old", ChangedBy = Editor });
             await context.SaveChangesAsync();
         }
 
@@ -250,7 +250,7 @@ public sealed class ContentPersistenceTests : IDisposable
         {
             _time.Advance(TimeSpan.FromMinutes(1));
             await using var context = CreateContext();
-            context.Add(new ContentHistory { ContentItemId = item.Id, Value = value, ChangedBy = Editor });
+            context.Add(new ContentHistory { SaveId = Guid.NewGuid(), ContentItemId = item.Id, Value = value, ChangedBy = Editor });
             await context.SaveChangesAsync();
         }
 
@@ -258,8 +258,8 @@ public sealed class ContentPersistenceTests : IDisposable
         var same = _time.GetUtcNow();
         await using (var context = CreateContext())
         {
-            context.Add(new ContentHistory { Id = Guid.CreateVersion7(same), ContentItemId = item.Id, Value = "v4a", ChangedBy = Editor });
-            context.Add(new ContentHistory { Id = Guid.CreateVersion7(same.AddMilliseconds(1)), ContentItemId = item.Id, Value = "v4b", ChangedBy = Editor });
+            context.Add(new ContentHistory { SaveId = Guid.NewGuid(), Id = Guid.CreateVersion7(same), ContentItemId = item.Id, Value = "v4a", ChangedBy = Editor });
+            context.Add(new ContentHistory { SaveId = Guid.NewGuid(), Id = Guid.CreateVersion7(same.AddMilliseconds(1)), ContentItemId = item.Id, Value = "v4b", ChangedBy = Editor });
             await context.SaveChangesAsync();
         }
 
@@ -286,7 +286,7 @@ public sealed class ContentPersistenceTests : IDisposable
             lists.Add(list);
             items.Add(field);
             sections.Add(ContentSection.Create("home", "highlights"));
-            history.Add(new ContentHistory { ContentItemId = field.Id, Value = "first", ChangedBy = Editor });
+            history.Add(new ContentHistory { SaveId = Guid.NewGuid(), ContentItemId = field.Id, Value = "first", ChangedBy = Editor });
 
             await using (var other = CreateContext())
             {

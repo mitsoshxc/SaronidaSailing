@@ -91,5 +91,12 @@ public sealed class PageContentAccessorTests
         public Task<ContentSaveResult> ApplyChangesAsync(
             IReadOnlyList<ContentChange> changes, ContentEditor editor, CancellationToken ct = default) =>
             throw new NotSupportedException();
+
+        public Task<IReadOnlyList<FieldVersion>> GetFieldHistoryAsync(
+            string key, string locale, Guid? listItemId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<ContentSaveDetails?> GetSaveAsync(Guid saveId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
     }
 }

@@ -226,6 +226,9 @@ namespace SaronidaSailing.Infrastructure.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<Guid>("SaveId")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("TEXT");
 
@@ -237,6 +240,9 @@ namespace SaronidaSailing.Infrastructure.Data.Migrations
 
                     b.HasIndex("ContentItemId")
                         .HasDatabaseName("IX_ContentHistory_ContentItemId");
+
+                    b.HasIndex("SaveId")
+                        .HasDatabaseName("IX_ContentHistory_SaveId");
 
                     b.ToTable("ContentHistory", (string)null);
                 });

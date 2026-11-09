@@ -4,6 +4,7 @@ using Microsoft.Extensions.Time.Testing;
 using SaronidaSailing.Core.Entities;
 using SaronidaSailing.Core.Interfaces;
 using SaronidaSailing.Core.Services;
+using SaronidaSailing.Infrastructure.Content;
 using SaronidaSailing.Infrastructure.Data;
 using SaronidaSailing.Infrastructure.Repositories;
 
@@ -258,7 +259,7 @@ public sealed class ContentServiceTests : IDisposable
         var field = await verify.Set<ContentItem>().SingleAsync();
         Assert.Equal(("second", added, "highlights"), (field.Value, field.ListItemId, field.SectionKey));
         var history = await verify.Set<ContentHistory>().Where(h => h.ContentItemId == field.Id).ToListAsync();
-        Assert.Equal(["first", "second"], history.Select(h => h.Value).Order());
+        Assert.Equal(["second"], history.Select(h => h.Value));
     }
 
     [Fact]
@@ -559,7 +560,7 @@ public sealed class ContentServiceTests : IDisposable
     {
         var id = Guid.NewGuid();
 
-        await Apply(
+        var result = await Apply(
             Field("home.hero.title", "el", "a"),
             Field("home.hero.subtitle", "el", "b"),
             Field("shared.footer.phone-1", "el", "1"),
@@ -572,7 +573,7 @@ public sealed class ContentServiceTests : IDisposable
         var entry = Assert.Single(_audit.Entries);
         Assert.Equal(("content-saved", Email, "10.0.0.1"), (entry.Event, entry.User, entry.Ip));
         Assert.Equal(
-            "pages=home,shared fields=3 list-added=1 list-deleted=0 reordered=0 list-activated=0 sections=0",
+            $"pages=home,shared fields=3 list-added=1 list-deleted=0 reordered=0 list-activated=0 sections=0 save={result.SaveId}",
             entry.Details);
     }
 
@@ -590,6 +591,268 @@ public sealed class ContentServiceTests : IDisposable
         await CreateService(context).ApplyChangesAsync([Field("home.hero.title", "el", "a")], _editor);
 
         Assert.Equal(1, observed);
+    }
+
+    private static SetField Rich(string key, string value, Guid? listItemId = null) =>
+        new(key, "el", ContentType.RichText, value, listItemId);
+
+    private static SetField LinkField(string key, string value) => new(key, "el", ContentType.Link, value);
+
+    private async Task<List<ContentHistory>> HistoryRows()
+    {
+        await using var context = CreateContext();
+        return await context.Set<ContentHistory>().AsNoTracking().OrderBy(h => h.Id).ToListAsync();
+    }
+
+    [Fact]
+    public async Task Write_RichText_IsStoredAndRecordedSanitized()
+    {
+        var result = await Apply(Rich("about.story.body", "<p>Hi <b>there</b></p><script>alert(1)</script>"));
+
+        Assert.True(result.Succeeded);
+        var page = await Read("about", "el");
+        Assert.Equal("<p>Hi there</p>", page.GetField("about.story.body")?.Value);
+        Assert.Equal(["<p>Hi there</p>"], (await HistoryRows()).Select(h => h.Value));
+    }
+
+    [Fact]
+    public async Task Write_RichTextWhoseSanitizedFormEqualsStored_IsANoOp()
+    {
+        await Apply(Rich("about.story.body", "<p>Hi</p>"));
+        _invalidator.Calls.Clear();
+
+        var result = await Apply(Rich("about.story.body", "<p>Hi</p><script>x</script>"));
+
+        Assert.True(result.Succeeded);
+        Assert.Null(result.SaveId);
+        Assert.Empty(_invalidator.Calls);
+        Assert.Single(await HistoryRows());
+    }
+
+    [Fact]
+    public async Task Write_EmptyEditorRichText_IsStoredAsEmptyString()
+    {
+        await Apply(Rich("about.story.body", "<p><br></p>"));
+
+        var page = await Read("about", "el");
+        Assert.Equal("", page.GetField("about.story.body")?.Value);
+    }
+
+    [Fact]
+    public async Task Write_InvalidLink_RejectsTheWholeBatch()
+    {
+        var result = await Apply(
+            Field("home.hero.title", "el", "a"),
+            LinkField("home.hero.cta", """{"url":"http://example.com","label":"Go"}"""));
+
+        Assert.False(result.Succeeded);
+        Assert.Null(result.SaveId);
+        Assert.Equal(
+            ["Invalid link for 'home.hero.cta' (el): URL must be https:, mailto: or tel: and label is required."],
+            result.Errors);
+        Assert.Empty(await HistoryRows());
+        Assert.Null((await Read("home", "el")).GetField("home.hero.title"));
+    }
+
+    [Theory]
+    [InlineData("not json")]
+    [InlineData("""{"url":"https://example.com","label":""}""")]
+    [InlineData("""{"url":"javascript:alert(1)","label":"x"}""")]
+    public async Task Write_MalformedLink_Fails(string value)
+    {
+        var result = await Apply(LinkField("home.hero.cta", value));
+
+        Assert.False(result.Succeeded);
+    }
+
+    [Fact]
+    public async Task Write_ValidAndEmptyLinks_AreAllowed()
+    {
+        var link = """{"url":"https://example.com","label":"Go"}""";
+        Assert.True((await Apply(LinkField("home.hero.cta", link))).Succeeded);
+        _time.Advance(TimeSpan.FromMinutes(1));
+        Assert.True((await Apply(LinkField("home.hero.cta", ""))).Succeeded);
+
+        Assert.Equal("", (await Read("home", "el")).GetField("home.hero.cta")?.Value);
+        Assert.Equal(["", link], (await HistoryRows()).OrderByDescending(h => h.CreatedAt).Select(h => h.Value));
+    }
+
+    [Fact]
+    public async Task Write_SameFieldTwiceInOneBatch_WritesOneHistoryRowWithTheLastValue()
+    {
+        var result = await Apply(
+            Field("home.hero.title", "el", "first"),
+            Field("home.hero.title", "el", "second"));
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("second", (await Read("home", "el")).GetField("home.hero.title")?.Value);
+        Assert.Equal(["second"], (await HistoryRows()).Select(h => h.Value));
+        Assert.Contains("fields=1 ", Assert.Single(_audit.Entries).Details);
+    }
+
+    [Fact]
+    public async Task Write_FieldChangedAndRestoredInOneBatch_WritesNothingForIt()
+    {
+        await Apply(Field("home.hero.title", "el", "A"), Field("home.hero.subtitle", "el", "S"));
+        _invalidator.Calls.Clear();
+        _audit.Entries.Clear();
+
+        var result = await Apply(
+            [Field("home.hero.title", "el", "B"), Field("home.hero.title", "el", "A")],
+            new ContentEditor("other@example.com", null));
+
+        Assert.True(result.Succeeded);
+        Assert.Null(result.SaveId);
+        Assert.Empty(_invalidator.Calls);
+        Assert.Empty(_audit.Entries);
+        Assert.Equal(2, (await HistoryRows()).Count);
+        await using var verify = CreateContext();
+        Assert.All(await verify.Set<ContentItem>().ToListAsync(), i => Assert.Equal(Email, i.UpdatedBy));
+    }
+
+    [Fact]
+    public async Task Write_RestoredFieldDoesNotHideOtherChanges()
+    {
+        await Apply(Field("home.hero.title", "el", "A"), Field("boat.hero.title", "el", "X"));
+        _invalidator.Calls.Clear();
+
+        var result = await Apply(
+            Field("home.hero.title", "el", "B"),
+            Field("home.hero.title", "el", "A"),
+            Field("boat.hero.title", "el", "Y"));
+
+        Assert.NotNull(result.SaveId);
+        Assert.Equal(["boat"], Assert.Single(_invalidator.Calls));
+        Assert.Contains("fields=1 ", _audit.Entries[^1].Details);
+        Assert.Equal(3, (await HistoryRows()).Count);
+    }
+
+    [Fact]
+    public async Task Write_FieldCreatedInBatchAlwaysCounts()
+    {
+        var result = await Apply(Field("home.hero.title", "el", ""));
+
+        Assert.NotNull(result.SaveId);
+        Assert.Single(await HistoryRows());
+    }
+
+    [Fact]
+    public async Task Write_HistoryRowsOfOneCallShareASaveIdAndEachCallGetsItsOwn()
+    {
+        var first = await Apply(Field("home.hero.title", "el", "a"), Field("boat.hero.title", "el", "b"));
+        var second = await Apply(Field("home.hero.title", "el", "c"));
+
+        Assert.NotNull(first.SaveId);
+        Assert.NotNull(second.SaveId);
+        Assert.NotEqual(first.SaveId, second.SaveId);
+        var rows = await HistoryRows();
+        Assert.Equal(2, rows.Count(r => r.SaveId == first.SaveId));
+        Assert.Single(rows, r => r.SaveId == second.SaveId);
+    }
+
+    [Fact]
+    public async Task Write_SaveId_IsNullWhenNothingWasWrittenOrRejected()
+    {
+        await Apply(Field("home.hero.title", "el", "a"));
+
+        Assert.Null((await Apply(Field("home.hero.title", "el", "a"))).SaveId);
+        Assert.Null((await Apply(Field("bad", "el", "a"))).SaveId);
+        Assert.Null((await Apply()).SaveId);
+    }
+
+    [Fact]
+    public async Task GetFieldHistory_ReturnsVersionsNewestFirst()
+    {
+        await Apply(Field("home.hero.title", "el", "v1"));
+        _time.Advance(TimeSpan.FromMinutes(1));
+        var second = await Apply([Field("home.hero.title", "el", "v2")], new ContentEditor("other@example.com", null));
+        _time.Advance(TimeSpan.FromMinutes(1));
+        await Apply(Field("home.hero.title", "en", "english"));
+        await using var context = CreateContext();
+
+        var versions = await CreateService(context).GetFieldHistoryAsync("home.hero.title", "el", null);
+
+        Assert.Equal(["v2", "v1"], versions.Select(v => v.Value));
+        Assert.Equal(("other@example.com", second.SaveId), (versions[0].ChangedBy, versions[0].SaveId));
+        Assert.Equal(DateTimeKind.Utc, versions[0].CreatedAt.Kind);
+        Assert.Empty(context.ChangeTracker.Entries());
+    }
+
+    [Fact]
+    public async Task GetFieldHistory_ListItemFieldsAndStandaloneFieldsAreSeparate()
+    {
+        var id = Guid.NewGuid();
+        await Apply(
+            new AddListItem("home.highlights", id),
+            Field("home.highlights.title", "el", "item", id),
+            Field("home.highlights.title", "el", "standalone"));
+        await using var context = CreateContext();
+        var service = CreateService(context);
+
+        Assert.Equal(["item"], (await service.GetFieldHistoryAsync("home.highlights.title", "el", id)).Select(v => v.Value));
+        Assert.Equal(["standalone"], (await service.GetFieldHistoryAsync("home.highlights.title", "el", null)).Select(v => v.Value));
+    }
+
+    [Fact]
+    public async Task GetFieldHistory_UnknownFieldIsEmptyAndBadInputThrows()
+    {
+        await using var context = CreateContext();
+        var service = CreateService(context);
+
+        Assert.Empty(await service.GetFieldHistoryAsync("home.hero.title", "el", null));
+        Assert.Empty(await service.GetFieldHistoryAsync("home.hero.title", "el", Guid.NewGuid()));
+        await Assert.ThrowsAsync<ArgumentException>(() => service.GetFieldHistoryAsync("bad", "el", null));
+        await Assert.ThrowsAsync<ArgumentException>(() => service.GetFieldHistoryAsync("home.hero.title", "fr", null));
+    }
+
+    [Fact]
+    public async Task GetSave_ReturnsWrittenAndPreviousValues()
+    {
+        var id = Guid.NewGuid();
+        var first = await Apply(
+            new AddListItem("home.highlights", id),
+            Field("home.hero.title", "el", "t1"),
+            Field("home.highlights.title", "el", "item1", id));
+        _time.Advance(TimeSpan.FromMinutes(1));
+        var second = await Apply(
+            Field("home.hero.title", "el", "t2"),
+            Field("home.highlights.title", "el", "item2", id),
+            Field("home.hero.subtitle", "el", "s1"));
+        await using var context = CreateContext();
+        var service = CreateService(context);
+
+        var firstDetails = await service.GetSaveAsync(first.SaveId!.Value);
+        var secondDetails = await service.GetSaveAsync(second.SaveId!.Value);
+
+        Assert.NotNull(firstDetails);
+        Assert.Equal((Email, 2), (firstDetails.ChangedBy, firstDetails.Fields.Count));
+        Assert.All(firstDetails.Fields, f => Assert.Equal("", f.PreviousValue));
+        Assert.NotNull(secondDetails);
+        Assert.Equal(DateTimeKind.Utc, secondDetails.CreatedAt.Kind);
+        var byKey = secondDetails.Fields.ToDictionary(f => (f.Key, f.ListItemId));
+        Assert.Equal(3, byKey.Count);
+        Assert.Equal(("t2", "t1"), (byKey[("home.hero.title", null)].Value, byKey[("home.hero.title", null)].PreviousValue));
+        Assert.Equal(("item2", "item1"), (byKey[("home.highlights.title", id)].Value, byKey[("home.highlights.title", id)].PreviousValue));
+        Assert.Equal(("s1", ""), (byKey[("home.hero.subtitle", null)].Value, byKey[("home.hero.subtitle", null)].PreviousValue));
+        Assert.Equal(ContentType.Text, byKey[("home.hero.title", null)].Type);
+        Assert.Equal("el", byKey[("home.hero.title", null)].Locale);
+    }
+
+    [Fact]
+    public async Task GetSave_UnknownIdIsNull_AndDeletedListItemFieldsAreAbsent()
+    {
+        var id = Guid.NewGuid();
+        var save = await Apply(
+            new AddListItem("home.highlights", id),
+            Field("home.highlights.title", "el", "item", id),
+            Field("home.hero.title", "el", "t"));
+        await Apply(new DeleteListItem("home.highlights", id));
+        await using var context = CreateContext();
+        var service = CreateService(context);
+
+        Assert.Null(await service.GetSaveAsync(Guid.NewGuid()));
+        var details = await service.GetSaveAsync(save.SaveId!.Value);
+        Assert.Equal(["home.hero.title"], details!.Fields.Select(f => f.Key));
     }
 
     public void Dispose() => _connection.Dispose();
@@ -618,6 +881,7 @@ public sealed class ContentServiceTests : IDisposable
             new ContentSectionRepository(context),
             new ContentHistoryRepository(context),
             new UnitOfWork(context),
+            new RichTextSanitizer(),
             _invalidator,
             _audit);
 

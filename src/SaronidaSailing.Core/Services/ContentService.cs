@@ -9,6 +9,7 @@ public sealed class ContentService(
     IContentSectionRepository sections,
     IContentHistoryRepository history,
     IUnitOfWork unitOfWork,
+    IRichTextSanitizer sanitizer,
     IPageCacheInvalidator cacheInvalidator,
     IAuditLog auditLog) : IContentService
 {
@@ -72,7 +73,7 @@ public sealed class ContentService(
             return Reject(editor, ["Editor email is required."]);
         }
 
-        var batch = new ContentBatch(items, listItems, sections, history, editor.Email);
+        var batch = new ContentBatch(items, listItems, sections, history, sanitizer, editor.Email);
         foreach (var change in changes)
         {
             await batch.ApplyAsync(change, ct);
@@ -83,6 +84,7 @@ public sealed class ContentService(
             return Reject(editor, batch.Errors);
         }
 
+        batch.Finish();
         if (batch.TouchedPages.Count == 0)
         {
             return ContentSaveResult.Success;
@@ -100,9 +102,58 @@ public sealed class ContentService(
             editor.IpAddress,
             $"pages={string.Join(',', pages)} fields={batch.FieldsWritten} list-added={batch.ListItemsAdded} "
             + $"list-deleted={batch.ListItemsDeleted} reordered={batch.ListsReordered} "
-            + $"list-activated={batch.ListItemsActivated} sections={batch.SectionsChanged}");
+            + $"list-activated={batch.ListItemsActivated} sections={batch.SectionsChanged} save={batch.SaveId}");
 
-        return ContentSaveResult.Success;
+        return ContentSaveResult.Saved(batch.SaveId);
+    }
+
+    public async Task<IReadOnlyList<FieldVersion>> GetFieldHistoryAsync(
+        string key, string locale, Guid? listItemId, CancellationToken ct = default)
+    {
+        if (!ContentKeys.TryParseField(key, out var page, out var section, out var field))
+        {
+            throw new ArgumentException($"Invalid field key '{key}'.", nameof(key));
+        }
+
+        if (!ContentLocales.IsSupported(locale))
+        {
+            throw new ArgumentException($"Unsupported locale '{locale}'.", nameof(locale));
+        }
+
+        var rows = await history.GetForFieldAsync(page, section, field, locale, listItemId, ct);
+        return [.. rows.Select(r => new FieldVersion(r.SaveId, r.Value, r.ChangedBy, r.CreatedAt))];
+    }
+
+    public async Task<ContentSaveDetails?> GetSaveAsync(Guid saveId, CancellationToken ct = default)
+    {
+        var entries = await history.GetForSaveAsync(saveId, ct);
+        if (entries.Count == 0)
+        {
+            return null;
+        }
+
+        var itemIds = entries.Select(e => e.Item.Id).ToArray();
+        var versionsByItem = (await history.GetForItemsAsync(itemIds, ct))
+            .GroupBy(h => h.ContentItemId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var fields = new List<SavedField>(entries.Count);
+        foreach (var (row, item) in entries)
+        {
+            var versions = versionsByItem[item.Id];
+            var index = versions.FindIndex(v => v.Id == row.Id);
+            var previous = index >= 0 && index + 1 < versions.Count ? versions[index + 1].Value : "";
+            fields.Add(new SavedField(
+                $"{item.PageKey}.{item.SectionKey}.{item.FieldKey}",
+                item.Locale,
+                item.Type,
+                item.ListItemId,
+                row.Value,
+                previous));
+        }
+
+        var first = entries[0].History;
+        return new ContentSaveDetails(saveId, first.ChangedBy, entries.Min(e => e.History.CreatedAt), fields);
     }
 
     private ContentSaveResult Reject(ContentEditor editor, IReadOnlyList<string> errors)

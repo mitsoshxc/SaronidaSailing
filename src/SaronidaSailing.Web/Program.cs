@@ -18,6 +18,7 @@ using SaronidaSailing.Web;
 using SaronidaSailing.Web.Caching;
 using SaronidaSailing.Web.Cli;
 using SaronidaSailing.Web.Content;
+using SaronidaSailing.Web.Endpoints;
 using SaronidaSailing.Web.Health;
 using SaronidaSailing.Web.Identity;
 using SaronidaSailing.Web.Localization;
@@ -79,10 +80,13 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.LoginPath = "/admin/login";
     options.LogoutPath = "/admin/logout";
     options.AccessDeniedPath = "/admin/two-factor/setup";
+    options.Events.OnRedirectToLogin = AdminApiCookieEvents.RedirectToLogin;
+    options.Events.OnRedirectToAccessDenied = AdminApiCookieEvents.RedirectToAccessDenied;
 });
 builder.Services.ConfigureOptions<ConfigureTwoFactorUserIdCookie>();
 builder.Services.AddAntiforgery(options =>
 {
+    options.HeaderName = "RequestVerificationToken";
     options.Cookie.HttpOnly = true;
     options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
     options.Cookie.SameSite = SameSiteMode.Strict;
@@ -168,6 +172,7 @@ app.MapHangfireDashboardWithAuthorizationPolicy(AdminPolicy.Name, "/admin/jobs",
 
 app.MapHealthChecks("/health");
 app.MapStaticAssets();
+app.MapContentEndpoints();
 app.MapRazorPages()
    .WithStaticAssets();
 
