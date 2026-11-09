@@ -1,6 +1,6 @@
 export const createPending = () => {
     const fields = new Map();
-    const ops = [];
+    const slots = new Map();
     const listeners = new Set();
 
     const notify = () => {
@@ -10,6 +10,14 @@ export const createPending = () => {
     };
 
     const fieldId = ({ key, locale, listItemId }) => `${key}|${locale}|${listItemId ?? ''}`;
+
+    const opCount = () => {
+        let total = 0;
+        for (const ops of slots.values()) {
+            total += ops.length;
+        }
+        return total;
+    };
 
     return {
         setField(field, value, originalValue) {
@@ -26,21 +34,40 @@ export const createPending = () => {
 
         get: (field) => fields.get(fieldId(field))?.value,
 
-        addOp(op) {
-            ops.push(op);
+        setOps(slot, ops) {
+            const before = JSON.stringify(slots.get(slot) ?? []);
+            if (before === JSON.stringify(ops)) {
+                return;
+            }
+            if (ops.length === 0) {
+                slots.delete(slot);
+            } else {
+                slots.set(slot, ops);
+            }
             notify();
         },
 
-        count: () => fields.size + ops.length,
+        dropItem(listItemId) {
+            let removed = false;
+            for (const [id, field] of fields) {
+                if (field.listItemId === listItemId) {
+                    fields.delete(id);
+                    removed = true;
+                }
+            }
+            if (removed) {
+                notify();
+            }
+        },
+
+        count: () => fields.size + opCount(),
 
         toBatch() {
-            const deleted = new Set(
-                ops.filter((op) => op.op === 'deleteListItem').map((op) => op.id));
-            const changes = [...ops];
+            const changes = [];
+            for (const ops of slots.values()) {
+                changes.push(...ops);
+            }
             for (const { key, locale, type, listItemId, value } of fields.values()) {
-                if (listItemId && deleted.has(listItemId)) {
-                    continue;
-                }
                 const change = { op: 'setField', key, locale, type, value };
                 if (listItemId) {
                     change.listItemId = listItemId;
@@ -52,7 +79,7 @@ export const createPending = () => {
 
         clear() {
             fields.clear();
-            ops.length = 0;
+            slots.clear();
             notify();
         },
 

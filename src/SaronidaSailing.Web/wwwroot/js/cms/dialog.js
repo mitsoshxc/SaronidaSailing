@@ -61,13 +61,15 @@ export const openDialog = ({ title, subtitle = '', returnFocus = null }) => {
             (body.querySelector(focusable) ?? actions.querySelector('button:not([disabled])'))?.focus();
         },
 
-        close() {
+        close(options) {
             if (!dialog.isConnected) {
                 return;
             }
             dialog.close();
             dialog.remove();
-            returnFocus?.();
+            if (options?.restoreFocus !== false) {
+                returnFocus?.();
+            }
         },
 
         requestCancel() {

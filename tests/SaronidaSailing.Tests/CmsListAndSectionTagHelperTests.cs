@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Razor.TagHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using SaronidaSailing.Core.Interfaces;
+using SaronidaSailing.Web.Content;
 using SaronidaSailing.Web.TagHelpers;
 using static SaronidaSailing.Tests.TagHelperTestSupport;
 
@@ -148,5 +149,79 @@ public sealed class CmsListAndSectionTagHelperTests
     public async Task Section_InvalidKey_Throws(string key)
     {
         await Assert.ThrowsAsync<InvalidOperationException>(() => RenderSection(Content(), key));
+    }
+
+    private static async Task<string> RenderSectionLink(
+        PageContent content, string key, ICmsEditContext editContext)
+    {
+        var attributes = new TagHelperAttributeList { { "href", "#x" } };
+        var output = NewOutput("a", attributes);
+
+        await new CmsSectionLinkTagHelper(new FakePageContentAccessor(content), editContext) { Key = key }
+            .ProcessAsync(NewContext("a", attributes), output);
+
+        return Render(output);
+    }
+
+    [Fact]
+    public async Task SectionLink_VisitorActive_IsRenderedWithoutAttribute()
+    {
+        var html = await RenderSectionLink(Content(), "home.instagram", Visitor);
+
+        Assert.Equal("<a href=\"#x\"></a>", html);
+    }
+
+    [Fact]
+    public async Task SectionLink_VisitorInactive_IsSuppressed()
+    {
+        var content = Content(sections: new() { ["home.instagram"] = false });
+
+        Assert.Equal("", await RenderSectionLink(content, "home.instagram", Visitor));
+    }
+
+    [Fact]
+    public async Task SectionLink_EditorInactive_HasBothDataAttributes()
+    {
+        var content = Content(sections: new() { ["home.instagram"] = false });
+
+        var html = await RenderSectionLink(content, "home.instagram", Editor);
+
+        Assert.Equal("<a href=\"#x\" data-cms-section-link=\"home.instagram\" data-cms-active=\"false\"></a>", html);
+    }
+
+    [Fact]
+    public async Task SectionLink_EditorActive_HasOnlySectionLinkAttribute()
+    {
+        var html = await RenderSectionLink(Content(), "home.instagram", Editor);
+
+        Assert.Equal("<a href=\"#x\" data-cms-section-link=\"home.instagram\"></a>", html);
+    }
+
+    [Fact]
+    public async Task SectionLink_SharedKey_WorksOnAPageSnapshot()
+    {
+        var content = Content(sections: new() { ["shared.sandbox"] = false });
+
+        Assert.Equal("", await RenderSectionLink(content, "shared.sandbox", Visitor));
+    }
+
+    [Fact]
+    public async Task SectionLink_OtherPageKey_Throws()
+    {
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => RenderSectionLink(Content(), "boat.gallery", Visitor));
+
+        Assert.Equal(
+            "'cms-section-link' can only point to a section of the current page ('home') or 'shared' (got 'boat.gallery').",
+            exception.Message);
+    }
+
+    [Theory]
+    [InlineData("home")]
+    [InlineData("home.instagram.x")]
+    [InlineData("")]
+    public async Task SectionLink_InvalidKey_Throws(string key)
+    {
+        await Assert.ThrowsAsync<InvalidOperationException>(() => RenderSectionLink(Content(), key, Visitor));
     }
 }

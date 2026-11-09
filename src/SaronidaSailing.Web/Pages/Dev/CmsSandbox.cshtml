@@ -8,13 +8,15 @@
     <meta name="robots" content="noindex, nofollow" />
 }
 
+<nav class="sandbox-nav" aria-label="Sandbox sections"><a href="#sandbox-list" cms-section-link="shared.sandbox-list">List section</a></nav>
+
 <section class="sandbox" cms-section="shared.sandbox">
     <h1 cms="shared.sandbox.title"></h1>
     <div cms="shared.sandbox.body" cms-rich></div>
     <p><a cms-link="shared.sandbox.cta"></a></p>
 </section>
 
-<section class="sandbox" cms-section="shared.sandbox-list">
+<section class="sandbox" id="sandbox-list" cms-section="shared.sandbox-list">
     <ul class="sandbox-list">
         <li cms-list="shared.sandbox-items">
             <h3 cms-field="title"></h3>
@@ -22,4 +24,7 @@
             <a cms-link-field="link"></a>
         </li>
     </ul>
+    <ol class="sandbox-steps">
+        <li cms-list="shared.sandbox-steps"><span cms-field="text"></span></li>
+    </ol>
 </section>

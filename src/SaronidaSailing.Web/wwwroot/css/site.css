@@ -178,3 +178,14 @@
 .sandbox-list li {
     margin-bottom: 1rem;
 }
+
+.sandbox-nav {
+    max-width: 40rem;
+    margin: 1rem auto 0;
+    padding: 0 1rem;
+}
+
+.sandbox-steps {
+    margin: 1rem 0 0;
+    padding-inline-start: 1.5rem;
+}

@@ -238,6 +238,9 @@ public class CmsAdminRenderingTests(TempDatabaseWebApplicationFactory factory)
         Assert.Contains($"data-cms-item=\"{item}\" data-cms-active=\"false\"", html);
         Assert.Contains("data-cms-key=\"shared.sandbox-items.title\" data-cms-type=\"text\">Κρυφό</h3>", html);
         Assert.Contains("<template data-cms-list-template=\"shared.sandbox-items\">", html);
+        Assert.Contains("<template data-cms-list-template=\"shared.sandbox-steps\">", html);
+        Assert.Contains("data-cms-section-link=\"shared.sandbox-list\" data-cms-active=\"false\"", html);
+        Assert.DoesNotContain("cms-section-link=", html.Replace("data-cms-section-link=", ""));
     }
 
     [Fact]

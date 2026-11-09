@@ -6,17 +6,21 @@ import { createToolbar } from './cms/toolbar.js';
 import { createWindows } from './cms/windows.js';
 import { createFieldBar } from './cms/fieldbar.js';
 import { createMissing } from './cms/missing.js';
+import { createLists } from './cms/lists.js';
+import { createSections } from './cms/sections.js';
 
 const config = JSON.parse(document.getElementById('cms-config').textContent);
 const pending = createPending();
 const editMode = createEditMode();
 const fields = createFields({ pending, config });
 
-createInline({ fields, editMode });
+const inline = createInline({ fields, editMode });
 const toolbar = createToolbar({ config, pending, editMode });
 const windows = createWindows({ config, fields, pending, toolbar });
-createFieldBar({ editMode, windows });
+const fieldBar = createFieldBar({ editMode, windows });
 createMissing();
+createSections({ pending, toolbar });
+createLists({ pending, inline, fieldBar, toolbar, editMode, config });
 
 const settingsButton = document.querySelector('[data-cms-action="page-settings"]');
 settingsButton?.addEventListener('click', () => windows.openSettings(() => settingsButton.focus()));

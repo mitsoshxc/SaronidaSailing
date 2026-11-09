@@ -34,5 +34,6 @@ export const createMissing = () => {
     });
 
     document.addEventListener('cms:fieldchange', render);
+    document.addEventListener('cms:structurechange', render);
     render();
 };
