@@ -1,3 +1,4 @@
+using Hangfire;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
@@ -138,6 +139,14 @@ app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.MapHangfireDashboardWithAuthorizationPolicy(AdminPolicy.Name, "/admin/jobs", new DashboardOptions
+{
+    DashboardTitle = "Saronida Sailing jobs",
+    AppPath = "/",
+    DisplayStorageConnectionString = false,
+    Authorization = [],
+});
 
 app.MapHealthChecks("/health");
 app.MapStaticAssets();
