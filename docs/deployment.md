@@ -46,7 +46,7 @@ Maintenance mode takes effect immediately — no restart, no deploy. Details und
 | `/usr/local/bin/saronida-admin` | Wrapper for the admin CLI commands |
 | `/etc/nginx/sites-available/saronida` | Site config (from `deploy/nginx/`) |
 
-The .NET container images run as the non-root `app` user (UID 1654) and listen on port 8080. The bind-mounted folders (`/var/saronida/data`, `/var/saronida/media`, later `/var/saronida/logs`) **must be owned by or writable for UID 1654** (e.g. `chown -R 1654:1654`). The container port is published on loopback only: `127.0.0.1:5000:8080`.
+The .NET container images run as the non-root `app` user (UID 1654) and listen on port 8080. The bind-mounted folders (`/var/saronida/data`, including `data/keys`, `/var/saronida/media` and `/var/saronida/logs`) **must be owned by or writable for UID 1654** (e.g. `chown -R 1654:1654`): the app writes the Data Protection keys to `data/keys` and the NLog files to `logs`. The container port is published on loopback only: `127.0.0.1:5000:8080`.
 
 ## Dockerfile
 
@@ -72,8 +72,15 @@ Production values are in `src/SaronidaSailing.Web/appsettings.json`; environment
 | `ConnectionStrings:Hangfire` | `/var/saronida/data/hangfire.db` | Plain file path (not a connection string) |
 | `Media:RootPath` | `/var/saronida/media` | Must exist and be writable; outside Development it is **not** created by the app, and `/health` fails if it is missing |
 | `Health:HomePageUrl` | `http://127.0.0.1:8080/` | URL the `home-page` health check requests from inside the container |
+| `Logs:Path` | `/var/saronida/logs` | NLog folder (`audit-*.log`, `app-*.log`); must be writable for UID 1654; startup fails if the key is missing |
+| `DataProtection:KeysPath` | `/var/saronida/data/keys` | Data Protection keys (unencrypted at rest); created if missing, must be writable for UID 1654; startup fails if the key is missing |
+| `ForwardedHeaders:KnownNetworks` | `["172.30.0.0/24"]` | CIDR networks allowed to set `X-Forwarded-For` / `X-Forwarded-Proto`; an invalid value fails startup. As an environment variable: `ForwardedHeaders__KnownNetworks__0` |
 
-A missing `ConnectionStrings:Content`, `ConnectionStrings:Hangfire` or `Media:RootPath` fails startup.
+A missing `ConnectionStrings:Content`, `ConnectionStrings:Hangfire`, `Media:RootPath`, `Logs:Path` or `DataProtection:KeysPath` fails startup.
+
+**Compose network.** The compose file (Phase 8) must pin the network subnet to `172.30.0.0/24`. Host nginx reaches the container through the published port `127.0.0.1:5000:8080`, so the app sees requests coming from the compose network gateway, not from `127.0.0.1`; `ForwardedHeaders:KnownNetworks` trusts exactly that subnet. If the subnet changes, change the key with it, or the app ignores the client IP and every login rate-limit bucket becomes the gateway address.
+
+**Admin CLI.** `saronida-admin` (Phase 8) wraps `docker compose exec web dotnet SaronidaSailing.Web.dll admin <command>`. The commands read the password from a hidden prompt and need a TTY: `docker compose exec` allocates one by default, so do not pass `-T`. Without a TTY the command fails with a message and exit code 1.
 
 ## nginx
 

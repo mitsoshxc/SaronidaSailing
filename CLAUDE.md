@@ -6,7 +6,7 @@ Stack: ASP.NET Core 10 Razor Pages · Entity Framework Core 10 · SQLite · ASP.
 
 Languages: Greek (default, no URL prefix) and English (`/en/`). Pages and sections come from the "Saronida Sailing Redesign" design canvas: https://claude.ai/artifact/RcU5iMfQSTJ34rH5gFB7MC (read it with the Artifact tool; desktop artboards `Desktop*.dc.html` hold the full layouts, the canvas notes hold design decisions).
 
-Project status: **Phase 1 (Foundation) is complete**. Docs mark what is implemented and what is still agreed design; `PLAN.md` tracks the rest of the build.
+Project status: **Phase 2 (Admin Authentication) is complete**. Docs mark what is implemented and what is still agreed design; `PLAN.md` tracks the rest of the build.
 
 ## Before You Start (working agreements)
 
@@ -15,7 +15,7 @@ Project status: **Phase 1 (Foundation) is complete**. Docs mark what is implemen
 - **Never decide on your own** what hasn't been agreed — propose, ask, then record the decision in `docs/` / `PLAN.md`.
 - **Development and testing happen on the developer's PC.** Cloud sessions: the "SaronidaSailing" environment installs the .NET 10 SDK via its setup script; there is no Docker daemon in the cloud, so the `Dockerfile`/compose are only built and run locally.
 - **Environments:** local → **preview** at `https://saronida.visualpivot.net` (password-protected, never crawlable, for showing the owner) → production at `https://www.saronidasailing.gr` on **the same droplet** (preview features removed, DNS switched). See `docs/deployment.md` → Preview.
-- **Verify during implementation** (flagged in the docs): unique index with nullable `ListItemId` (Phase 3), `Hangfire.Storage.SQLite` still maintained (Phase 1), NLog 90-day cleanup with dated file names (Phase 2), iPhone HEIC upload (Phase 5), Meta app development mode (Phase 6).
+- **Verify during implementation** (flagged in the docs): unique index with nullable `ListItemId` (Phase 3), `Hangfire.Storage.SQLite` still maintained (Phase 1), iPhone HEIC upload (Phase 5), Meta app development mode (Phase 6).
 
 ## Emergency: take the site offline
 

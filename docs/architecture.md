@@ -46,9 +46,9 @@ SaronidaSailing.slnx
 global.json, Directory.Build.props, Directory.Packages.props, nuget.config
 .config/dotnet-tools.json          dotnet-ef local tool
 src/
-  SaronidaSailing.Core/            entities (BaseEntity), interfaces, services (no EF, no ASP.NET)
-  SaronidaSailing.Infrastructure/  Data/ (AppDbContext, DatabaseInitializer, Migrations), Health/, Media/, DependencyInjection.cs
-  SaronidaSailing.Web/             Program.cs, Localization/, Health/, Pages/, wwwroot, appsettings*.json
+  SaronidaSailing.Core/            entities (BaseEntity, ApplicationUser), interfaces, services (no EF, no ASP.NET)
+  SaronidaSailing.Infrastructure/  Data/ (AppDbContext, DatabaseInitializer, Migrations), Health/, Logging/ (AuditLog), Media/, DependencyInjection.cs
+  SaronidaSailing.Web/             Program.cs, Cli/, Identity/, Localization/, Health/, Pages/ (Pages/Admin/), wwwroot, appsettings*.json
 tests/
   SaronidaSailing.Tests/           xUnit; temp-file databases (see docs/conventions.md -> Tests)
 Dockerfile, .dockerignore
@@ -72,7 +72,7 @@ Root build files:
 Data layer (`Infrastructure/Data/`):
 
 - `AppDbContext` stamps `CreatedAt` / `UpdatedAt` on every `SaveChanges*` from the injected `TimeProvider` (see `docs/domain-model.md` -> Entities). A convention converter makes every `DateTime` come back from SQLite as UTC.
-- `DatabaseInitializer.InitializeDatabaseAsync` runs in `Web/Program.cs` before the app accepts requests: creates the database folder, applies migrations, then sets `PRAGMA journal_mode=WAL`. The only migration so far is an empty `InitialCreate` (no entities yet).
+- `DatabaseInitializer.InitializeDatabaseAsync` runs in `Web/Program.cs` before the app accepts requests: creates the database folder, applies migrations, then sets `PRAGMA journal_mode=WAL`. Migrations so far: an empty `InitialCreate` and `AddIdentity` (the Identity tables).
 - Connection string `ConnectionStrings:Content`; a missing value fails startup.
 
 ## Pages (from the "Saronida Sailing Redesign" design canvas)
@@ -208,9 +208,9 @@ Linux native assets: `SkiaSharp.NativeAssets.Linux.NoDependencies` (nothing to i
 | Database backup copy (`VACUUM INTO`) | Nightly |
 
 - Storage: `Hangfire.Storage.SQLite` 0.4.3 in a separate file (`hangfire.db`; `ConnectionStrings:Hangfire` is a plain file path, not a connection string) so job polling never locks the content database.
-- Server: Hangfire 1.8.25, **2 workers**, registered in `Infrastructure/DependencyInjection.cs` (`AddInfrastructure`). **Implemented so far: storage and server only** - no jobs and no dashboard yet.
+- Server: Hangfire 1.8.25, **2 workers**, registered in `Infrastructure/DependencyInjection.cs` (`AddInfrastructure`). **Implemented so far: storage, server and the dashboard** - no jobs yet.
 - **Known defect:** `SQLiteStorage.Dispose()` in 0.4.3 can hang or crash. Production disposes it only at process exit; the test factory therefore retries deleting its temp folder instead of relying on a clean dispose.
-- Dashboard at `/admin/jobs`, admin-only (Phase 2).
+- Dashboard at `/admin/jobs`, mapped in `Web/Program.cs` with `MapHangfireDashboardWithAuthorizationPolicy(AdminPolicy.Name, ...)`: only requests that satisfy the `Admin` policy (authenticated + `amr=mfa`) get in; the dashboard's own authorization filter list is empty. Hangfire's antiforgery works with our `Secure` / `SameSite=Strict` cookies (`HangfireDashboardTests`).
 - Every job must be safe to run twice.
 - Possible later job: delete media files never referenced by any content or history (uploads discarded before Save). Not in scope until needed.
 
@@ -242,44 +242,100 @@ Reachable only from the droplet itself — nginx denies `/health` from the inter
 
 ## Admin Accounts
 
-- No registration page. Admins are managed only with CLI commands built into the web app, run on the droplet (they go through Identity, so password hashes and stamps are always valid — never insert users with SQL):
+- No registration page. Admins are managed only with CLI commands built into the web app, run on the droplet (they go through Identity, so password hashes and stamps are always valid — never insert users with SQL).
+
+**CLI** (`Web/Cli/AdminCommandRunner.cs`): `dotnet SaronidaSailing.Web.dll admin <command>`. When the first argument is `admin`, `Program.cs` builds the host without the command-line args, runs migrations, runs the command and exits without starting the web server.
 
 | Command | Does |
 |---|---|
-| `admin add <email>` | Prompts for the password (hidden input, typed twice, checked against the password policy) and creates the admin |
-| `admin reset-password <email>` | Prompts for a new password the same way; also clears lockout |
-| `admin list` | Lists admins |
-| `admin remove <email>` | Deletes an admin |
+| `admin add <email>` | Prompts for the password, creates the admin (2FA is set up at first login) |
+| `admin reset-password <email>` | Prompts for a new password; clears lockout and the failed-attempt count, and changes the security stamp (existing sessions end within a minute). 2FA is left as it is |
+| `admin list` | Lists admins: email, 2FA on/off, and "locked until" when locked out |
+| `admin remove <email>` | Asks `[y/N]`, then deletes the admin |
 
-  Run as `docker compose exec web dotnet SaronidaSailing.Web.dll admin <command>`, wrapped by a host script `saronida-admin`. Passwords are never passed as arguments (they would end up in shell history).
+- Exit codes: `0` success, `1` failure (password mismatch, policy error, unknown admin, remove not confirmed, no TTY), `2` wrong usage.
+- Passwords are never arguments (shell history). They are typed twice with hidden input (`ConsolePasswordPrompt`), which needs an interactive terminal: with redirected input the command fails with a message. Run on the droplet as `docker compose exec web dotnet SaronidaSailing.Web.dll admin <command>` (no `-T`), wrapped by the host script `saronida-admin` (still Phase 8).
+- Every command writes an audit line (user `cli`).
 - The first admin is created with `admin add` after the first deploy — no passwords in config or environment variables.
-- Login at `/admin/login`; not linked from the public site.
-- **2FA mandatory**: first login forces authenticator-app (TOTP) setup and shows recovery codes. A lost phone is recovered with a recovery code; a forgotten password with `admin reset-password`.
-- Session: 12 hours, sliding; no "remember me". Cookie `Secure`, `HttpOnly`, `SameSite=Strict`.
-- Lockout: 5 failed attempts → 15 minutes. Plus a per-IP rate limit on the login endpoint.
-- **Data Protection keys persisted** to `/var/saronida/data/keys` — otherwise every deploy logs admins out and invalidates antiforgery tokens.
+- **Password policy** (`AddInfrastructureIdentity` in `Infrastructure/DependencyInjection.cs`): minimum 12 characters, no character-class rules. Email is the user name and must be unique.
+
+**Pages** (all under `Web/Pages/Admin/`, layout `Pages/Shared/_AdminLayout.cshtml`): English only and not localized, `noindex, nofollow` meta, and `[ResponseCache(NoStore = true)]`. Not linked from the public site.
+
+| Path | Purpose |
+|---|---|
+| `/admin/login` | Email + password |
+| `/admin/login/code` | TOTP code (second step) |
+| `/admin/login/recovery` | Recovery code instead of a TOTP code |
+| `/admin/two-factor/setup` | Mandatory authenticator setup |
+| `/admin/logout` | The GET page only shows a confirm form; signing out is a POST |
+
+```
+password ──► 2FA on?  yes ─► /admin/login/code ─► signed in (amr=mfa) ─► returnUrl or /
+                      no  ─► signed in WITHOUT amr ─► /admin/two-factor/setup ─► code ─► signed in (amr=mfa)
+```
+
+1. `/admin/login` checks the password with lockout counting. Failures show one generic message ("Invalid email or password, or the account is temporarily locked.") whether the user is unknown, the password is wrong or the account is locked.
+2. With 2FA on, the user goes to `/admin/login/code`; until the code is accepted the user is held only in the Identity two-factor cookie (`Secure`, `HttpOnly`, `SameSite=Strict`, `Web/Identity/ConfigureTwoFactorUserIdCookie.cs`). A wrong TOTP or recovery code shows a generic message too and counts toward lockout.
+3. With 2FA off, the password login signs the user in without the `amr` claim, so the `Admin` policy still fails, and the user lands on `/admin/two-factor/setup` (which is also the `AccessDeniedPath`).
+4. The setup page shows a QR code (QRCoder, inline SVG, `Web/Identity/AuthenticatorQr.cs`) and the same key in groups of 4. A valid code enables 2FA, signs the user in with `amr=mfa`, and the POST response shows **10 recovery codes once**; the page cannot show them again and the app never logs them.
+5. No "remember this browser" and no "remember me": the sign-in is never persistent. `returnUrl` is honoured only when it is a local URL, otherwise `/`.
+6. A lost phone is recovered with a recovery code; a forgotten password with `admin reset-password`.
+
+**Authorization:** the `Admin` policy (`Web/Identity/AdminPolicy.cs`) = authenticated user + claim `amr=mfa`. Only a completed 2FA login carries that claim.
+
+**Session:** cookie `saronida.auth`, `Secure` (always), `HttpOnly`, `SameSite=Strict`, 12 hours, sliding. The antiforgery cookie uses the same flags. The security stamp is re-validated every **1 minute**, so a password reset or removal takes effect quickly. A refresh builds a new principal from the user store, which would drop the `amr` claim and lock the admin out of the `Admin` policy; `MfaClaimPreserver` (`OnRefreshingPrincipal`) copies `amr` from the old principal.
+
+**Lockout:** 5 failed attempts → 15 minutes (also for new users). Wrong TOTP and recovery codes count like wrong passwords.
+
+**Data Protection keys** are persisted to `DataProtection:KeysPath` (`/var/saronida/data/keys`; Development `data/keys`), application name `SaronidaSailing` — otherwise every deploy logs admins out and invalidates antiforgery tokens. The keys are **not encrypted at rest** (file permissions only). When a key is created, `XmlKeyManager` logs a warning that reaches the app log.
+
 - Several admins may edit at once; concurrent saves to the same field: last save wins. `ContentHistory` records who changed what.
-- Hangfire dashboard `/admin/jobs`: admin-only authorization filter.
+- Hangfire dashboard `/admin/jobs`: see Background Jobs.
 
 ## Logging (NLog)
 
+Implemented. Configuration is the `NLog` section of `appsettings.json`, loaded in `Web/Program.cs` (the default Microsoft logging providers are cleared). The folder comes from `Logs:Path` (`/var/saronida/logs`; Development `data/logs`); startup fails if it is missing.
+
 | File | Contents |
 |---|---|
-| `audit-YYYY-MM-DD.log` | Logins (success/failure), lockouts, 2FA setup, admin CLI commands, content changes — time, user, IP |
-| `app-YYYY-MM-DD.log` | Warnings and errors |
+| `audit-YYYY-MM-DD.log` | Everything written by the `Audit` logger (see below) |
+| `app-YYYY-MM-DD.log` | Warnings and errors from all other loggers |
 
-- Location `/var/saronida/logs` (bind mount, survives deploys). Never in the database.
-- **Retention 90 days**, deleted by NLog's own archive cleanup when files roll over (no Hangfire job needed). Exact NLog settings verified at implementation; if NLog's cleanup doesn't fit the file naming, fall back to a daily Hangfire cleanup job.
+- Lines start with a UTC ISO 8601 timestamp. Warnings and errors also go to the console (Docker log). Never in the database.
+- Routing rules, first match wins: `Audit` → audit file only; `Microsoft.Hosting.Lifetime` Info → console; `Microsoft.*`, `System.*`, `Hangfire.*` up to Info → dropped; everything else from Warn → app file and console.
+- **Retention 90 days**: `maxArchiveDays: 90` on both file targets. Because the file names carry the date, NLog deletes older files when a new day's file is opened — no Hangfire cleanup job needed. Verified by `LogRetentionTests`.
 - Docker's console log for the container is size-capped (json-file `max-size` / `max-file`).
 - IP addresses in logs are personal data: the Privacy page must mention the logs and the 90-day retention.
+- Until Phase 3 adds entity configurations, EF logs a startup warning "No instantiatable types implementing IEntityTypeConfiguration".
+
+**Audit line format** (`Infrastructure/Logging/AuditLog.cs`): `time|event|user=…|ip=…[|details]`; an empty user or IP is written as `-`. Fields can carry attacker input (the email typed on the login form), so each is sanitized: control and line/paragraph-separator characters become a space, `|` becomes `/`, and it is cut at 256 characters.
+
+| Event | Written when |
+|---|---|
+| `login-2fa-required` | Password correct, 2FA on |
+| `login-2fa-setup-required` | Password correct, 2FA not set up yet |
+| `login-failed` | Wrong password or unknown user |
+| `login-locked-out` | A password, TOTP or recovery attempt hit lockout |
+| `login-2fa-failed` | Wrong TOTP or recovery code |
+| `login-succeeded` | Login complete (details `totp` or `recovery`) |
+| `recovery-code-used` | Recovery code accepted (details `remaining=N`) |
+| `2fa-enabled`, `2fa-setup-failed` | Setup page: valid or invalid code |
+| `logout` | Sign out |
+| `login-rate-limited` | Rate limiter rejection (details: path) |
+| `admin-added`, `admin-password-reset`, `admin-removed`, `admin-listed`, `admin-remove-cancelled` | CLI commands (user `cli`) |
+| `admin-add-failed`, `admin-password-reset-failed`, `admin-remove-failed` | CLI command failed (details: email and errors) |
+
+Content-change events are added with the CMS.
 
 ## Security
 
 | Concern | Measure |
 |---|---|
 | Admin login | Identity cookie auth + mandatory TOTP 2FA; lockout; per-IP rate limiter on login (see Admin Accounts) |
-| Real client IP | nginx `realip` module sets the client IP from `CF-Connecting-IP` (Cloudflare ranges only); app uses `UseForwardedHeaders` trusting nginx (127.0.0.1) |
-| CSRF | Antiforgery tokens on all admin write endpoints |
+| Real client IP | nginx `realip` module sets the client IP from `CF-Connecting-IP` (Cloudflare ranges only) and forwards it in `X-Forwarded-For`. The app (`UseForwardedHeaders`, `Web/ForwardedHeadersSetup.cs`) reads `X-Forwarded-For` and `X-Forwarded-Proto` with `ForwardLimit = 1`, and trusts them **only** from the networks in `ForwardedHeaders:KnownNetworks` = `172.30.0.0/24`, the docker compose network subnet. It is not `127.0.0.1`: host nginx reaches the container through the published port, so the app sees the request coming from the compose network gateway. The compose file must pin that subnet (see `docs/deployment.md`) |
+| Rate limiting | `UseRateLimiter` with one global partitioned limiter (`Web/Identity/AdminLoginRateLimit.cs`): only **POSTs** to `/admin/login`, `/admin/login/code`, `/admin/login/recovery` and `/admin/two-factor/setup` are limited, 10 per minute per client IP, fixed window, no queue. Rejection: 429, `Retry-After: 60`, plain-text message, audit event `login-rate-limited`. GETs and all other paths are not limited |
+| Lockout | 5 failed attempts → 15 minutes, per account; TOTP and recovery failures count |
+| CSRF | Antiforgery tokens on all admin write endpoints; antiforgery cookie `Secure`, `HttpOnly`, `SameSite=Strict` |
 | XSS | Razor encoding by default; rich text sanitized with HtmlSanitizer before storage; link URLs restricted to `https:`, `tel:`, `mailto:` |
 | Transport | Cloudflare SSL mode **Full (strict)**; Let's Encrypt cert on the origin |
 | Uploads | Admin-only; validated by decoding; size limits |

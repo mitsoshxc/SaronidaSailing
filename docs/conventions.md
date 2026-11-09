@@ -28,6 +28,9 @@ These rules apply to every file in the codebase. The Dev agent enforces them on 
 | Hangfire job classes live in `Infrastructure/Jobs/` | Thin: call a service. Recurring jobs registered in `Program.cs`. |
 | Razor Pages, tag helpers, admin API endpoints live in `Web` | No business logic in page models or endpoints — delegate to services. |
 | ViewModels live in `Web/Models/` | Never pass entities to pages/views. |
+| Auth policy and helpers live in `Web/Identity/` | `AdminPolicy`, `AdminLoginRateLimit`, `MfaClaimPreserver`, `AuthenticatorQr`. Admin pages are in `Web/Pages/Admin/` |
+| CLI commands live in `Web/Cli/` | `AdminCommandRunner` and its console prompts; selected in `Program.cs` when the first argument is `admin` |
+| Audit logger writer `AuditLog` lives in `Infrastructure/Logging/` | Behind `IAuditLog` in `Core/Interfaces/` |
 
 `Core` must not reference `Infrastructure` or `Web`. `Infrastructure` must not reference `Web`.
 
@@ -85,7 +88,7 @@ The database must stay swappable (Postgres / SQL Server) with only a provider an
 
 ## Logging
 
-- NLog only. Audit events (logins, admin actions, content changes) go to the audit logger; warnings/errors to the app log.
+- NLog only. Audit events (logins, admin actions, content changes) go through `IAuditLog.Record(event, user, ip, details)` (`Core/Interfaces`); never write to the `Audit` logger directly, because `IAuditLog` sanitizes the fields (see `docs/architecture.md` -> Logging). Warnings/errors go to the app log.
 - Never log passwords, 2FA codes, recovery codes, tokens or cookies.
 - Logs go to files, never to the database.
 
@@ -96,6 +99,9 @@ The database must stay swappable (Postgres / SQL Server) with only a provider an
 - xUnit in `tests/SaronidaSailing.Tests/`.
 - Tests that need the web host use `TempDatabaseWebApplicationFactory`: a temp folder per factory holding the content database, `hangfire.db` and the media folder, plus the home-page health client routed to the in-memory test server. The folder is deleted on dispose (the delete is retried because Hangfire's SQLite storage releases its file late).
 - Every test class that uses the factory is marked `[Collection(WebHostCollection.Name)]`. Hangfire's `JobStorage.Current` is static, so web-host tests must not run in parallel.
+- The factory sets its base address to `https://localhost`, because the auth and antiforgery cookies are `Secure`.
+- The login rate limiter is per client IP, so every test client gets its own IP through the test-only `X-Test-Remote-Ip` header, applied by `TestRemoteIpStartupFilter` in `TempDatabaseWebApplicationFactory.cs`. Do not share one client across tests that post to the login paths.
+- NLog's `LogManager` is static, so tests that read log files keep their own factory class (the `LogRetentionTests` pattern: `[Collection(WebHostCollection.Name)]` plus `IClassFixture<TempDatabaseWebApplicationFactory>`).
 - Tests that only need the `DbContext` (e.g. `BaseEntityTimestampTests`) use a plain SQLite in-memory connection and a fake `TimeProvider`.
 
 ---
@@ -145,3 +151,10 @@ The database must stay swappable (Postgres / SQL Server) with only a provider an
 - `let` / `const` only — never `var`.
 - Plain JS, no framework. Keep scripts small and scoped; no globals.
 - `cms-edit.js` is loaded only for the authenticated admin.
+
+---
+
+## Local Development
+
+- The launch profile serves `https://localhost:5001` and `http://localhost:5000` (`Properties/launchSettings.json`). Admin pages need HTTPS: the antiforgery and auth cookies are `Secure` always, so over plain HTTP the browser drops them and login cannot work. Run `dotnet dev-certs https --trust` once.
+- Development data lives under `src/SaronidaSailing.Web/data/` (databases, `media`, `keys`, `logs`).
