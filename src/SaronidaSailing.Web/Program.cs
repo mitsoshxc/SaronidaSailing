@@ -7,11 +7,15 @@ using SaronidaSailing.Infrastructure;
 using SaronidaSailing.Infrastructure.Data;
 using SaronidaSailing.Infrastructure.Health;
 using SaronidaSailing.Infrastructure.Media;
+using SaronidaSailing.Core.Interfaces;
+using SaronidaSailing.Core.Services;
+using SaronidaSailing.Web.Cli;
 using SaronidaSailing.Web.Health;
 using SaronidaSailing.Web.Identity;
 using SaronidaSailing.Web.Localization;
 
-var builder = WebApplication.CreateBuilder(args);
+var isAdminCommand = AdminCommandRunner.IsAdminCommand(args);
+var builder = WebApplication.CreateBuilder(isAdminCommand ? [] : args);
 
 var logsPath = builder.Configuration["Logs:Path"];
 if (string.IsNullOrWhiteSpace(logsPath))
@@ -31,6 +35,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddInfrastructureIdentity()
     .AddSignInManager()
     .AddDefaultTokenProviders();
+builder.Services.AddScoped<IAdminAccountService, AdminAccountService>();
 builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme).AddIdentityCookies();
 builder.Services.AddAuthorization();
 builder.Services.Configure<SecurityStampValidatorOptions>(options => options.ValidationInterval = TimeSpan.FromMinutes(1));
@@ -75,6 +80,25 @@ var app = builder.Build();
 
 await app.Services.InitializeDatabaseAsync();
 
+if (isAdminCommand)
+{
+    int exitCode;
+    using (var scope = app.Services.CreateScope())
+    {
+        var runner = new AdminCommandRunner(
+            scope.ServiceProvider.GetRequiredService<IAdminAccountService>(),
+            scope.ServiceProvider.GetRequiredService<IAuditLog>(),
+            new ConsolePasswordPrompt(),
+            new ConsoleLineReader(),
+            Console.Out,
+            Console.Error);
+        exitCode = await runner.RunAsync(args);
+    }
+
+    LogManager.Shutdown();
+    return exitCode;
+}
+
 if (app.Environment.IsDevelopment())
 {
     MediaFolder.EnsureExists(app.Services.GetRequiredService<IOptions<MediaOptions>>().Value.RootPath);
@@ -105,5 +129,7 @@ app.MapRazorPages()
    .WithStaticAssets();
 
 await app.RunAsync();
+
+return 0;
 
 public partial class Program;
