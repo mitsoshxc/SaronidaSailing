@@ -16,8 +16,8 @@ public class ContentListItem : BaseEntity
 
     public ICollection<ContentItem> Fields { get; init; } = [];
 
-    public static ContentListItem Create(string pageKey, string listKey, int sortOrder) =>
-        new() { PageKey = pageKey, ListKey = listKey, SortOrder = sortOrder };
+    public static ContentListItem Create(string pageKey, string listKey, int sortOrder, Guid? id = null) =>
+        new() { Id = id ?? Guid.CreateVersion7(), PageKey = pageKey, ListKey = listKey, SortOrder = sortOrder };
 
     public void MoveTo(int sortOrder) => SortOrder = sortOrder;
 

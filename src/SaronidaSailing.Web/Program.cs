@@ -12,6 +12,7 @@ using SaronidaSailing.Infrastructure.Media;
 using SaronidaSailing.Core.Interfaces;
 using SaronidaSailing.Core.Services;
 using SaronidaSailing.Web;
+using SaronidaSailing.Web.Caching;
 using SaronidaSailing.Web.Cli;
 using SaronidaSailing.Web.Health;
 using SaronidaSailing.Web.Identity;
@@ -42,6 +43,9 @@ builder.Services.AddInfrastructureIdentity()
     .AddSignInManager()
     .AddDefaultTokenProviders();
 builder.Services.AddScoped<IAdminAccountService, AdminAccountService>();
+builder.Services.AddOutputCache();
+builder.Services.AddScoped<IContentService, ContentService>();
+builder.Services.AddSingleton<IPageCacheInvalidator, OutputCachePageInvalidator>();
 builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme).AddIdentityCookies();
 builder.Services.AddAuthorizationBuilder()
     .AddPolicy(AdminPolicy.Name, policy => policy
