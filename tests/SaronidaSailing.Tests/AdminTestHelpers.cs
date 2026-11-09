@@ -66,12 +66,24 @@ public static class AdminTestHelpers
 {
     public const string Password = "correct-horse-battery";
 
-    public static HttpClient NewClient(WebApplicationFactory<Program> factory) =>
-        factory.CreateClient(new WebApplicationFactoryClientOptions
+    private static int _clientCounter;
+
+    public static HttpClient NewClient(WebApplicationFactory<Program> factory)
+    {
+        var n = Interlocked.Increment(ref _clientCounter);
+        return NewClientFromIp(factory, $"10.200.{n / 250}.{n % 250 + 1}");
+    }
+
+    public static HttpClient NewClientFromIp(WebApplicationFactory<Program> factory, string remoteIp, Uri? baseAddress = null)
+    {
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             AllowAutoRedirect = false,
-            BaseAddress = new Uri("https://localhost"),
+            BaseAddress = baseAddress ?? new Uri("https://localhost"),
         });
+        client.DefaultRequestHeaders.Add(TestRemoteIpStartupFilter.HeaderName, remoteIp);
+        return client;
+    }
 
     public static async Task AddAdminAsync(WebApplicationFactory<Program> factory, string email)
     {

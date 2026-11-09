@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using NLog;
@@ -9,6 +10,7 @@ using SaronidaSailing.Infrastructure.Health;
 using SaronidaSailing.Infrastructure.Media;
 using SaronidaSailing.Core.Interfaces;
 using SaronidaSailing.Core.Services;
+using SaronidaSailing.Web;
 using SaronidaSailing.Web.Cli;
 using SaronidaSailing.Web.Health;
 using SaronidaSailing.Web.Identity;
@@ -28,6 +30,9 @@ LogManager.Setup().LoadConfigurationFromSection(builder.Configuration);
 LogManager.Configuration!.Variables["logDir"] = Path.GetFullPath(logsPath, builder.Environment.ContentRootPath);
 builder.Logging.AddNLog();
 
+ForwardedHeadersSetup.Configure(new ForwardedHeadersOptions(), builder.Configuration);
+builder.Services.Configure<ForwardedHeadersOptions>(options => ForwardedHeadersSetup.Configure(options, builder.Configuration));
+builder.Services.AddRateLimiter(AdminLoginRateLimit.Configure);
 builder.Services.AddRazorPages(options => options.Conventions.Add(new LocalizedPageRouteConvention()));
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ILocalizedUrlService, LocalizedUrlService>();
@@ -111,6 +116,8 @@ if (app.Environment.IsDevelopment())
     MediaFolder.EnsureExists(app.Services.GetRequiredService<IOptions<MediaOptions>>().Value.RootPath);
 }
 
+app.UseForwardedHeaders();
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
@@ -126,6 +133,8 @@ app.UseRequestLocalization(options =>
 });
 
 app.UseRouting();
+
+app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();

@@ -1,3 +1,5 @@
+using System.Net;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Hosting.Server;
@@ -7,7 +9,26 @@ using SaronidaSailing.Web.Health;
 
 namespace SaronidaSailing.Tests;
 
-public sealed class TempDatabaseWebApplicationFactory : WebApplicationFactory<Program>
+public sealed class TestRemoteIpStartupFilter : IStartupFilter
+{
+    public const string HeaderName = "X-Test-Remote-Ip";
+
+    public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
+    {
+        app.Use((context, nextMiddleware) =>
+        {
+            if (context.Request.Headers.TryGetValue(HeaderName, out var ip) && IPAddress.TryParse(ip.ToString(), out var address))
+            {
+                context.Connection.RemoteIpAddress = address;
+            }
+
+            return nextMiddleware();
+        });
+        next(app);
+    };
+}
+
+public sealed class TempDatabaseWebApplicationFactory: WebApplicationFactory<Program>
 {
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "saronida-tests-" + Guid.NewGuid().ToString("N"));
 
@@ -34,9 +55,13 @@ public sealed class TempDatabaseWebApplicationFactory : WebApplicationFactory<Pr
         builder.UseSetting("DataProtection:KeysPath", KeysPath);
         builder.UseSetting("Health:HomePageUrl", "http://localhost/");
 
-        builder.ConfigureTestServices(services => services
-            .AddHttpClient(HomePageHealthCheck.HttpClientName)
-            .ConfigurePrimaryHttpMessageHandler(sp => ((TestServer)sp.GetRequiredService<IServer>()).CreateHandler()));
+        builder.ConfigureTestServices(services =>
+        {
+            services
+                .AddHttpClient(HomePageHealthCheck.HttpClientName)
+                .ConfigurePrimaryHttpMessageHandler(sp => ((TestServer)sp.GetRequiredService<IServer>()).CreateHandler());
+            services.AddTransient<IStartupFilter, TestRemoteIpStartupFilter>();
+        });
     }
 
     protected override void Dispose(bool disposing)
