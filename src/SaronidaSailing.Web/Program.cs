@@ -40,7 +40,14 @@ builder.Logging.AddNLog();
 ForwardedHeadersSetup.Configure(new ForwardedHeadersOptions(), builder.Configuration);
 builder.Services.Configure<ForwardedHeadersOptions>(options => ForwardedHeadersSetup.Configure(options, builder.Configuration));
 builder.Services.AddRateLimiter(AdminLoginRateLimit.Configure);
-builder.Services.AddRazorPages(options => options.Conventions.Add(new LocalizedPageRouteConvention()));
+builder.Services.AddRazorPages(options =>
+{
+    options.Conventions.Add(new LocalizedPageRouteConvention());
+    if (builder.Environment.IsDevelopment())
+    {
+        options.Conventions.AddPageRoute("/Dev/CmsSandbox", "en/dev/cms-sandbox");
+    }
+});
 builder.Services.Configure<WebEncoderOptions>(options =>
     options.TextEncoderSettings = new TextEncoderSettings(
         UnicodeRanges.BasicLatin, UnicodeRanges.Latin1Supplement, UnicodeRanges.GreekandCoptic, UnicodeRanges.GeneralPunctuation));
@@ -48,6 +55,7 @@ builder.Services.AddSiteOptions(builder.Configuration);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ILocalizedUrlService, LocalizedUrlService>();
 builder.Services.AddScoped<IPageContentAccessor, PageContentAccessor>();
+builder.Services.AddScoped<ICmsEditContext, CmsEditContext>();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddInfrastructureIdentity()
     .AddSignInManager()

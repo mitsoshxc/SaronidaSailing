@@ -6,8 +6,13 @@ namespace SaronidaSailing.Web.TagHelpers;
 
 [HtmlTargetElement(Attributes = "cms")]
 [HtmlTargetElement(Attributes = "cms-field")]
-public sealed class CmsTagHelper(IPageContentAccessor accessor, ILogger<CmsTagHelper> logger) : TagHelper
+public sealed class CmsTagHelper(
+    IPageContentAccessor accessor,
+    ICmsEditContext editContext,
+    ILogger<CmsTagHelper> logger) : TagHelper
 {
+    private const string RichAttribute = "cms-rich";
+
     [HtmlAttributeName("cms")]
     public string? Key { get; set; }
 
@@ -16,27 +21,54 @@ public sealed class CmsTagHelper(IPageContentAccessor accessor, ILogger<CmsTagHe
 
     public override async Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
     {
-        var value = await CmsFieldResolver.ReadAsync(context, accessor, Key, ItemField, "cms", "cms-field");
+        var rich = context.AllAttributes.ContainsName(RichAttribute);
+        output.Attributes.RemoveAll(RichAttribute);
 
-        if (value is null)
+        var templateType = rich ? ContentType.RichText : ContentType.Text;
+        var field = await CmsFieldResolver.ReadAsync(context, accessor, Key, ItemField, "cms", "cms-field");
+        var editor = await editContext.IsEditorAsync();
+        var value = field.Value;
+
+        if (value is not null && value.Type != templateType)
+        {
+            logger.LogWarning(
+                "Content '{Key}' is {Type} but the template renders it as {Template}.",
+                field.Key, value.Type, templateType);
+            output.SuppressOutput();
+            return;
+        }
+
+        var empty = value is null || string.IsNullOrWhiteSpace(value.Value);
+        if (empty && !editor)
         {
             output.SuppressOutput();
             return;
         }
 
-        switch (value.Type)
+        if (editor)
         {
-            case ContentType.Text:
-                output.Content.SetContent(value.Value);
-                break;
-            case ContentType.RichText:
-                output.Content.SetHtmlContent(value.Value);
-                break;
-            default:
-                logger.LogWarning(
-                    "Content '{Key}' is {Type} but the template renders it as text.", Key ?? ItemField, value.Type);
-                output.SuppressOutput();
-                break;
+            output.Attributes.SetAttribute("data-cms-key", field.Key);
+            output.Attributes.SetAttribute("data-cms-type", rich ? "richText" : "text");
+            if (value is { IsFallback: true })
+            {
+                CmsFieldResolver.Flag(output, "data-cms-fallback");
+            }
+        }
+
+        if (empty)
+        {
+            CmsFieldResolver.Flag(output, "data-cms-empty");
+            output.Content.SetContent(string.Empty);
+            return;
+        }
+
+        if (rich)
+        {
+            output.Content.SetHtmlContent(value!.Value);
+        }
+        else
+        {
+            output.Content.SetContent(value!.Value);
         }
     }
 }

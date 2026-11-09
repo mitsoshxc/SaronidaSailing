@@ -20,7 +20,7 @@ public sealed class CmsListAndSectionTagHelperTests
         var context = NewContext("li", attributes);
         var output = NewOutput("li", attributes, () => (child ?? RenderTitleChild)(context));
 
-        await new CmsListTagHelper(accessor) { Key = key }.ProcessAsync(context, output);
+        await new CmsListTagHelper(accessor, Visitor) { Key = key }.ProcessAsync(context, output);
 
         return Render(output);
 
@@ -29,7 +29,7 @@ public sealed class CmsListAndSectionTagHelperTests
             var childAttributes = new TagHelperAttributeList();
             var childContext = NewContext("span", childAttributes, new Dictionary<object, object>(listContext.Items));
             var childOutput = NewOutput("span", childAttributes);
-            await new CmsTagHelper(accessor, NullLogger<CmsTagHelper>.Instance) { ItemField = "title" }
+            await new CmsTagHelper(accessor, Visitor, NullLogger<CmsTagHelper>.Instance) { ItemField = "title" }
                 .ProcessAsync(childContext, childOutput);
             return Html(Render(childOutput));
         }
@@ -77,12 +77,12 @@ public sealed class CmsListAndSectionTagHelperTests
         {
             var childAttributes = new TagHelperAttributeList();
             var childOutput = NewOutput("a", childAttributes);
-            await new CmsLinkTagHelper(accessor, NullLogger<CmsLinkTagHelper>.Instance) { ItemField = "link" }
+            await new CmsLinkTagHelper(accessor, Visitor, NullLogger<CmsLinkTagHelper>.Instance) { ItemField = "link" }
                 .ProcessAsync(NewContext("a", childAttributes, new Dictionary<object, object>(context.Items)), childOutput);
             return Html(Render(childOutput));
         });
 
-        await new CmsListTagHelper(accessor) { Key = "home.highlights" }.ProcessAsync(context, output);
+        await new CmsListTagHelper(accessor, Visitor) { Key = "home.highlights" }.ProcessAsync(context, output);
 
         Assert.Equal("<li><a href=\"tel:&#x2B;30\">Call</a></li>", Render(output));
     }
@@ -97,7 +97,7 @@ public sealed class CmsListAndSectionTagHelperTests
         {
             var attributes = new TagHelperAttributeList();
             var innerContext = NewContext("ul", attributes, new Dictionary<object, object>(outer.Items));
-            await new CmsListTagHelper(accessor) { Key = "home.highlights" }
+            await new CmsListTagHelper(accessor, Visitor) { Key = "home.highlights" }
                 .ProcessAsync(innerContext, NewOutput("ul", attributes));
             return new DefaultTagHelperContent();
         }));
@@ -117,7 +117,7 @@ public sealed class CmsListAndSectionTagHelperTests
         var attributes = new TagHelperAttributeList { { "id", "ig" } };
         var output = NewOutput("section", attributes);
 
-        await new CmsSectionTagHelper(new FakePageContentAccessor(content)) { Key = key }
+        await new CmsSectionTagHelper(new FakePageContentAccessor(content), Visitor) { Key = key }
             .ProcessAsync(NewContext("section", attributes), output);
 
         return Render(output);

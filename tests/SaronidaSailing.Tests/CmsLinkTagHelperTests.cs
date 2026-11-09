@@ -11,7 +11,7 @@ public sealed class CmsLinkTagHelperTests
 {
     private static async Task<string> Render(PageContent content, string key = "home.hero.cta")
     {
-        var helper = new CmsLinkTagHelper(new FakePageContentAccessor(content), NullLogger<CmsLinkTagHelper>.Instance)
+        var helper = new CmsLinkTagHelper(new FakePageContentAccessor(content), Visitor, NullLogger<CmsLinkTagHelper>.Instance)
         {
             Key = key,
         };
@@ -87,7 +87,7 @@ public sealed class CmsLinkTagHelperTests
     [Fact]
     public async Task LinkField_OutsideList_Throws()
     {
-        var helper = new CmsLinkTagHelper(new FakePageContentAccessor(Content()), NullLogger<CmsLinkTagHelper>.Instance)
+        var helper = new CmsLinkTagHelper(new FakePageContentAccessor(Content()), Visitor, NullLogger<CmsLinkTagHelper>.Instance)
         {
             ItemField = "link",
         };

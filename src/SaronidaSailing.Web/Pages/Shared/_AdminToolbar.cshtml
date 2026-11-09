@@ -1,0 +1,22 @@
+@using SaronidaSailing.Web.Content
+@using SaronidaSailing.Web.Localization
+@inject IPageContentAccessor ContentAccessor
+@inject ILocalizedUrlService UrlService
+@{
+    var isEnglish = (await ContentAccessor.GetAsync()).Locale == SiteCultures.English;
+    var alternatePath = UrlService.GetAlternatePath();
+}
+<div class="cms-toolbar" role="region" aria-label="Admin toolbar">
+    <button type="button" class="cms-toolbar-button" data-cms-action="toggle-edit" aria-pressed="true">Edit mode</button>
+    <button type="button" class="cms-toolbar-button" data-cms-action="save" disabled>Save page</button>
+    <button type="button" class="cms-toolbar-button" data-cms-action="discard" disabled>Discard</button>
+    <span class="cms-toolbar-counter" data-cms-counter aria-live="polite">No unsaved changes</span>
+    @if (alternatePath is not null)
+    {
+        <a class="cms-toolbar-link" href="@alternatePath" lang="@(isEnglish ? SiteCultures.Greek : SiteCultures.English)">@(isEnglish ? "Ελληνικά" : "English")</a>
+    }
+    <a class="cms-toolbar-link" href="/admin/jobs">Jobs</a>
+    <form method="post" action="/admin/logout" asp-antiforgery="true" class="cms-toolbar-form">
+        <button type="submit" class="cms-toolbar-button">Log out</button>
+    </form>
+</div>

@@ -1,14 +1,38 @@
+@using Microsoft.AspNetCore.Antiforgery
+@using SaronidaSailing.Web.Content
+@inject ICmsEditContext EditContext
+@inject IPageContentAccessor ContentAccessor
+@inject IAntiforgery Antiforgery
+@{
+    var isEditor = await EditContext.IsEditorAsync();
+}
 <!DOCTYPE html>
 <html lang="@System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <cms-seo fallback-title="@ViewData["Title"] · Saronida Sailing" />
+    @await RenderSectionAsync("Head", required: false)
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    @if (isEditor)
+    {
+        <link rel="stylesheet" href="~/css/cms-edit.css" asp-append-version="true" />
+    }
 </head>
 <body>
+    @if (isEditor)
+    {
+        <partial name="_AdminToolbar" />
+    }
     <main>
         @RenderBody()
     </main>
+    @if (isEditor)
+    {
+        var config = CmsEditorConfig.Create(
+            await ContentAccessor.GetAsync(), Antiforgery.GetAndStoreTokens(Context).RequestToken!);
+        <script type="application/json" id="cms-config">@Html.Raw(config.ToJson())</script>
+        <script type="module" src="~/js/cms-edit.js" asp-append-version="true"></script>
+    }
 </body>
 </html>

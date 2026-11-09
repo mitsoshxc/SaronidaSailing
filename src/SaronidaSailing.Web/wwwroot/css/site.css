@@ -162,3 +162,19 @@
         columns: 2;
     }
 }
+
+.sandbox {
+    max-width: 40rem;
+    margin: 1rem auto;
+    padding: 0 1rem;
+}
+
+.sandbox-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.sandbox-list li {
+    margin-bottom: 1rem;
+}

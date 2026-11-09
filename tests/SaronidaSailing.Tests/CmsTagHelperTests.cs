@@ -10,7 +10,7 @@ namespace SaronidaSailing.Tests;
 public sealed class CmsTagHelperTests
 {
     private static CmsTagHelper Helper(PageContent content, string? key = null, string? field = null) =>
-        new(new FakePageContentAccessor(content), NullLogger<CmsTagHelper>.Instance) { Key = key, ItemField = field };
+        new(new FakePageContentAccessor(content), Visitor, NullLogger<CmsTagHelper>.Instance) { Key = key, ItemField = field };
 
     private static async Task<TagHelperOutput> Run(CmsTagHelper helper, params (string, object)[] attributes)
     {
@@ -36,7 +36,7 @@ public sealed class CmsTagHelperTests
     {
         var content = Content(fields: new() { ["home.hero.body"] = Rich("<p>Hi <strong>there</strong></p>") });
 
-        var output = await Run(Helper(content, "home.hero.body"));
+        var output = await Run(Helper(content, "home.hero.body"), ("cms-rich", ""));
 
         Assert.Equal("<h1><p>Hi <strong>there</strong></p></h1>", Render(output));
     }

@@ -16,6 +16,10 @@ internal static class TagHelperTestSupport
 {
     private static readonly HtmlEncoder Encoder = HtmlEncoder.Create(UnicodeRanges.All);
 
+    public static readonly ICmsEditContext Visitor = new FakeEditContext(false);
+
+    public static readonly ICmsEditContext Editor = new FakeEditContext(true);
+
     public static PageContent Content(
         string locale = "el",
         Dictionary<string, ContentValue>? fields = null,
@@ -61,5 +65,32 @@ internal static class TagHelperTestSupport
         using var writer = new StringWriter();
         output.WriteTo(writer, Encoder);
         return writer.ToString();
+    }
+}
+
+internal sealed class FakeEditContext(bool isEditor) : ICmsEditContext
+{
+    public Task<bool> IsEditorAsync() => Task.FromResult(isEditor);
+}
+
+internal sealed class ListLogger<T> : Microsoft.Extensions.Logging.ILogger<T>
+{
+    public List<string> Warnings { get; } = [];
+
+    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+    public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
+
+    public void Log<TState>(
+        Microsoft.Extensions.Logging.LogLevel logLevel,
+        Microsoft.Extensions.Logging.EventId eventId,
+        TState state,
+        Exception? exception,
+        Func<TState, Exception?, string> formatter)
+    {
+        if (logLevel == Microsoft.Extensions.Logging.LogLevel.Warning)
+        {
+            Warnings.Add(formatter(state, exception));
+        }
     }
 }

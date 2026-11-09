@@ -1,0 +1,25 @@
+@page "/dev/cms-sandbox"
+@model CmsSandboxModel
+@{
+    ViewData["Title"] = "CMS sandbox";
+}
+
+@section Head {
+    <meta name="robots" content="noindex, nofollow" />
+}
+
+<section class="sandbox" cms-section="shared.sandbox">
+    <h1 cms="shared.sandbox.title"></h1>
+    <div cms="shared.sandbox.body" cms-rich></div>
+    <p><a cms-link="shared.sandbox.cta"></a></p>
+</section>
+
+<section class="sandbox" cms-section="shared.sandbox-list">
+    <ul class="sandbox-list">
+        <li cms-list="shared.sandbox-items">
+            <h3 cms-field="title"></h3>
+            <div cms-field="text" cms-rich></div>
+            <a cms-link-field="link"></a>
+        </li>
+    </ul>
+</section>
