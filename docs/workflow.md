@@ -56,7 +56,7 @@ Local development:
 
 1. `dotnet tool restore` once — installs `dotnet-ef` from `.config/dotnet-tools.json`.
 2. `dotnet restore` / `dotnet build` work independently of machine-level NuGet feeds: the repo `nuget.config` clears them and uses nuget.org only.
-3. `dotnet run --project src/SaronidaSailing.Web` serves http://localhost:5132 (Development environment, from `launchSettings.json`).
+3. `dotnet run --project src/SaronidaSailing.Web` serves http://localhost:5000 (Development environment, from `launchSettings.json`).
 4. Development data (content DB, `hangfire.db`, media) goes to `src/SaronidaSailing.Web/data/`, which is gitignored; delete the folder to start fresh. The media folder is created automatically in Development only.
 5. `dotnet test` runs the xUnit tests (see `docs/conventions.md` -> Tests).
 

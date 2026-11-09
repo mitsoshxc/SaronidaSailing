@@ -231,7 +231,7 @@ Configuration keys:
 
 | Key | Production (`appsettings.json`) | Development |
 |---|---|---|
-| `Health:HomePageUrl` | `http://127.0.0.1:8080/` (the container's own port) | `http://localhost:5132/` |
+| `Health:HomePageUrl` | `http://127.0.0.1:8080/` (the container's own port) | `http://localhost:5000/` |
 | `Media:RootPath` | `/var/saronida/media` | `data/media` |
 
 The media folder is created at startup **only in Development** (`MediaFolder.EnsureExists` in `Web/Program.cs`). Elsewhere it is a bind mount, and a missing or unwritable folder must fail `/health` rather than be silently created inside the container.
