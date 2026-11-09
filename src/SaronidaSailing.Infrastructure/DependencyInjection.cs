@@ -5,6 +5,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using SaronidaSailing.Infrastructure.Data;
+using SaronidaSailing.Core.Interfaces;
+using SaronidaSailing.Infrastructure.Logging;
 using SaronidaSailing.Infrastructure.Media;
 
 namespace SaronidaSailing.Infrastructure;
@@ -31,6 +33,7 @@ public static class DependencyInjection
             .ValidateOnStart();
 
         services.TryAddSingleton(TimeProvider.System);
+        services.AddSingleton<IAuditLog, AuditLog>();
         services.AddDbContext<AppDbContext>(options => options.UseSqlite(connectionString));
 
         DatabaseDirectory.EnsureExistsForFile(hangfirePath);

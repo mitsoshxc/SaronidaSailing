@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Options;
+using NLog;
+using NLog.Extensions.Logging;
 using SaronidaSailing.Infrastructure;
 using SaronidaSailing.Infrastructure.Data;
 using SaronidaSailing.Infrastructure.Health;
@@ -7,6 +9,17 @@ using SaronidaSailing.Web.Health;
 using SaronidaSailing.Web.Localization;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var logsPath = builder.Configuration["Logs:Path"];
+if (string.IsNullOrWhiteSpace(logsPath))
+{
+    throw new InvalidOperationException("Logs:Path is not configured.");
+}
+
+builder.Logging.ClearProviders();
+LogManager.Setup().LoadConfigurationFromSection(builder.Configuration);
+LogManager.Configuration!.Variables["logDir"] = Path.GetFullPath(logsPath, builder.Environment.ContentRootPath);
+builder.Logging.AddNLog();
 
 builder.Services.AddRazorPages(options => options.Conventions.Add(new LocalizedPageRouteConvention()));
 builder.Services.AddHttpContextAccessor();

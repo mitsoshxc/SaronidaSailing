@@ -17,10 +17,13 @@ public sealed class TempDatabaseWebApplicationFactory : WebApplicationFactory<Pr
 
     public string MediaPath => Path.Combine(_directory, "media");
 
+    public string LogsPath => Path.Combine(_directory, "logs");
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         Directory.CreateDirectory(MediaPath);
 
+        builder.UseSetting("Logs:Path", LogsPath);
         builder.UseSetting("ConnectionStrings:Content", $"Data Source={DatabasePath};Pooling=False");
         builder.UseSetting("ConnectionStrings:Hangfire", HangfirePath);
         builder.UseSetting("Media:RootPath", MediaPath);
