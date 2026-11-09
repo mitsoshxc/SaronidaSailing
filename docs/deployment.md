@@ -150,7 +150,7 @@ After local development and testing, the site is shown to the owner on the Digit
 | Host name | `saronida.visualpivot.net` |
 | TLS | Let's Encrypt certificate for that subdomain |
 | **Not crawlable** | (1) nginx **HTTP Basic Auth** on the whole site (crawlers only ever get 401), (2) `X-Robots-Tag: noindex, nofollow` on every response, (3) `robots.txt` → `Disallow: /`, no `sitemap.xml`. One shared username/password for the owner, kept in an htpasswd file on the droplet (never in the repo) |
-| App config | `ASPNETCORE_ENVIRONMENT=Preview`; `Site:BaseUrl` = the preview URL, used for canonical, `hreflang`, Open Graph and JSON-LD URLs |
+| App config | `ASPNETCORE_ENVIRONMENT=Preview`; `Site:BaseUrl` = the preview URL (set as the environment variable `Site__BaseUrl`; required, the app refuses to start without a valid absolute http(s) URL with no path), used for canonical, `hreflang`, Open Graph and JSON-LD URLs |
 | Redirects | No canonical `www.saronidasailing.gr` redirect and no old-site redirects |
 | Instagram | The Meta app needs the preview URL as an allowed OAuth redirect URI too |
 | Monitoring | Not needed |

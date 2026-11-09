@@ -1,6 +1,6 @@
 # Domain Model
 
-Status: **`BaseEntity` is implemented (Phase 1); all other entities are planned, not yet implemented.** Exact uniqueness/index details are settled in the Phase 3 brief.
+Status: **`BaseEntity`, `ApplicationUser` and the four content entities (`ContentItem`, `ContentListItem`, `ContentSection`, `ContentHistory`; migration `AddContent`) are implemented. `MediaAsset`, `InstagramPost` and `IntegrationSetting` are planned, not yet implemented.**
 
 ## Content Keys
 
@@ -16,66 +16,79 @@ Every editable spot has a key: `{page}.{section}.{field}` — lowercase, kebab-c
 
 Page key `shared` is reserved for content on every page (header, footer). Writing to it evicts the cache of all pages.
 
+Parsing and validation live in `Core/Services/ContentKeys.cs`: each segment matches `[a-z0-9]+(-[a-z0-9]+)*` and is at most 100 characters; a field key has exactly 3 segments, a list key or section key exactly 2. Locales are `el` and `en` (`Core/Services/ContentLocales.cs`).
+
 ## Entities
 
 All entities except `ApplicationUser` inherit `BaseEntity` (`Core/Entities/BaseEntity.cs`, implemented): `Id` (Guid, `init`, defaults to `Guid.CreateVersion7()`), `CreatedAt` (DateTime, UTC, private setter), `UpdatedAt` (DateTime, UTC, private setter). The timestamps are stamped automatically by `AppDbContext.SaveChanges*` (`CreatedAt` and `UpdatedAt` on insert, `UpdatedAt` on update) and are never set by hand.
 
 ### ContentItem
 
-The current value of one editable field in one locale — either a standalone field or a field of a list item.
+Implemented (`Core/Entities/ContentItem.cs`, table `ContentItems`). The current value of one editable field in one locale — either a standalone field or a field of a list item. Created with `ContentItem.Create(...)`; `Value` and `UpdatedBy` change only through `SetValue`.
 
 | Field | Type | Notes |
 |---|---|---|
-| `PageKey` | string | e.g. `home` |
-| `SectionKey` | string | e.g. `hero` |
-| `FieldKey` | string | e.g. `title` |
-| `Locale` | string | `el`, `en` |
+| `PageKey` | string (max 100) | e.g. `home` |
+| `SectionKey` | string (max 100) | e.g. `hero`; for a list item's field, the list's `ListKey` |
+| `FieldKey` | string (max 100) | e.g. `title` |
+| `Locale` | string (max 5) | `el`, `en` |
 | `ListItemId` | Guid? | FK → `ContentListItem`; null for standalone fields |
-| `Type` | `ContentType` enum | `Text`, `RichText`, `Link`, `Image` |
+| `Type` | `ContentType` enum | `Text`, `RichText`, `Link`, `Image` (`Core/Entities/ContentType.cs`); stored as a string (max 20) |
 | `Value` | string | Plain text, sanitized HTML, link JSON (`url`, `label`), or `MediaAsset.Id` |
-| `UpdatedBy` | string | FK → `ApplicationUser.Id` |
+| `UpdatedBy` | string (max 256) | The editing admin's **email**, plain text, no FK to `ApplicationUser` — history survives `admin remove` and continues if the same email is re-added |
 
-Uniqueness: one row per (`PageKey`, `SectionKey`, `FieldKey`, `Locale`, `ListItemId`). Note: SQLite and Postgres treat NULLs as distinct in unique indexes, so standalone fields (null `ListItemId`) need their own enforcement — decided in the Phase 3 brief.
+SQLite and Postgres treat NULLs as distinct in unique indexes, so uniqueness is two filtered unique indexes (`Infrastructure/Data/Configurations/ContentItemConfiguration.cs`):
+
+| Index | Columns | Filter |
+|---|---|---|
+| `UX_ContentItems_Standalone` (unique) | `PageKey`, `SectionKey`, `FieldKey`, `Locale` | `ListItemId IS NULL` |
+| `UX_ContentItems_ListField` (unique) | `ListItemId`, `FieldKey`, `Locale` | `ListItemId IS NOT NULL` |
+| `IX_ContentItems_PageKey_Locale` | `PageKey`, `Locale` | none; serves the page read |
+
+A list item's fields carry the list's `PageKey` and its `ListKey` as `SectionKey`. `ContentPersistenceTests` proves both indexes on SQLite.
+
+`Value` is not sanitized yet: HtmlSanitizer and link-URL validation on save arrive with the Save-page API (Phase 4). Link JSON is read and checked by `Core/Services/ContentLink.cs` (`https:`, `tel:`, `mailto:` only).
 
 ### ContentListItem
 
-One entry of a repeating block (a highlight, a trip card, a gallery photo...). Its fields are `ContentItem` rows with `ListItemId` set.
+Implemented (`Core/Entities/ContentListItem.cs`, table `ContentListItems`). One entry of a repeating block (a highlight, a trip card, a gallery photo...). Its fields are `ContentItem` rows with `ListItemId` set. A list item has no locale (its fields do).
 
 | Field | Type | Notes |
 |---|---|---|
-| `PageKey` | string | |
-| `ListKey` | string | e.g. `highlights` (full key `home.highlights`) |
-| `SortOrder` | int | Admin reorders by drag |
-| `IsActive` | bool | Inactive items are hidden from visitors, shown dimmed to the admin |
+| `PageKey` | string (max 100) | |
+| `ListKey` | string (max 100) | e.g. `highlights` (full key `home.highlights`) |
+| `SortOrder` | int | Admin reorders by drag; changed with `MoveTo` |
+| `IsActive` | bool | Default true; changed with `SetActive`. Inactive items are hidden from visitors, shown dimmed to the admin |
 
-Deleting a list item deletes its `ContentItem` rows.
+`Id` is normally generated by the client (`Create(..., id)` falls back to `Guid.CreateVersion7()`). Index `IX_ContentListItems_PageKey_ListKey_SortOrder`. Deleting a list item cascades (database `ON DELETE CASCADE`) to its `ContentItem` rows and from there to their `ContentHistory` rows.
 
 ### ContentSection
 
-Visibility of a whole page section (e.g. hide the Instagram section).
+Implemented (`Core/Entities/ContentSection.cs`, table `ContentSections`). Visibility of a whole page section (e.g. hide the Instagram section).
 
 | Field | Type | Notes |
 |---|---|---|
-| `PageKey` | string | |
-| `SectionKey` | string | Unique together with `PageKey` |
-| `IsActive` | bool | Inactive sections are hidden from visitors (and their menu links), shown dimmed to the admin |
+| `PageKey` | string (max 100) | |
+| `SectionKey` | string (max 100) | Unique together with `PageKey` (`UX_ContentSections_PageKey_SectionKey`) |
+| `IsActive` | bool | Default true; a section with no row counts as active. Inactive sections are hidden from visitors (and their menu links), shown dimmed to the admin |
 
-Toggling `home.instagram` also removes / re-registers the Instagram recurring jobs (see `docs/architecture.md` → Instagram Feed).
+Toggling `home.instagram` will also remove / re-register the Instagram recurring jobs (planned, see `docs/architecture.md` → Instagram Feed).
 
 ### ContentHistory
 
-Append-only log of previous values, used for undo. Never pruned — all history is kept.
+Implemented (`Core/Entities/ContentHistory.cs`, table `ContentHistory`). Append-only: **one row per saved version** of a field, the first save included. Never pruned — all history is kept; used for undo (the History modal is Phase 4).
 
 | Field | Type | Notes |
 |---|---|---|
-| `ContentItemId` | Guid | FK → `ContentItem` |
-| `PreviousValue` | string | |
-| `ChangedBy` | string | FK → `ApplicationUser.Id` |
-| `ChangedAt` | DateTime (UTC) | |
+| `ContentItemId` | Guid | FK → `ContentItem`, cascade delete; index `IX_ContentHistory_ContentItemId` |
+| `Value` | string | The value as saved in that version |
+| `ChangedBy` | string (max 256) | The admin's email, plain text, no FK |
+
+The change time is `CreatedAt`. There is no `ChangedAt` and no `PreviousValue`; the current value stays in `ContentItem`.
 
 ### MediaAsset
 
-One uploaded image and its generated files.
+Planned. One uploaded image and its generated files.
 
 | Field | Type | Notes |
 |---|---|---|
@@ -90,7 +103,7 @@ Alt text is a separate `Text` content field (e.g. `home.hero.image-alt`), so it 
 
 ### InstagramPost
 
-Cached posts for the Home page feed.
+Planned. Cached posts for the Home page feed.
 
 | Field | Type | Notes |
 |---|---|---|
@@ -102,7 +115,7 @@ Cached posts for the Home page feed.
 
 ### IntegrationSetting
 
-Key/value store for integration state, e.g. the Instagram access token and its expiry.
+Planned. Key/value store for integration state, e.g. the Instagram access token and its expiry.
 
 | Field | Type | Notes |
 |---|---|---|

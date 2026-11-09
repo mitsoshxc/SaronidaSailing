@@ -31,6 +31,11 @@ These rules apply to every file in the codebase. The Dev agent enforces them on 
 | Auth policy and helpers live in `Web/Identity/` | `AdminPolicy`, `AdminLoginRateLimit`, `MfaClaimPreserver`, `AuthenticatorQr`. Admin pages are in `Web/Pages/Admin/` |
 | CLI commands live in `Web/Cli/` | `AdminCommandRunner` and its console prompts; selected in `Program.cs` when the first argument is `admin` |
 | Audit logger writer `AuditLog` lives in `Infrastructure/Logging/` | Behind `IAuditLog` in `Core/Interfaces/` |
+| Repositories only stage changes | They never call `SaveChanges`; the service commits once through `IUnitOfWork` (`Core/Interfaces/`, implemented in `Infrastructure/Data/UnitOfWork.cs`) |
+| Content key parsing, locales and link validation live in `Core/Services/` | `ContentKeys`, `ContentLocales`, `ContentLink`; do not re-parse keys or locales elsewhere |
+| Output-cache code lives in `Web/Caching/` | `CacheTags` (policy and tag names), `OutputCachePageInvalidator` (implements `IPageCacheInvalidator` from `Core/Interfaces/`) |
+| The per-request content snapshot lives in `Web/Content/` | `IPageContentAccessor`; tag helpers in `Web/TagHelpers/` read content only through it |
+| Strongly typed options live in `Web/` | e.g. `SiteOptions` (`Site:BaseUrl`), validated on start |
 
 `Core` must not reference `Infrastructure` or `Web`. `Infrastructure` must not reference `Web`.
 
@@ -80,7 +85,7 @@ The database must stay swappable (Postgres / SQL Server) with only a provider an
 
 ## Output Caching
 
-- Every public page uses `[OutputCache(PolicyName = "CmsPage", Tags = new[] { "page:{pageKey}" })]`.
+- Every public page model uses `[OutputCache(PolicyName = CacheTags.PolicyName, Tags = [CacheTags.HomePage])]` — the policy `CmsPage` plus its own tag `page:{pageKey}` (add a constant or use `CacheTags.Page(pageKey)` for other pages). A guard test fails if a built site page lacks either.
 - Every content write — field save, list item add/delete/reorder/activate — evicts `page:{pageKey}`; writes to page key `shared` evict `pages:all`. A write without eviction is a bug.
 - `UseOutputCache()` comes after `UseAuthentication()` and `UseAuthorization()`.
 
@@ -102,6 +107,9 @@ The database must stay swappable (Postgres / SQL Server) with only a provider an
 - The factory sets its base address to `https://localhost`, because the auth and antiforgery cookies are `Secure`.
 - The login rate limiter is per client IP, so every test client gets its own IP through the test-only `X-Test-Remote-Ip` header, applied by `TestRemoteIpStartupFilter` in `TempDatabaseWebApplicationFactory.cs`. Do not share one client across tests that post to the login paths.
 - NLog's `LogManager` is static, so tests that read log files keep their own factory class (the `LogRetentionTests` pattern: `[Collection(WebHostCollection.Name)]` plus `IClassFixture<TempDatabaseWebApplicationFactory>`).
+- Output-cache behaviour is tested against the real host in `OutputCacheTests` (`OutputCacheWebHostTests`, with its own factory class per the rule above); the policy itself is tested without a host (`CmsPageCachePolicyTests`).
+- Tag helpers are unit-tested without a host through `TagHelperTestSupport` (builds a `PageContent` snapshot and a `FakePageContentAccessor`); `PageContentAccessorWebHostTests` uses the web host.
+- A fake clock (`FakeTimeProvider`) controls `CreatedAt`/`UpdatedAt` only. `BaseEntity.Id` is `Guid.CreateVersion7()` from the real clock, so it does not follow the fake clock. History reads sort by `CreatedAt` descending, then `Id` descending (`ContentHistoryRepository`); a test that needs a deterministic tie-break passes explicit ids built with `Guid.CreateVersion7(timestamp)` (see `ContentPersistenceTests.HistoryReads_AreNewestFirst`).
 - Tests that only need the `DbContext` (e.g. `BaseEntityTimestampTests`) use a plain SQLite in-memory connection and a fake `TimeProvider`.
 
 ---
@@ -116,9 +124,12 @@ The database must stay swappable (Postgres / SQL Server) with only a provider an
 
 ## Views and CMS markup
 
-- Every admin-editable value is rendered through `<cms>`, `<cms-link>`, `<cms-image>` or `<cms-list>`. Never hardcode content the admin is meant to edit.
-- Repeating blocks are always `<cms-list>`; visitors never see inactive items.
-- Every page section is wrapped so it can be deactivated; visitors never see inactive sections or menu links pointing to them.
+- CMS tag helpers are **attributes on the real element**, not wrapper elements: `<h1 cms="home.hero.title">`, `<a cms-link="home.hero.cta">`, `<li cms-list="home.highlights">` with `cms-field="title"` / `cms-link-field="link"` on its children, `<section cms-section="home.instagram">`. `<cms-image>` (planned, Phase 5) will be an element. See `docs/architecture.md` → CMS Editing Flow.
+- Every admin-editable value is rendered through these helpers. Never hardcode content the admin is meant to edit.
+- Repeating blocks are always `cms-list`; visitors never see inactive items. `cms-list` cannot be nested; `cms-field` / `cms-link-field` only inside a `cms-list` element.
+- Keys must be valid (`{page}.{section}.{field}` for fields, `{page}.{list}` for lists and sections): an invalid key throws. A missing value omits the element for visitors, so the template must not rely on the element being present.
+- Every page section is wrapped in `cms-section` so it can be deactivated; visitors never see inactive sections or menu links pointing to them.
+- The layout's `<head>` uses `<cms-seo fallback-title="...">` for the title and Open Graph tags (`Pages/Shared/_Layout.cshtml`).
 - Third-party content (currently only the Google Map) loads only after consent in its banner category, client-side. Adding any new embed, tracker or cookie is a tech-lead decision (see `docs/architecture.md` → Cookies & Privacy).
 - Never render `RichText` values that did not pass the sanitizer.
 - Link URLs allowed: `https:`, `tel:`, `mailto:` only. Links to external sites (booking platforms) open in a new tab and say so.
