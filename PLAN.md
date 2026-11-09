@@ -57,7 +57,7 @@ Tag helpers (decided 2026-11-09): attributes on real elements instead of `<cms>`
 - [x] `IContentService`: read by key + locale (English falls back to Greek when missing), save field with history (kept forever), list operations (add / delete / reorder / activate), section activate/deactivate
 - [x] Tag helpers: `cms`, `cms-link`, `cms-list` (+ `cms-field` / `cms-link-field`), `cms-section` (visitor rendering)
 - [x] Page SEO rendering: `<title>`, meta description, Open Graph tags from `{page}.seo.*`
-- [ ] Output cache policy `CmsPage` (1h) + tag eviction on every write
+- [x] Output cache policy `CmsPage` (1h) + tag eviction on every write
 
 ## Phase 4 — Inline Editing
 

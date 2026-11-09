@@ -52,7 +52,10 @@ builder.Services.AddInfrastructureIdentity()
     .AddSignInManager()
     .AddDefaultTokenProviders();
 builder.Services.AddScoped<IAdminAccountService, AdminAccountService>();
-builder.Services.AddOutputCache();
+builder.Services.AddOutputCache(options => options.AddPolicy(CacheTags.PolicyName, policy => policy
+    .Expire(TimeSpan.FromHours(1))
+    .Tag(CacheTags.AllPages)
+    .SetVaryByQuery([])));
 builder.Services.AddScoped<IContentService, ContentService>();
 builder.Services.AddSingleton<IPageCacheInvalidator, OutputCachePageInvalidator>();
 builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme).AddIdentityCookies();
@@ -152,6 +155,8 @@ app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.UseOutputCache();
 
 app.MapHangfireDashboardWithAuthorizationPolicy(AdminPolicy.Name, "/admin/jobs", new DashboardOptions
 {
