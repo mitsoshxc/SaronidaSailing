@@ -128,7 +128,7 @@ public static class ContentEndpoints
                 details.ChangedBy,
                 details.CreatedAt,
                 [.. details.Fields.Select(f => new SavedFieldResponse(
-                    f.Key, f.Locale, f.Type, f.ListItemId, f.Value, f.PreviousValue))]));
+                    f.Key, f.Locale, f.Type, f.ListItemId, f.Value, f.PreviousValue, f.CurrentValue))]));
     }
 
     private static async Task<byte[]?> ReadBodyAsync(HttpContext http, CancellationToken ct)

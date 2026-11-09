@@ -1,8 +1,10 @@
 @using Microsoft.AspNetCore.Antiforgery
 @using SaronidaSailing.Web.Content
+@using SaronidaSailing.Web.Localization
 @inject ICmsEditContext EditContext
 @inject IPageContentAccessor ContentAccessor
 @inject IAntiforgery Antiforgery
+@inject ILocalizedUrlService UrlService
 @{
     var isEditor = await EditContext.IsEditorAsync();
 }
@@ -30,7 +32,9 @@
     @if (isEditor)
     {
         var config = CmsEditorConfig.Create(
-            await ContentAccessor.GetAsync(), Antiforgery.GetAndStoreTokens(Context).RequestToken!);
+            await ContentAccessor.GetAsync(),
+            Antiforgery.GetAndStoreTokens(Context).RequestToken!,
+            UrlService.GetCurrentPage());
         <script type="application/json" id="cms-config">@Html.Raw(config.ToJson())</script>
         <script type="module" src="~/js/cms-edit.js" asp-append-version="true"></script>
     }

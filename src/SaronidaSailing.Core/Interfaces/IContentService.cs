@@ -16,7 +16,7 @@ public record ContentSaveResult(bool Succeeded, IReadOnlyList<string> Errors, Gu
 public record FieldVersion(Guid SaveId, string Value, string ChangedBy, DateTime CreatedAt);
 
 public record SavedField(
-    string Key, string Locale, ContentType Type, Guid? ListItemId, string Value, string PreviousValue);
+    string Key, string Locale, ContentType Type, Guid? ListItemId, string Value, string PreviousValue, string CurrentValue);
 
 public record ContentSaveDetails(Guid SaveId, string ChangedBy, DateTime CreatedAt, IReadOnlyList<SavedField> Fields);
 

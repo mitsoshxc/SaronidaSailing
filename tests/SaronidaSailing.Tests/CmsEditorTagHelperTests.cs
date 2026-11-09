@@ -1,3 +1,4 @@
+using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Razor.TagHelpers;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -60,9 +61,20 @@ public sealed class CmsEditorTagHelperTests
         var content = Content(fields: new() { ["home.hero.title"] = Rich("<p>Hi</p>") });
 
         Assert.Equal(
-            "<h1 class=\"t\" data-cms-key=\"home.hero.title\" data-cms-type=\"richText\"><p>Hi</p></h1>",
+            "<h1 class=\"t\" data-cms-key=\"home.hero.title\" data-cms-type=\"richText\""
+            + " data-cms-value=\"&lt;p&gt;Hi&lt;/p&gt;\"><p>Hi</p></h1>",
             await RenderText(content, Editor, rich: true));
         Assert.Equal("<h1 class=\"t\"><p>Hi</p></h1>", await RenderText(content, Visitor, rich: true));
+    }
+
+    [Fact]
+    public async Task RichText_Editor_BlankHasNoValueAttribute_TextNeverHasOne()
+    {
+        var blank = Content(fields: new() { ["home.hero.title"] = Rich("  ") });
+        var text = Content(fields: new() { ["home.hero.title"] = Text("Hi") });
+
+        Assert.DoesNotContain("data-cms-value", await RenderText(blank, Editor, rich: true));
+        Assert.DoesNotContain("data-cms-value", await RenderText(text, Editor));
     }
 
     [Fact]
@@ -155,7 +167,8 @@ public sealed class CmsEditorTagHelperTests
         var content = Content(fields: new() { ["home.hero.cta"] = Link(json) });
 
         Assert.Equal(
-            "<a class=\"b\" data-cms-key=\"home.hero.cta\" data-cms-type=\"link\" data-cms-invalid></a>",
+            "<a class=\"b\" data-cms-key=\"home.hero.cta\" data-cms-type=\"link\""
+            + $" data-cms-value=\"{HtmlEncoder.Default.Encode(json)}\" data-cms-invalid></a>",
             await RenderLink(content, Editor, logger));
         Assert.Equal("", await RenderLink(content, Visitor, logger));
         Assert.Equal(2, logger.Warnings.Count);

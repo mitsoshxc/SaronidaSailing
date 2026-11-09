@@ -24,6 +24,8 @@ export const createPending = () => {
             notify();
         },
 
+        get: (field) => fields.get(fieldId(field))?.value,
+
         addOp(op) {
             ops.push(op);
             notify();

@@ -171,3 +171,338 @@ html:not(.cms-view) [data-cms-type="text"]:focus {
     margin: 0;
     padding-inline-start: 1.25rem;
 }
+
+.cms-toolbar-button[hidden] {
+    display: none;
+}
+
+html:not(.cms-view) [data-cms-key] {
+    scroll-margin-top: 6rem;
+}
+
+html:not(.cms-view) [data-cms-type="richText"],
+html:not(.cms-view) [data-cms-type="link"] {
+    cursor: pointer;
+}
+
+html:not(.cms-view) [data-cms-type="richText"]:focus-visible,
+html:not(.cms-view) [data-cms-type="link"]:focus-visible {
+    outline: 3px solid #0b4f6c;
+    outline-offset: 2px;
+}
+
+.cms-fieldbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 900;
+    display: flex;
+    gap: 0.25rem;
+    padding: 0.25rem;
+    border-radius: 0.5rem;
+    background: #14232b;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 1rem;
+    line-height: 1.25;
+}
+
+.cms-fieldbar-button {
+    box-sizing: border-box;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    padding: 0.25rem 0.75rem;
+    border: 2px solid #8fa3ad;
+    border-radius: 0.375rem;
+    background: transparent;
+    color: #ffffff;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.cms-fieldbar-button:focus-visible {
+    outline: 3px solid #ffd166;
+    outline-offset: 2px;
+}
+
+.cms-dialog {
+    box-sizing: border-box;
+    width: min(40rem, 100vw - 2rem);
+    max-width: none;
+    max-height: calc(100dvh - 2rem);
+    padding: 0;
+    overflow: auto;
+    border: 2px solid #14232b;
+    border-radius: 0.5rem;
+    background: #ffffff;
+    color: #14232b;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 1rem;
+    line-height: 1.4;
+}
+
+.cms-dialog::backdrop {
+    background: rgba(20, 35, 43, 0.65);
+}
+
+.cms-dialog [hidden] {
+    display: none;
+}
+
+.cms-dialog-header,
+.cms-dialog-body,
+.cms-dialog-note,
+.cms-dialog-actions {
+    padding-inline: 1rem;
+}
+
+.cms-dialog-header {
+    padding-block: 1rem 0.5rem;
+}
+
+.cms-dialog-title {
+    margin: 0;
+    font-size: 1.375rem;
+    line-height: 1.2;
+}
+
+.cms-dialog-subtitle {
+    margin: 0.25rem 0 0;
+    color: #3d4e57;
+}
+
+.cms-dialog-body {
+    padding-block: 0.5rem 1rem;
+}
+
+.cms-dialog-note {
+    margin: 0;
+    color: #3d4e57;
+    font-size: 0.875rem;
+}
+
+.cms-dialog-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding-block: 0.75rem 1rem;
+}
+
+.cms-dialog-loading {
+    margin: 0;
+    color: #3d4e57;
+}
+
+.cms-button {
+    box-sizing: border-box;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    padding: 0.5rem 1rem;
+    border: 2px solid #14232b;
+    border-radius: 0.375rem;
+    background: #ffffff;
+    color: #14232b;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.cms-button-primary {
+    background: #14232b;
+    color: #ffffff;
+}
+
+.cms-button:disabled {
+    border-color: #8fa3ad;
+    color: #5b6b73;
+    background: #eef2f4;
+    cursor: not-allowed;
+}
+
+.cms-button:focus-visible,
+.cms-input:focus-visible,
+.cms-radio input:focus-visible {
+    outline: 3px solid #0b4f6c;
+    outline-offset: 2px;
+}
+
+.cms-form {
+    display: grid;
+    gap: 1rem;
+}
+
+.cms-field {
+    display: grid;
+    gap: 0.25rem;
+}
+
+.cms-label,
+.cms-legend {
+    font-weight: 600;
+}
+
+.cms-input {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0.5rem 0.75rem;
+    border: 2px solid #5b6b73;
+    border-radius: 0.375rem;
+    background: #ffffff;
+    color: #14232b;
+    font: inherit;
+}
+
+.cms-input[aria-invalid="true"] {
+    border-color: #a1171a;
+}
+
+.cms-textarea {
+    resize: vertical;
+}
+
+.cms-fieldset {
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.cms-radio {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+}
+
+.cms-radio input {
+    width: 1.25rem;
+    height: 1.25rem;
+    margin: 0;
+}
+
+.cms-hint,
+.cms-count {
+    margin: 0;
+    color: #3d4e57;
+    font-size: 0.875rem;
+}
+
+.cms-error {
+    margin: 0;
+    padding: 0.5rem 0.75rem;
+    border-left: 4px solid #a1171a;
+    border-radius: 0.25rem;
+    background: #fde8e8;
+    color: #5c0a0c;
+}
+
+.cms-flag {
+    display: inline-block;
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    background: #a1171a;
+    color: #ffffff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+.cms-rich-area {
+    min-height: 12rem;
+    font-size: 1rem;
+}
+
+.cms-dialog .ql-snow .ql-toolbar button,
+.cms-dialog .ql-toolbar.ql-snow button {
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0.5rem;
+}
+
+.cms-dialog .ql-toolbar.ql-snow button:focus-visible {
+    outline: 3px solid #0b4f6c;
+    outline-offset: -3px;
+}
+
+.cms-dialog .ql-container.ql-snow {
+    font-family: inherit;
+    font-size: 1rem;
+}
+
+.cms-dialog .ql-editor {
+    min-height: 12rem;
+    color: #14232b;
+}
+
+.cms-dialog .ql-editor:focus-visible {
+    outline: 3px solid #0b4f6c;
+    outline-offset: -3px;
+}
+
+.cms-history-list,
+.cms-undo-list {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.cms-history-row,
+.cms-undo-item {
+    display: grid;
+    gap: 0.25rem;
+    padding: 0.75rem;
+    border: 1px solid #8fa3ad;
+    border-radius: 0.375rem;
+}
+
+.cms-history-meta {
+    margin: 0;
+    color: #3d4e57;
+    font-size: 0.875rem;
+}
+
+.cms-history-badge {
+    color: #14232b;
+}
+
+.cms-history-preview {
+    margin: 0;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.cms-history-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+}
+
+.cms-undo-question {
+    margin: 0 0 0.75rem;
+    font-weight: 600;
+}
+
+.cms-undo-line {
+    overflow-wrap: anywhere;
+}
+
+.cms-undo-skipped .cms-undo-item {
+    color: #3d4e57;
+}
+
+@media (min-width: 720px) {
+    .cms-dialog-header,
+    .cms-dialog-body,
+    .cms-dialog-note,
+    .cms-dialog-actions {
+        padding-inline: 1.5rem;
+    }
+
+    .cms-dialog-actions {
+        justify-content: flex-end;
+    }
+}

@@ -156,4 +156,6 @@ export const createToolbar = ({ config, pending, editMode }) => {
     }
 
     render();
+
+    return { setStatus };
 };

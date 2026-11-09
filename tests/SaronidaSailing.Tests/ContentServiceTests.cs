@@ -839,6 +839,22 @@ public sealed class ContentServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task GetSave_CurrentValue_IsTheFieldsPresentValue()
+    {
+        var first = await Apply(Field("home.hero.title", "el", "t1"), Field("home.hero.subtitle", "el", "s1"));
+        _time.Advance(TimeSpan.FromMinutes(1));
+        await Apply(Field("home.hero.title", "el", "t2"));
+        await using var context = CreateContext();
+        var service = CreateService(context);
+
+        var details = await service.GetSaveAsync(first.SaveId!.Value);
+
+        var byKey = details!.Fields.ToDictionary(f => f.Key);
+        Assert.Equal(("t1", "t2"), (byKey["home.hero.title"].Value, byKey["home.hero.title"].CurrentValue));
+        Assert.Equal(("s1", "s1"), (byKey["home.hero.subtitle"].Value, byKey["home.hero.subtitle"].CurrentValue));
+    }
+
+    [Fact]
     public async Task GetSave_UnknownIdIsNull_AndDeletedListItemFieldsAreAbsent()
     {
         var id = Guid.NewGuid();

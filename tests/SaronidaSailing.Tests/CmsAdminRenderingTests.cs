@@ -91,6 +91,68 @@ public class CmsAdminRenderingTests(TempDatabaseWebApplicationFactory factory)
         Assert.Contains("\"locale\":\"en\"", html);
     }
 
+    private static JsonElement ReadConfig(string html) =>
+        JsonDocument.Parse(Regex.Match(html, @"<script type=""application/json"" id=""cms-config"">(.*?)</script>").Groups[1].Value)
+            .RootElement;
+
+    [Fact]
+    public async Task Admin_Home_ConfigHasSeo_AndPageSettingsButton()
+    {
+        await Apply(
+            new SetField("home.seo.title", "el", ContentType.Text, "Τίτλος"),
+            new SetField("home.seo.title", "en", ContentType.Text, "Title"),
+            new SetField("home.seo.description", "el", ContentType.Text, "Περιγραφή"));
+        var admin = await NewAdminClientAsync("render-seo@example.com");
+
+        var greek = await admin.GetStringAsync("/");
+        var english = await admin.GetStringAsync("/en/");
+
+        var el = ReadConfig(greek);
+        var seo = el.GetProperty("seo");
+        Assert.Equal("home", seo.GetProperty("pageKey").GetString());
+        Assert.Equal("Τίτλος", seo.GetProperty("title").GetProperty("value").GetString());
+        Assert.Equal(JsonValueKind.Null, seo.GetProperty("title").GetProperty("greek").ValueKind);
+        Assert.Equal(" (ανοίγει σε νέα καρτέλα)", el.GetProperty("opensInNewTab").GetString());
+        Assert.Contains("data-cms-action=\"page-settings\"", greek);
+
+        var enSeo = ReadConfig(english).GetProperty("seo");
+        Assert.Equal("Title", enSeo.GetProperty("title").GetProperty("value").GetString());
+        Assert.Equal("", enSeo.GetProperty("description").GetProperty("value").GetString());
+        Assert.Equal("Περιγραφή", enSeo.GetProperty("description").GetProperty("greek").GetString());
+        Assert.Contains("data-cms-action=\"page-settings\"", english);
+    }
+
+    [Fact]
+    public async Task Admin_Sandbox_HasNoSeoAndNoPageSettingsButton()
+    {
+        var admin = await NewAdminClientAsync("render-noseo@example.com");
+
+        var html = await admin.GetStringAsync("/dev/cms-sandbox");
+
+        Assert.Equal(JsonValueKind.Null, ReadConfig(html).GetProperty("seo").ValueKind);
+        Assert.DoesNotContain("page-settings", html);
+    }
+
+    [Fact]
+    public async Task Admin_NextMissingButton_OnlyOnEnglishPages()
+    {
+        var admin = await NewAdminClientAsync("render-missing@example.com");
+
+        Assert.Contains("data-cms-action=\"next-missing\"", await admin.GetStringAsync("/en/"));
+        Assert.DoesNotContain("next-missing", await admin.GetStringAsync("/"));
+    }
+
+    [Theory]
+    [InlineData("/lib/quill/quill.js")]
+    [InlineData("/lib/quill/quill.snow.css")]
+    [InlineData("/lib/quill/LICENSE")]
+    public async Task VendoredQuill_IsServed(string path)
+    {
+        var response = await NewClient(factory).GetAsync(path);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
     [Fact]
     public async Task SignedInWithoutTwoFactor_GetsVisitorPage()
     {

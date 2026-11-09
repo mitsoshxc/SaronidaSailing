@@ -149,7 +149,8 @@ public sealed class ContentService(
                 item.Type,
                 item.ListItemId,
                 row.Value,
-                previous));
+                previous,
+                item.Value));
         }
 
         var first = entries[0].History;

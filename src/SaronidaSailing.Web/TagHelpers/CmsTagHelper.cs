@@ -53,6 +53,11 @@ public sealed class CmsTagHelper(
             {
                 CmsFieldResolver.Flag(output, "data-cms-fallback");
             }
+
+            if (rich && !string.IsNullOrWhiteSpace(value?.Value))
+            {
+                output.Attributes.SetAttribute("data-cms-value", value!.Value);
+            }
         }
 
         if (empty)

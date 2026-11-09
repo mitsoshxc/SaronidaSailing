@@ -297,6 +297,7 @@ public class ContentApiTests(TempDatabaseWebApplicationFactory factory) : IClass
         Assert.Equal(JsonValueKind.Null, field.GetProperty("listItemId").ValueKind);
         Assert.Equal("new", field.GetProperty("value").GetString());
         Assert.Equal("old", field.GetProperty("previousValue").GetString());
+        Assert.Equal("new", field.GetProperty("currentValue").GetString());
         Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
         Assert.Equal("no-store", unknown.Headers.CacheControl?.ToString());
         Assert.NotEmpty(await ReadErrorsAsync(unknown));

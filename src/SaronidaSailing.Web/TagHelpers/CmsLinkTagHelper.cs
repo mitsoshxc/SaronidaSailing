@@ -62,7 +62,7 @@ public sealed class CmsLinkTagHelper(
                 CmsFieldResolver.Flag(output, "data-cms-fallback");
             }
 
-            if (link is not null)
+            if (!blank)
             {
                 output.Attributes.SetAttribute("data-cms-value", value!.Value);
             }

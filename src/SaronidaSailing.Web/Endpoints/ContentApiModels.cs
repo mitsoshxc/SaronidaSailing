@@ -74,7 +74,7 @@ public sealed record SaveContentResponse(Guid? SaveId);
 public sealed record FieldVersionResponse(Guid SaveId, string Value, string ChangedBy, DateTime CreatedAt);
 
 public sealed record SavedFieldResponse(
-    string Key, string Locale, ContentType Type, Guid? ListItemId, string Value, string PreviousValue);
+    string Key, string Locale, ContentType Type, Guid? ListItemId, string Value, string PreviousValue, string CurrentValue);
 
 public sealed record ContentSaveResponse(
     Guid SaveId, string ChangedBy, DateTime CreatedAt, IReadOnlyList<SavedFieldResponse> Fields);

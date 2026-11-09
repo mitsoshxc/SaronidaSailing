@@ -10,6 +10,14 @@
     <button type="button" class="cms-toolbar-button" data-cms-action="toggle-edit" aria-pressed="true">Edit mode</button>
     <button type="button" class="cms-toolbar-button" data-cms-action="save" disabled>Save page</button>
     <button type="button" class="cms-toolbar-button" data-cms-action="discard" disabled>Discard</button>
+    @if (UrlService.GetCurrentPage() is not null)
+    {
+        <button type="button" class="cms-toolbar-button" data-cms-action="page-settings">Page settings</button>
+    }
+    @if (isEnglish)
+    {
+        <button type="button" class="cms-toolbar-button" data-cms-action="next-missing" hidden></button>
+    }
     <span class="cms-toolbar-counter" data-cms-counter aria-live="polite">No unsaved changes</span>
     <p class="cms-toolbar-status" data-cms-status role="status" aria-live="polite"></p>
     @if (alternatePath is not null)
