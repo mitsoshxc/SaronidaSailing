@@ -1,0 +1,22 @@
+@page "/admin/login/code"
+@model LoginCodeModel
+@{
+    ViewData["Title"] = "Authenticator code";
+}
+
+<h1>Authenticator code</h1>
+<p>Enter the 6-digit code from your authenticator app.</p>
+
+<form method="post">
+    @if (Model.Error is not null)
+    {
+        <p id="error" class="admin-error" role="alert">@Model.Error</p>
+    }
+    <div class="admin-field">
+        <label for="Code">Code</label>
+        <input id="Code" name="Code" type="text" inputmode="numeric" autocomplete="one-time-code" required
+               aria-describedby="@(Model.Error is null ? null : "error")" aria-invalid="@(Model.Error is null ? null : "true")" />
+    </div>
+    <button type="submit" class="admin-button">Verify</button>
+</form>
+<p><a href="/admin/login/recovery?returnUrl=@Uri.EscapeDataString(Model.ReturnUrl ?? "")">Use a recovery code instead</a></p>

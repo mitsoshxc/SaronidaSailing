@@ -3,6 +3,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
     <PackageReference Include="NLog.Web.AspNetCore" />
+    <PackageReference Include="QRCoder" />
   </ItemGroup>
 
   <ItemGroup>

@@ -29,6 +29,24 @@ public class LoggingTests(TempDatabaseWebApplicationFactory factory) : IClassFix
     }
 
     [Fact]
+    public void AuditRecord_SanitizesFieldsAgainstLogInjection()
+    {
+        var audit = factory.Services.GetRequiredService<IAuditLog>();
+
+        audit.Record("sanitize-test", "evil\r\n2026-01-01|fake-event|user=x\t\u2028", "1.2.3.4|5", new string('d', 1000));
+        LogManager.Flush();
+
+        var lines = ReadLines(factory.LogsPath, $"audit-{Today}.log");
+        var line = lines.Single(l => l.Contains("sanitize-test"));
+        var fields = line.Split('|');
+        Assert.Equal(5, fields.Length);
+        Assert.Equal("user=evil  2026-01-01/fake-event/user=x  ", fields[2]);
+        Assert.Equal("ip=1.2.3.4/5", fields[3]);
+        Assert.Equal(256, fields[4].Length);
+        Assert.DoesNotContain(lines, l => l.StartsWith("2026-01-01"));
+    }
+
+    [Fact]
     public void Warning_WritesToAppFile_AndInformationWritesNowhere()
     {
         var logger = factory.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Saronida.Tests.Ordinary");

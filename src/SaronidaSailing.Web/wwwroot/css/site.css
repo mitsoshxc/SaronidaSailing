@@ -1,0 +1,152 @@
+.admin {
+    --admin-bg: #eef3f6;
+    --admin-card: #ffffff;
+    --admin-text: #14232b;
+    --admin-primary: #0b4f6c;
+    --admin-border: #5b6b73;
+    --admin-error: #a1171a;
+    margin: 0;
+    background: var(--admin-bg);
+    color: var(--admin-text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 1rem;
+    line-height: 1.5;
+}
+
+.admin-main {
+    display: flex;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.admin-card {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 26rem;
+    margin-top: 1rem;
+    padding: 1.5rem 1.25rem;
+    background: var(--admin-card);
+    border: 1px solid var(--admin-border);
+    border-radius: 0.5rem;
+}
+
+.admin-brand {
+    margin: 0 0 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--admin-primary);
+}
+
+.admin-card h1 {
+    margin: 0 0 1rem;
+    font-size: 1.5rem;
+    line-height: 1.25;
+}
+
+.admin-field {
+    margin-bottom: 1rem;
+}
+
+.admin-field label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-weight: 600;
+}
+
+.admin-field input {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0.5rem 0.75rem;
+    border: 2px solid var(--admin-border);
+    border-radius: 0.375rem;
+    background: #ffffff;
+    color: var(--admin-text);
+    font: inherit;
+}
+
+.admin-field input[aria-invalid="true"] {
+    border-color: var(--admin-error);
+}
+
+.admin-error {
+    margin: 0 0 1rem;
+    padding: 0.5rem 0.75rem;
+    border-left: 4px solid var(--admin-error);
+    background: #fdf0f0;
+    color: var(--admin-error);
+    font-weight: 600;
+}
+
+.admin-button {
+    display: inline-block;
+    box-sizing: border-box;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    padding: 0.5rem 1.25rem;
+    border: 2px solid var(--admin-primary);
+    border-radius: 0.375rem;
+    background: var(--admin-primary);
+    color: #ffffff;
+    font: inherit;
+    font-weight: 600;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.admin a {
+    color: var(--admin-primary);
+}
+
+.admin a.admin-button {
+    color: #ffffff;
+}
+
+.admin a:focus-visible,
+.admin button:focus-visible,
+.admin input:focus-visible {
+    outline: 3px solid #14232b;
+    outline-offset: 2px;
+}
+
+.admin-qr {
+    max-width: 14rem;
+    margin: 0 auto 1rem;
+}
+
+.admin-qr svg {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.admin-key {
+    font-size: 1.0625rem;
+    font-weight: 600;
+    word-break: break-word;
+}
+
+.admin-codes {
+    margin: 0 0 1rem;
+    padding: 0;
+    list-style: none;
+    column-gap: 1rem;
+    columns: 1;
+}
+
+.admin-codes li {
+    margin-bottom: 0.25rem;
+    font-size: 1.0625rem;
+}
+
+@media (min-width: 720px) {
+    .admin-card {
+        margin-top: 3rem;
+        padding: 2rem;
+    }
+
+    .admin-codes {
+        columns: 2;
+    }
+}

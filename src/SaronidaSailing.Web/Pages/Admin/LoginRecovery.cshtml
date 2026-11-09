@@ -1,0 +1,22 @@
+@page "/admin/login/recovery"
+@model LoginRecoveryModel
+@{
+    ViewData["Title"] = "Recovery code";
+}
+
+<h1>Recovery code</h1>
+<p>Enter one of the recovery codes you saved when you set up two-factor authentication. Each code works once.</p>
+
+<form method="post">
+    @if (Model.Error is not null)
+    {
+        <p id="error" class="admin-error" role="alert">@Model.Error</p>
+    }
+    <div class="admin-field">
+        <label for="RecoveryCode">Recovery code</label>
+        <input id="RecoveryCode" name="RecoveryCode" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" required
+               aria-describedby="@(Model.Error is null ? null : "error")" aria-invalid="@(Model.Error is null ? null : "true")" />
+    </div>
+    <button type="submit" class="admin-button">Verify</button>
+</form>
+<p><a href="/admin/login/code?returnUrl=@Uri.EscapeDataString(Model.ReturnUrl ?? "")">Use an authenticator code instead</a></p>

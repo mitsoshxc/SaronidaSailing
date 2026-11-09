@@ -40,7 +40,7 @@ Approved design (2026-11-09): Identity tables live in `saronida.db` (`AppDbConte
 
 - [x] ASP.NET Core Identity (cookie auth): 12h sliding session, `Secure`/`HttpOnly`/`SameSite=Strict`, Data Protection keys persisted
 - [x] Admin CLI commands: `admin add` / `reset-password` / `list` / `remove` (password prompted, hidden). Password policy: minimum 12 characters, no character-class rules (decided 2026-11-09)
-- [ ] `/admin/login` + mandatory TOTP 2FA setup with recovery codes; logout. Admin-only pages are English only; QR code rendered server-side as inline SVG with QRCoder (decided 2026-11-09)
+- [x] `/admin/login` + mandatory TOTP 2FA setup with recovery codes; logout. Admin-only pages are English only; QR code rendered server-side as inline SVG with QRCoder (decided 2026-11-09)
 - [ ] Lockout (5 tries → 15 min) + per-IP login rate limiting (login and 2FA-code POSTs: 10 per minute per IP, fixed window, 429; decided 2026-11-09); forwarded headers
 - [x] NLog: `audit-*.log` + `app-*.log` in `/var/saronida/logs`, 90-day retention
 - [ ] Hangfire dashboard at `/admin/jobs`, admin-only

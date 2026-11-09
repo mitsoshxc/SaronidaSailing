@@ -1,0 +1,38 @@
+@page "/admin/two-factor/setup"
+@model TwoFactorSetupModel
+@{
+    ViewData["Title"] = "Two-factor authentication";
+}
+
+@if (Model.RecoveryCodes is not null)
+{
+    <h1>Save your recovery codes</h1>
+    <p>Two-factor authentication is now on. Save these recovery codes now, for example in a password manager. Each code works once, and they will not be shown again.</p>
+    <ul class="admin-codes">
+        @foreach (var recoveryCode in Model.RecoveryCodes)
+        {
+            <li><code>@recoveryCode</code></li>
+        }
+    </ul>
+    <p><a class="admin-button" href="/">Continue to the site</a></p>
+}
+else
+{
+    <h1>Set up two-factor authentication</h1>
+    <p>Two-factor authentication is required for admins. Scan the QR code with an authenticator app, then enter the 6-digit code it shows.</p>
+    <div class="admin-qr">@Html.Raw(Model.QrSvg)</div>
+    <p>Cannot scan? Enter this key manually: <code class="admin-key">@Model.FormattedKey</code></p>
+
+    <form method="post">
+        @if (Model.Error is not null)
+        {
+            <p id="error" class="admin-error" role="alert">@Model.Error</p>
+        }
+        <div class="admin-field">
+            <label for="Code">Code from the app</label>
+            <input id="Code" name="Code" type="text" inputmode="numeric" autocomplete="one-time-code" required
+                   aria-describedby="@(Model.Error is null ? null : "error")" aria-invalid="@(Model.Error is null ? null : "true")" />
+        </div>
+        <button type="submit" class="admin-button">Turn on two-factor authentication</button>
+    </form>
+}

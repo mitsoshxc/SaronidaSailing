@@ -79,6 +79,6 @@ public class IdentityTests(TempDatabaseWebApplicationFactory factory) : IClassFi
         Assert.Equal(SameSiteMode.Strict, options.Cookie.SameSite);
         Assert.Equal("/admin/login", options.LoginPath.Value);
         Assert.Equal("/admin/logout", options.LogoutPath.Value);
-        Assert.Equal("/admin/login", options.AccessDeniedPath.Value);
+        Assert.Equal("/admin/two-factor/setup", options.AccessDeniedPath.Value);
     }
 }

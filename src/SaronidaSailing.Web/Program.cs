@@ -37,8 +37,15 @@ builder.Services.AddInfrastructureIdentity()
     .AddDefaultTokenProviders();
 builder.Services.AddScoped<IAdminAccountService, AdminAccountService>();
 builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme).AddIdentityCookies();
-builder.Services.AddAuthorization();
-builder.Services.Configure<SecurityStampValidatorOptions>(options => options.ValidationInterval = TimeSpan.FromMinutes(1));
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy(AdminPolicy.Name, policy => policy
+        .RequireAuthenticatedUser()
+        .RequireClaim(AdminPolicy.MfaClaimType, AdminPolicy.MfaClaimValue));
+builder.Services.Configure<SecurityStampValidatorOptions>(options =>
+{
+    options.ValidationInterval = TimeSpan.FromMinutes(1);
+    options.OnRefreshingPrincipal = MfaClaimPreserver.PreserveAsync;
+});
 builder.Services.ConfigureApplicationCookie(options =>
 {
     options.Cookie.Name = "saronida.auth";
@@ -49,7 +56,7 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.SlidingExpiration = true;
     options.LoginPath = "/admin/login";
     options.LogoutPath = "/admin/logout";
-    options.AccessDeniedPath = "/admin/login";
+    options.AccessDeniedPath = "/admin/two-factor/setup";
 });
 builder.Services.ConfigureOptions<ConfigureTwoFactorUserIdCookie>();
 builder.Services.AddAntiforgery(options =>
