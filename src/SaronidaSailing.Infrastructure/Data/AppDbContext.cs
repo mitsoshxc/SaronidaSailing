@@ -1,13 +1,15 @@
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SaronidaSailing.Core.Entities;
 
 namespace SaronidaSailing.Infrastructure.Data;
 
-public class AppDbContext(DbContextOptions options, TimeProvider timeProvider) : DbContext(options)
+public class AppDbContext(DbContextOptions options, TimeProvider timeProvider) : IdentityDbContext<ApplicationUser>(options)
 {
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        base.OnModelCreating(modelBuilder);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
     }
 

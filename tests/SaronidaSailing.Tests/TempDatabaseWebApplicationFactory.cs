@@ -11,6 +11,8 @@ public sealed class TempDatabaseWebApplicationFactory : WebApplicationFactory<Pr
 {
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "saronida-tests-" + Guid.NewGuid().ToString("N"));
 
+    public TempDatabaseWebApplicationFactory() => ClientOptions.BaseAddress = new Uri("https://localhost");
+
     public string DatabasePath => Path.Combine(_directory, "saronida.db");
 
     public string HangfirePath => Path.Combine(_directory, "hangfire.db");
@@ -18,6 +20,8 @@ public sealed class TempDatabaseWebApplicationFactory : WebApplicationFactory<Pr
     public string MediaPath => Path.Combine(_directory, "media");
 
     public string LogsPath => Path.Combine(_directory, "logs");
+
+    public string KeysPath => Path.Combine(_directory, "keys");
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -27,6 +31,7 @@ public sealed class TempDatabaseWebApplicationFactory : WebApplicationFactory<Pr
         builder.UseSetting("ConnectionStrings:Content", $"Data Source={DatabasePath};Pooling=False");
         builder.UseSetting("ConnectionStrings:Hangfire", HangfirePath);
         builder.UseSetting("Media:RootPath", MediaPath);
+        builder.UseSetting("DataProtection:KeysPath", KeysPath);
         builder.UseSetting("Health:HomePageUrl", "http://localhost/");
 
         builder.ConfigureTestServices(services => services

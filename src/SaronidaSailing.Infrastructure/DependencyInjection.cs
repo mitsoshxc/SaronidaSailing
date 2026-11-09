@@ -1,9 +1,11 @@
 using Hangfire;
 using Hangfire.Storage.SQLite;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using SaronidaSailing.Core.Entities;
 using SaronidaSailing.Infrastructure.Data;
 using SaronidaSailing.Core.Interfaces;
 using SaronidaSailing.Infrastructure.Logging;
@@ -45,5 +47,26 @@ public static class DependencyInjection
         services.AddHangfireServer(options => options.WorkerCount = 2);
 
         return services;
+    }
+
+    public static IdentityBuilder AddInfrastructureIdentity(this IServiceCollection services)
+    {
+        return services
+            .AddIdentityCore<ApplicationUser>(options =>
+            {
+                options.Password.RequiredLength = 12;
+                options.Password.RequireDigit = false;
+                options.Password.RequireLowercase = false;
+                options.Password.RequireUppercase = false;
+                options.Password.RequireNonAlphanumeric = false;
+                options.Password.RequiredUniqueChars = 1;
+                options.User.RequireUniqueEmail = true;
+                options.Lockout.MaxFailedAccessAttempts = 5;
+                options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+                options.Lockout.AllowedForNewUsers = true;
+                options.SignIn.RequireConfirmedEmail = false;
+                options.SignIn.RequireConfirmedAccount = false;
+            })
+            .AddEntityFrameworkStores<AppDbContext>();
     }
 }
