@@ -209,6 +209,175 @@ namespace SaronidaSailing.Infrastructure.Data.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
+            modelBuilder.Entity("SaronidaSailing.Core.Entities.ContentHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ChangedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ContentItemId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContentItemId")
+                        .HasDatabaseName("IX_ContentHistory_ContentItemId");
+
+                    b.ToTable("ContentHistory", (string)null);
+                });
+
+            modelBuilder.Entity("SaronidaSailing.Core.Entities.ContentItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FieldKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("ListItemId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Locale")
+                        .IsRequired()
+                        .HasMaxLength(5)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PageKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SectionKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UpdatedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PageKey", "Locale")
+                        .HasDatabaseName("IX_ContentItems_PageKey_Locale");
+
+                    b.HasIndex("ListItemId", "FieldKey", "Locale")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ContentItems_ListField")
+                        .HasFilter("\"ListItemId\" IS NOT NULL");
+
+                    b.HasIndex("PageKey", "SectionKey", "FieldKey", "Locale")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ContentItems_Standalone")
+                        .HasFilter("\"ListItemId\" IS NULL");
+
+                    b.ToTable("ContentItems", (string)null);
+                });
+
+            modelBuilder.Entity("SaronidaSailing.Core.Entities.ContentListItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ListKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PageKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PageKey", "ListKey", "SortOrder")
+                        .HasDatabaseName("IX_ContentListItems_PageKey_ListKey_SortOrder");
+
+                    b.ToTable("ContentListItems", (string)null);
+                });
+
+            modelBuilder.Entity("SaronidaSailing.Core.Entities.ContentSection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("PageKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SectionKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PageKey", "SectionKey")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ContentSections_PageKey_SectionKey");
+
+                    b.ToTable("ContentSections", (string)null);
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
                 {
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole", null)
@@ -258,6 +427,30 @@ namespace SaronidaSailing.Infrastructure.Data.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("SaronidaSailing.Core.Entities.ContentHistory", b =>
+                {
+                    b.HasOne("SaronidaSailing.Core.Entities.ContentItem", null)
+                        .WithMany()
+                        .HasForeignKey("ContentItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SaronidaSailing.Core.Entities.ContentItem", b =>
+                {
+                    b.HasOne("SaronidaSailing.Core.Entities.ContentListItem", "ListItem")
+                        .WithMany("Fields")
+                        .HasForeignKey("ListItemId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("ListItem");
+                });
+
+            modelBuilder.Entity("SaronidaSailing.Core.Entities.ContentListItem", b =>
+                {
+                    b.Navigation("Fields");
                 });
 #pragma warning restore 612, 618
         }

@@ -10,6 +10,7 @@ using SaronidaSailing.Infrastructure.Data;
 using SaronidaSailing.Core.Interfaces;
 using SaronidaSailing.Infrastructure.Logging;
 using SaronidaSailing.Infrastructure.Media;
+using SaronidaSailing.Infrastructure.Repositories;
 
 namespace SaronidaSailing.Infrastructure;
 
@@ -37,6 +38,12 @@ public static class DependencyInjection
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<IAuditLog, AuditLog>();
         services.AddDbContext<AppDbContext>(options => options.UseSqlite(connectionString));
+
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<IContentItemRepository, ContentItemRepository>();
+        services.AddScoped<IContentListItemRepository, ContentListItemRepository>();
+        services.AddScoped<IContentSectionRepository, ContentSectionRepository>();
+        services.AddScoped<IContentHistoryRepository, ContentHistoryRepository>();
 
         DatabaseDirectory.EnsureExistsForFile(hangfirePath);
         services.AddHangfire(config => config
