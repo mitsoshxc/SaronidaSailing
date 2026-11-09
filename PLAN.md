@@ -56,7 +56,7 @@ Tag helpers (decided 2026-11-09): attributes on real elements instead of `<cms>`
 - [x] Entities + configurations + repositories: `ContentItem`, `ContentListItem`, `ContentSection`, `ContentHistory`. `ContentItem.UpdatedBy` and `ContentHistory.ChangedBy` store the admin's **email** as plain text, no FK to `ApplicationUser` — history survives `admin remove` and continues when an admin is re-added with the same email (decided 2026-11-09; supersedes the FK in `docs/domain-model.md`, which Doc updates at the end of Phase 3)
 - [x] `IContentService`: read by key + locale (English falls back to Greek when missing), save field with history (kept forever), list operations (add / delete / reorder / activate), section activate/deactivate
 - [x] Tag helpers: `cms`, `cms-link`, `cms-list` (+ `cms-field` / `cms-link-field`), `cms-section` (visitor rendering)
-- [ ] Page SEO rendering: `<title>`, meta description, Open Graph tags from `{page}.seo.*`
+- [x] Page SEO rendering: `<title>`, meta description, Open Graph tags from `{page}.seo.*`
 - [ ] Output cache policy `CmsPage` (1h) + tag eviction on every write
 
 ## Phase 4 — Inline Editing
@@ -75,7 +75,7 @@ Tag helpers (decided 2026-11-09): attributes on real elements instead of `<cms>`
 
 - [ ] `MediaAsset` entity, `IMediaService`, storage under `Media:RootPath`
 - [ ] SkiaSharp pipeline: validate (JPEG/PNG/WebP, 25 MB, 50 MP), EXIF orientation, strip metadata, WebP 480/960/1600/2400 q~80, content-hash file names; original kept privately
-- [ ] `<cms-image>` tag helper (`srcset`, `alt-source`)
+- [ ] `<cms-image>` tag helper (`srcset`, `alt-source`) + `og:image` from `{page}.seo.image` in `<cms-seo>` (deferred from Phase 3, 2026-11-09)
 - [ ] Image modal: upload new / choose existing (media library), required alt text pre-filled from the nearest title
 - [ ] Test an upload from a real iPhone (HEIC → JPEG conversion)
 

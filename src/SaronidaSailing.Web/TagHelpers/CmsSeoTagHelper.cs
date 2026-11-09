@@ -1,0 +1,112 @@
+using Microsoft.AspNetCore.Html;
+using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.AspNetCore.Razor.TagHelpers;
+using Microsoft.Extensions.Options;
+using SaronidaSailing.Core.Entities;
+using SaronidaSailing.Core.Interfaces;
+using SaronidaSailing.Core.Services;
+using SaronidaSailing.Web.Content;
+using SaronidaSailing.Web.Localization;
+
+namespace SaronidaSailing.Web.TagHelpers;
+
+[HtmlTargetElement("cms-seo", TagStructure = TagStructure.WithoutEndTag)]
+public sealed class CmsSeoTagHelper(
+    IPageContentAccessor accessor,
+    ILocalizedUrlService urlService,
+    IOptions<SiteOptions> site,
+    ILogger<CmsSeoTagHelper> logger) : TagHelper
+{
+    private const string SiteName = "Saronida Sailing";
+
+    [HtmlAttributeName("fallback-title")]
+    public string? FallbackTitle { get; set; }
+
+    public override async Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
+    {
+        output.TagName = null;
+        output.TagMode = TagMode.StartTagAndEndTag;
+
+        var page = urlService.GetCurrentPage();
+        var fallback = string.IsNullOrWhiteSpace(FallbackTitle) ? SiteName : FallbackTitle;
+
+        if (page is null)
+        {
+            Append(output, Title(fallback));
+            return;
+        }
+
+        var content = await accessor.GetAsync();
+        var title = ReadText(content, $"{page.Key}.seo.title") ?? fallback;
+        var description = ReadText(content, $"{page.Key}.seo.description");
+        var locale = content.Locale;
+
+        Append(output, Title(title));
+        if (description is not null)
+        {
+            Append(output, Meta("name", "description", description));
+        }
+
+        Append(output, Meta("property", "og:title", title));
+        if (description is not null)
+        {
+            Append(output, Meta("property", "og:description", description));
+        }
+
+        Append(output, Meta("property", "og:type", "website"));
+        Append(output, Meta("property", "og:site_name", SiteName));
+        Append(output, Meta("property", "og:url", site.Value.BaseUrl + urlService.GetPath(page.Key, locale)));
+        Append(output, Meta("property", "og:locale", OgLocale(locale)));
+        Append(output, Meta("property", "og:locale:alternate", OgLocale(OtherLocale(locale))));
+    }
+
+    private string? ReadText(PageContent content, string key)
+    {
+        var value = content.GetField(key);
+        if (value is null)
+        {
+            return null;
+        }
+
+        if (value.Type != ContentType.Text)
+        {
+            logger.LogWarning("Content '{Key}' is {Type} but SEO renders it as text.", key, value.Type);
+            return null;
+        }
+
+        return string.IsNullOrWhiteSpace(value.Value) ? null : value.Value;
+    }
+
+    private static string OtherLocale(string locale) =>
+        locale == ContentLocales.English ? ContentLocales.Greek : ContentLocales.English;
+
+    private static string OgLocale(string locale) => locale == ContentLocales.English ? "en_GB" : "el_GR";
+
+    private static IHtmlContent Title(string text)
+    {
+        var tag = new TagBuilder("title");
+        tag.InnerHtml.Append(text);
+        return tag;
+    }
+
+    private static IHtmlContent Meta(string attribute, string name, string content)
+    {
+        var tag = new HtmlContentBuilder();
+        tag.AppendHtml($"<meta {attribute}=\"");
+        tag.Append(name);
+        tag.AppendHtml("\" content=\"");
+        tag.Append(content);
+        tag.AppendHtml("\" />");
+        return tag;
+    }
+
+    private static void Append(TagHelperOutput output, IHtmlContent tag)
+    {
+        if (output.Content.GetContent().Length > 0)
+        {
+            output.Content.AppendHtml("\n    ");
+        }
+
+        output.Content.AppendHtml(tag);
+    }
+}

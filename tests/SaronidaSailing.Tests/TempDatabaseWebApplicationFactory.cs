@@ -53,6 +53,7 @@ public sealed class TempDatabaseWebApplicationFactory: WebApplicationFactory<Pro
         builder.UseSetting("ConnectionStrings:Hangfire", HangfirePath);
         builder.UseSetting("Media:RootPath", MediaPath);
         builder.UseSetting("DataProtection:KeysPath", KeysPath);
+        builder.UseSetting("Site:BaseUrl", "https://localhost");
         builder.UseSetting("Health:HomePageUrl", "http://localhost/");
 
         builder.ConfigureTestServices(services =>
