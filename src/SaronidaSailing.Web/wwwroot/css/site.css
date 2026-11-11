@@ -1,3 +1,9 @@
+:root {
+    color-scheme: light;
+    background: #ffffff;
+    color: #14232b;
+}
+
 .visually-hidden {
     position: absolute;
     width: 1px;
