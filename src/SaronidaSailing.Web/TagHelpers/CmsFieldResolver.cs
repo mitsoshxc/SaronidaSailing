@@ -43,6 +43,16 @@ internal static class CmsFieldResolver
         return key;
     }
 
+    public static string RequireAddLabel(string? label, string listKey, string attribute)
+    {
+        if (string.IsNullOrWhiteSpace(label))
+        {
+            throw new InvalidOperationException($"List '{listKey}' requires a non-blank '{attribute}'.");
+        }
+
+        return label.Trim();
+    }
+
     public static string RequireSectionKey(string? key, string attribute)
     {
         if (key is null || !ContentKeys.TryParseSection(key, out _, out _))

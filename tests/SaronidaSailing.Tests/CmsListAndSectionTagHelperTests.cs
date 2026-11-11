@@ -21,7 +21,7 @@ public sealed class CmsListAndSectionTagHelperTests
         var context = NewContext("li", attributes);
         var output = NewOutput("li", attributes, () => (child ?? RenderTitleChild)(context));
 
-        await new CmsListTagHelper(accessor, Visitor) { Key = key }.ProcessAsync(context, output);
+        await new CmsListTagHelper(accessor, Visitor) { Key = key, AddLabel = "Add item" }.ProcessAsync(context, output);
 
         return Render(output);
 
@@ -60,6 +60,51 @@ public sealed class CmsListAndSectionTagHelperTests
         Assert.Equal("<li class=\"item\"></li><li class=\"item\"><span>Two</span></li>", html);
     }
 
+    private static async Task<string> RenderListWithLabel(ICmsEditContext editContext, string? label, params ContentListEntry[] entries)
+    {
+        var accessor = new FakePageContentAccessor(ListContent(entries));
+        var attributes = new TagHelperAttributeList { { "class", "item" } };
+        var context = NewContext("li", attributes);
+        var output = NewOutput("li", attributes, () => Task.FromResult<TagHelperContent>(Html("")));
+
+        await new CmsListTagHelper(accessor, editContext) { Key = "home.highlights", AddLabel = label }
+            .ProcessAsync(context, output);
+
+        return Render(output);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task List_Editor_CarriesAddLabelOnTemplate(bool withItems)
+    {
+        ContentListEntry[] entries = withItems ? [Entry(1, true)] : [];
+
+        var html = await RenderListWithLabel(Editor, "Add step", entries);
+
+        Assert.Contains("<template data-cms-list-template=\"home.highlights\" data-cms-add-label=\"Add step\">", html);
+        Assert.DoesNotContain("cms-add-label=\"Add step\" class", html);
+    }
+
+    [Fact]
+    public async Task List_Visitor_NeverShowsAddLabel()
+    {
+        var html = await RenderListWithLabel(Visitor, "Add step", Entry(1, true));
+
+        Assert.DoesNotContain("add-label", html);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task List_MissingOrBlankAddLabel_Throws_ForVisitorAndEditor(string? label)
+    {
+        await Assert.ThrowsAsync<InvalidOperationException>(() => RenderListWithLabel(Visitor, label, Entry(1, true)));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => RenderListWithLabel(Editor, label, Entry(1, true)));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => RenderListWithLabel(Visitor, label));
+    }
+
     [Fact]
     public async Task List_NoActiveEntries_IsSuppressed()
     {
@@ -83,7 +128,7 @@ public sealed class CmsListAndSectionTagHelperTests
             return Html(Render(childOutput));
         });
 
-        await new CmsListTagHelper(accessor, Visitor) { Key = "home.highlights" }.ProcessAsync(context, output);
+        await new CmsListTagHelper(accessor, Visitor) { Key = "home.highlights", AddLabel = "Add item" }.ProcessAsync(context, output);
 
         Assert.Equal("<li><a href=\"tel:&#x2B;30\">Call</a></li>", Render(output));
     }
@@ -98,7 +143,7 @@ public sealed class CmsListAndSectionTagHelperTests
         {
             var attributes = new TagHelperAttributeList();
             var innerContext = NewContext("ul", attributes, new Dictionary<object, object>(outer.Items));
-            await new CmsListTagHelper(accessor, Visitor) { Key = "home.highlights" }
+            await new CmsListTagHelper(accessor, Visitor) { Key = "home.highlights", AddLabel = "Add item" }
                 .ProcessAsync(innerContext, NewOutput("ul", attributes));
             return new DefaultTagHelperContent();
         }));

@@ -11,9 +11,13 @@ public sealed class CmsListTagHelper(IPageContentAccessor accessor, ICmsEditCont
     [HtmlAttributeName("cms-list")]
     public string? Key { get; set; }
 
+    [HtmlAttributeName("cms-add-label")]
+    public string? AddLabel { get; set; }
+
     public override async Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
     {
         var key = CmsFieldResolver.RequireListKey(Key, "cms-list");
+        var addLabel = CmsFieldResolver.RequireAddLabel(AddLabel, key, "cms-add-label");
         if (CmsFieldResolver.IsInsideList(context))
         {
             throw new InvalidOperationException($"'cms-list' cannot be nested (list '{key}').");
@@ -47,6 +51,8 @@ public sealed class CmsListTagHelper(IPageContentAccessor accessor, ICmsEditCont
                 var empty = new ContentListEntry(Guid.Empty, 0, true, new Dictionary<string, ContentValue>());
                 copies.AppendHtml("<template data-cms-list-template=\"");
                 copies.Append(key);
+                copies.AppendHtml("\" data-cms-add-label=\"");
+                copies.Append(addLabel);
                 copies.AppendHtml("\">");
                 copies.AppendHtml(await RenderCopyAsync(context, output, attributes, key, empty, editor));
                 copies.AppendHtml("</template>");

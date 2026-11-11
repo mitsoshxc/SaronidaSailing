@@ -205,7 +205,7 @@ public sealed class CmsEditorTagHelperTests
             return Html(Render(childOutput));
         });
 
-        await new CmsListTagHelper(accessor, edit) { Key = "home.highlights" }.ProcessAsync(context, output);
+        await new CmsListTagHelper(accessor, edit) { Key = "home.highlights", AddLabel = "Add item" }.ProcessAsync(context, output);
         return Render(output);
     }
 
@@ -223,7 +223,7 @@ public sealed class CmsEditorTagHelperTests
             + "<span data-cms-key=\"home.highlights.title\" data-cms-type=\"text\">First</span></li>"
             + $"<li class=\"item\" data-cms-list=\"home.highlights\" data-cms-item=\"{hidden.Id}\" data-cms-active=\"false\">"
             + "<span data-cms-key=\"home.highlights.title\" data-cms-type=\"text\">Hidden</span></li>"
-            + "<template data-cms-list-template=\"home.highlights\">"
+            + "<template data-cms-list-template=\"home.highlights\" data-cms-add-label=\"Add item\">"
             + "<li class=\"item\" data-cms-list=\"home.highlights\">"
             + "<span data-cms-key=\"home.highlights.title\" data-cms-type=\"text\" data-cms-empty></span></li></template>",
             html);
@@ -234,7 +234,7 @@ public sealed class CmsEditorTagHelperTests
     {
         var html = await RenderList(Content(), Editor);
 
-        Assert.StartsWith("<template data-cms-list-template=\"home.highlights\">", html);
+        Assert.StartsWith("<template data-cms-list-template=\"home.highlights\" data-cms-add-label=\"Add item\">", html);
         Assert.Equal(1, html.Split("<li ").Length - 1);
         Assert.DoesNotContain("data-cms-item", html);
     }

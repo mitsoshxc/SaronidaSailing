@@ -215,7 +215,7 @@ export const createLists = ({ pending, inline, fieldBar, toolbar, editMode, conf
     const addAddButton = (list) => {
         const wrapper = document.createElement(list.template.content.firstElementChild.tagName.toLowerCase());
         wrapper.className = 'cms-list-add';
-        const button = el('button', 'cms-button', 'Add item');
+        const button = el('button', 'cms-button', list.template.dataset.cmsAddLabel || 'Add item');
         button.type = 'button';
         button.addEventListener('click', () => addItem(list));
         wrapper.append(button);

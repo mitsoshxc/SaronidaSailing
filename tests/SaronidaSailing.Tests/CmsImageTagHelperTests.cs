@@ -360,7 +360,7 @@ public sealed class CmsImageTagHelperTests
         var context = NewContext("li", attributes);
         var output = NewOutput("li", attributes, () => RenderImageChild(context));
 
-        await new CmsListTagHelper(accessor, edit) { Key = "home.cards" }.ProcessAsync(context, output);
+        await new CmsListTagHelper(accessor, edit) { Key = "home.cards", AddLabel = "Add item" }.ProcessAsync(context, output);
         return Render(output);
 
         async Task<TagHelperContent> RenderImageChild(TagHelperContext listContext)
@@ -413,7 +413,7 @@ public sealed class CmsImageTagHelperTests
         Assert.Contains(" data-cms-alt-key=\"home.cards.image-alt\"", html);
         Assert.Contains(" data-cms-alt-proposal=\"Card &lt;1&gt;\"", html);
         Assert.Contains(
-            "<template data-cms-list-template=\"home.cards\"><li class=\"card\" data-cms-list=\"home.cards\"><button type=\"button\" class=\"cms-image-placeholder\""
+            "<template data-cms-list-template=\"home.cards\" data-cms-add-label=\"Add item\"><li class=\"card\" data-cms-list=\"home.cards\"><button type=\"button\" class=\"cms-image-placeholder\""
             + " data-cms-key=\"home.cards.image\"",
             html);
     }
