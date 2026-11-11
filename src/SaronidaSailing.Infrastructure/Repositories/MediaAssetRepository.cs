@@ -10,6 +10,9 @@ public sealed class MediaAssetRepository(AppDbContext db) : IMediaAssetRepositor
     public Task<MediaAsset?> GetByIdAsync(Guid id, CancellationToken ct = default) =>
         db.Set<MediaAsset>().FirstOrDefaultAsync(x => x.Id == id, ct);
 
+    public async Task<IReadOnlyList<MediaAsset>> GetByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct = default) =>
+        await db.Set<MediaAsset>().AsNoTracking().Where(x => ids.Contains(x.Id)).ToListAsync(ct);
+
     public Task<MediaAsset?> GetByContentHashAsync(string contentHash, CancellationToken ct = default) =>
         db.Set<MediaAsset>().FirstOrDefaultAsync(x => x.ContentHash == contentHash, ct);
 

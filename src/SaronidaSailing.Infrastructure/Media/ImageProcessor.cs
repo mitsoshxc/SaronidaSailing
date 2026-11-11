@@ -97,7 +97,7 @@ internal static class ImageProcessor
 
     private static byte[] Resize(SKImage image, SKMatrix originMatrix, int width, int height, int targetWidth)
     {
-        var targetHeight = Math.Max(1, (int)Math.Round(height * (double)targetWidth / width));
+        var targetHeight = MediaDimensions.ScaledHeight(width, height, targetWidth);
         var info = new SKImageInfo(targetWidth, targetHeight, SKColorType.Rgba8888, SKAlphaType.Premul, SKColorSpace.CreateSrgb());
 
         using var target = new SKBitmap(info);

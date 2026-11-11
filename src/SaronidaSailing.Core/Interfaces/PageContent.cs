@@ -12,7 +12,8 @@ public sealed class PageContent(
     string locale,
     IReadOnlyDictionary<string, ContentValue> fields,
     IReadOnlyDictionary<string, IReadOnlyList<ContentListEntry>> lists,
-    IReadOnlyDictionary<string, bool> sections)
+    IReadOnlyDictionary<string, bool> sections,
+    IReadOnlyDictionary<Guid, PageImage>? images = null)
 {
     public string PageKey { get; } = pageKey;
 
@@ -21,6 +22,8 @@ public sealed class PageContent(
     public ContentValue? GetField(string key) => fields.GetValueOrDefault(key);
 
     public IReadOnlyList<ContentListEntry> GetList(string listKey) => lists.GetValueOrDefault(listKey) ?? [];
+
+    public PageImage? GetImage(Guid id) => images?.GetValueOrDefault(id);
 
     public bool IsSectionActive(string sectionKey) => sections.GetValueOrDefault(sectionKey, true);
 }

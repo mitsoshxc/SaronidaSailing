@@ -133,6 +133,101 @@ public sealed class CmsSeoTagHelperTests
         Assert.StartsWith("<title>Boat · Saronida Sailing</title>", html);
     }
 
+    private static readonly Guid SeoImageId = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+
+    private static PageContent BoatImageContent(string locale, PageImage? photo, Dictionary<string, ContentValue>? extra = null)
+    {
+        var fields = new Dictionary<string, ContentValue> { ["boat.seo.image"] = Image(SeoImageId) };
+        foreach (var (key, value) in extra ?? [])
+        {
+            fields[key] = value;
+        }
+
+        return new PageContent(
+            "boat",
+            locale,
+            fields,
+            new Dictionary<string, IReadOnlyList<ContentListEntry>>(),
+            new Dictionary<string, bool>(),
+            photo is null ? new Dictionary<Guid, PageImage>() : new Dictionary<Guid, PageImage> { [SeoImageId] = photo });
+    }
+
+    [Fact]
+    public async Task SeoImage_EmitsAbsoluteUrl_WidthHeightAndAlt()
+    {
+        var content = BoatImageContent(
+            "el", Photo(SeoImageId, 3000, 2000), new() { ["boat.seo.image-alt"] = Text("Το σκάφος \"Αιγαίο\"") });
+
+        var html = await Run(content);
+
+        Assert.EndsWith(
+            "\n    <meta property=\"og:image\" content=\"https://localhost:5001/media/photo-1600.webp\" />"
+            + "\n    <meta property=\"og:image:width\" content=\"1600\" />"
+            + "\n    <meta property=\"og:image:height\" content=\"1067\" />"
+            + "\n    <meta property=\"og:image:alt\" content=\"Το σκάφος &quot;Αιγαίο&quot;\" />",
+            html);
+    }
+
+    [Theory]
+    [InlineData(new[] { 480, 960, 1600, 2400 }, 4000, 3000, 1600, 1200)]
+    [InlineData(new[] { 480, 960, 1600, 2400 }, 2400, 1000, 1600, 667)]
+    [InlineData(new[] { 480, 960 }, 1000, 500, 960, 480)]
+    [InlineData(new[] { 300 }, 300, 200, 300, 200)]
+    public async Task SeoImage_PicksTheLargestSourceUpTo1600(int[] widths, int width, int height, int expectedWidth, int expectedHeight)
+    {
+        var content = BoatImageContent("el", Photo(SeoImageId, width, height, widths));
+
+        var html = await Run(content);
+
+        Assert.Contains($"/media/photo-{expectedWidth}.webp\"", html);
+        Assert.Contains($"<meta property=\"og:image:width\" content=\"{expectedWidth}\" />", html);
+        Assert.Contains($"<meta property=\"og:image:height\" content=\"{expectedHeight}\" />", html);
+    }
+
+    [Fact]
+    public async Task SeoImage_OnlyLargerThan1600_UsesTheSmallest()
+    {
+        var content = BoatImageContent("el", Photo(SeoImageId, 4000, 2000, 1800, 2400));
+
+        var html = await Run(content);
+
+        Assert.Contains("/media/photo-1800.webp\"", html);
+        Assert.Contains("og:image:height\" content=\"900\"", html);
+    }
+
+    [Fact]
+    public async Task SeoImage_WithoutAlt_OmitsAltTag_AndEnglishFallsBackToGreekAlt()
+    {
+        var withoutAlt = await Run(BoatImageContent("el", Photo(SeoImageId)));
+        var fallback = await Run(BoatImageContent(
+            "en", Photo(SeoImageId), new() { ["boat.seo.image-alt"] = new ContentValue("Ελληνικό", ContentType.Text, true) }));
+
+        Assert.DoesNotContain("og:image:alt", withoutAlt);
+        Assert.Contains("<meta property=\"og:image:alt\" content=\"Ελληνικό\" />", fallback);
+    }
+
+    [Fact]
+    public async Task SeoImage_MissingEmptyOrUnknown_EmitsNoImageTags()
+    {
+        var unknown = await Run(BoatImageContent("el", null));
+        var empty = await Run(BoatContent("el", new() { ["boat.seo.image"] = new ContentValue("", ContentType.Image, false) }));
+        var none = await Run(BoatContent("el", []));
+        var wrongType = await Run(BoatContent("el", new() { ["boat.seo.image"] = Text("x") }));
+
+        foreach (var html in new[] { unknown, empty, none, wrongType })
+        {
+            Assert.DoesNotContain("og:image", html);
+        }
+    }
+
+    [Fact]
+    public async Task NonSitePage_IgnoresSeoImage()
+    {
+        var html = await Run(BoatImageContent("el", Photo(SeoImageId)), pagePath: "/Error");
+
+        Assert.DoesNotContain("og:image", html);
+    }
+
     [Fact]
     public async Task NonSitePage_EmitsTitleOnly()
     {

@@ -189,3 +189,9 @@
     margin: 1rem 0 0;
     padding-inline-start: 1.5rem;
 }
+
+.sandbox img,
+.sandbox-list img {
+    max-width: 100%;
+    height: auto;
+}

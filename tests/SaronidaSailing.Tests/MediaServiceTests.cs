@@ -508,6 +508,9 @@ public sealed class MediaServiceTests(ITestOutputHelper output) : IAsyncLifetime
 
         public Task<MediaAsset?> GetByIdAsync(Guid id, CancellationToken ct = default) => inner.GetByIdAsync(id, ct);
 
+        public Task<IReadOnlyList<MediaAsset>> GetByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct = default) =>
+            inner.GetByIdsAsync(ids, ct);
+
         public Task<MediaAsset?> GetByContentHashAsync(string contentHash, CancellationToken ct = default)
         {
             if (_lookedUp)

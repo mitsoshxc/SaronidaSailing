@@ -24,14 +24,27 @@ internal static class TagHelperTestSupport
         string locale = "el",
         Dictionary<string, ContentValue>? fields = null,
         Dictionary<string, IReadOnlyList<ContentListEntry>>? lists = null,
-        Dictionary<string, bool>? sections = null) =>
-        new("home", locale, fields ?? [], lists ?? [], sections ?? []);
+        Dictionary<string, bool>? sections = null,
+        Dictionary<Guid, PageImage>? images = null) =>
+        new("home", locale, fields ?? [], lists ?? [], sections ?? [], images);
 
     public static ContentValue Text(string value) => new(value, ContentType.Text, false);
 
     public static ContentValue Rich(string value) => new(value, ContentType.RichText, false);
 
     public static ContentValue Link(string json) => new(json, ContentType.Link, false);
+
+    public static ContentValue Image(Guid id, bool fallback = false) => new(id.ToString(), ContentType.Image, fallback);
+
+    public static PageImage Photo(Guid id, int width = 3000, int height = 2000, params int[] widths) =>
+        PhotoOf(id, width, height, widths.Length == 0 ? [480, 960, 1600, 2400] : widths);
+
+    private static PageImage PhotoOf(Guid id, int width, int height, int[] widths) =>
+        new(
+            id,
+            width,
+            height,
+            [.. widths.Select(w => new PageImageSource(w, $"/media/photo-{w}.webp"))]);
 
     public static ContentListEntry Entry(int sortOrder, bool active, params (string Field, ContentValue Value)[] fields) =>
         new(Guid.NewGuid(), sortOrder, active, fields.ToDictionary(f => f.Field, f => f.Value));

@@ -1059,10 +1059,70 @@ public sealed class ContentServiceTests : IAsyncLifetime
         Assert.Equal(1, _existCalls);
     }
 
+    [Fact]
+    public async Task Read_ResolvesAllImagesWithOneMediaQuery()
+    {
+        var first = await SeedMediaAsync();
+        var second = await SeedMediaAsync();
+        var item = Guid.NewGuid();
+        await Apply(
+            Image("home.hero.image", "el", first.ToString()),
+            Field("home.hero.image-alt", "el", "A"),
+            Image("shared.footer.logo", "el", first.ToString()),
+            Field("shared.footer.logo-alt", "el", "L"),
+            new AddListItem("home.cards", item),
+            Image("home.cards.image", "el", second.ToString(), item),
+            Field("home.cards.image-alt", "el", "B", item));
+        _getByIdsCalls = 0;
+
+        var page = await Read("home", "en");
+
+        Assert.Equal(1, _getByIdsCalls);
+        var hero = page.GetImage(first)!;
+        Assert.Equal(first, hero.Id);
+        Assert.Equal((1000, 800), (hero.Width, hero.Height));
+        Assert.Equal([480, 960], hero.Sources.Select(s => s.Width));
+        Assert.Matches("^/media/photo-[0-9a-f]{16}-480[.]webp$", hero.Sources[0].Url);
+        Assert.Matches("^/media/photo-[0-9a-f]{16}-960[.]webp$", hero.Sources[1].Url);
+        Assert.Equal(640, hero.HeightAt(800));
+        Assert.NotNull(page.GetImage(second));
+    }
+
+    [Fact]
+    public async Task Read_WithoutImages_DoesNotQueryMedia()
+    {
+        await Apply(Field("home.hero.title", "el", "t"));
+        _getByIdsCalls = 0;
+
+        var page = await Read("home", "el");
+
+        Assert.Equal(0, _getByIdsCalls);
+        Assert.Null(page.GetImage(Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task Read_IgnoresUnknownImageIds()
+    {
+        var id = await SeedMediaAsync();
+        await Apply(Image("home.hero.image", "el", id.ToString()), Field("home.hero.image-alt", "el", "A"));
+        await using (var context = CreateContext())
+        {
+            context.Set<MediaAsset>().Remove(await context.Set<MediaAsset>().SingleAsync(a => a.Id == id));
+            await context.SaveChangesAsync();
+        }
+
+        var page = await Read("home", "el");
+
+        Assert.Null(page.GetImage(id));
+        Assert.Equal(id.ToString(), page.GetField("home.hero.image")!.Value);
+    }
+
     private static SetField Image(string key, string locale, string value, Guid? listItemId = null) =>
         new(key, locale, ContentType.Image, value, listItemId);
 
     private int _existCalls;
+
+    private int _getByIdsCalls;
 
     private async Task<Guid> SeedMediaAsync()
     {
@@ -1097,7 +1157,7 @@ public sealed class ContentServiceTests : IAsyncLifetime
             new ContentListItemRepository(context),
             new ContentSectionRepository(context),
             new ContentHistoryRepository(context),
-            new CountingMediaAssetRepository(new MediaAssetRepository(context), () => _existCalls++),
+            new CountingMediaAssetRepository(new MediaAssetRepository(context), () => _existCalls++, () => _getByIdsCalls++),
             new UnitOfWork(context),
             new RichTextSanitizer(),
             _invalidator,
@@ -1106,9 +1166,15 @@ public sealed class ContentServiceTests : IAsyncLifetime
     private AppDbContext CreateContext() =>
         new(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(_connectionString).Options, _time);
 
-    private sealed class CountingMediaAssetRepository(IMediaAssetRepository inner, Action onExist) : IMediaAssetRepository
+    private sealed class CountingMediaAssetRepository(IMediaAssetRepository inner, Action onExist, Action? onGetByIds = null) : IMediaAssetRepository
     {
         public Task<MediaAsset?> GetByIdAsync(Guid id, CancellationToken ct = default) => inner.GetByIdAsync(id, ct);
+
+        public Task<IReadOnlyList<MediaAsset>> GetByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct = default)
+        {
+            onGetByIds?.Invoke();
+            return inner.GetByIdsAsync(ids, ct);
+        }
 
         public Task<MediaAsset?> GetByContentHashAsync(string contentHash, CancellationToken ct = default) =>
             inner.GetByContentHashAsync(contentHash, ct);

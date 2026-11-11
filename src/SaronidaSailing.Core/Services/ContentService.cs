@@ -58,7 +58,35 @@ public sealed class ContentService(
 
         var sectionStates = sectionRows.ToDictionary(s => $"{s.PageKey}.{s.SectionKey}", s => s.IsActive);
 
-        return new PageContent(pageKey, locale, fields, lists, sectionStates);
+        var images = await LoadImagesAsync(itemRows, ct);
+
+        return new PageContent(pageKey, locale, fields, lists, sectionStates, images);
+    }
+
+    private async Task<IReadOnlyDictionary<Guid, PageImage>> LoadImagesAsync(
+        IReadOnlyList<ContentItem> itemRows, CancellationToken ct)
+    {
+        var ids = new HashSet<Guid>();
+        foreach (var row in itemRows.Where(i => i.Type == ContentType.Image))
+        {
+            if (Guid.TryParse(row.Value, out var id))
+            {
+                ids.Add(id);
+            }
+        }
+
+        if (ids.Count == 0)
+        {
+            return new Dictionary<Guid, PageImage>();
+        }
+
+        return (await media.GetByIdsAsync(ids, ct)).ToDictionary(
+            a => a.Id,
+            a => new PageImage(
+                a.Id,
+                a.Width,
+                a.Height,
+                [.. a.GetWidths().Order().Select(w => new PageImageSource(w, MediaFileNames.PublicUrl(a, w)))]));
     }
 
     public async Task<ContentSaveResult> ApplyChangesAsync(

@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Html;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.Razor.TagHelpers;
@@ -18,6 +19,8 @@ public sealed class CmsSeoTagHelper(
     ILogger<CmsSeoTagHelper> logger) : TagHelper
 {
     private const string SiteName = "Saronida Sailing";
+
+    private const int MaxOgImageWidth = 1600;
 
     [HtmlAttributeName("fallback-title")]
     public string? FallbackTitle { get; set; }
@@ -58,6 +61,45 @@ public sealed class CmsSeoTagHelper(
         Append(output, Meta("property", "og:url", site.Value.BaseUrl + urlService.GetPath(page.Key, locale)));
         Append(output, Meta("property", "og:locale", OgLocale(locale)));
         Append(output, Meta("property", "og:locale:alternate", OgLocale(OtherLocale(locale))));
+
+        if (FindImage(content, $"{page.Key}.seo.image") is { } image)
+        {
+            var source = image.Sources.Where(s => s.Width <= MaxOgImageWidth).MaxBy(s => s.Width)
+                ?? image.Sources.MinBy(s => s.Width)!;
+            Append(output, Meta("property", "og:image", site.Value.BaseUrl + source.Url));
+            Append(output, Meta("property", "og:image:width", source.Width.ToString(CultureInfo.InvariantCulture)));
+            Append(
+                output,
+                Meta("property", "og:image:height", image.HeightAt(source.Width).ToString(CultureInfo.InvariantCulture)));
+            if (ReadText(content, $"{page.Key}.seo.image-alt") is { } alt)
+            {
+                Append(output, Meta("property", "og:image:alt", alt));
+            }
+        }
+    }
+
+    private PageImage? FindImage(PageContent content, string key)
+    {
+        var value = content.GetField(key);
+        if (value is null || string.IsNullOrWhiteSpace(value.Value))
+        {
+            return null;
+        }
+
+        if (value.Type != ContentType.Image)
+        {
+            logger.LogWarning("Content '{Key}' is {Type} but SEO renders it as an image.", key, value.Type);
+            return null;
+        }
+
+        var image = Guid.TryParse(value.Value, out var id) ? content.GetImage(id) : null;
+        if (image is null || image.Sources.Count == 0)
+        {
+            logger.LogWarning("Content '{Key}' refers to image '{Id}', which does not exist.", key, value.Value);
+            return null;
+        }
+
+        return image;
     }
 
     private string? ReadText(PageContent content, string key)
