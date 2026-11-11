@@ -34,8 +34,19 @@ public sealed class ContentServiceTests : IAsyncLifetime
         var en = await Read("home", "en");
 
         Assert.Equal(new ContentValue("Γεια", ContentType.Text, false), el.GetField("home.hero.title"));
-        Assert.Equal(new ContentValue("Hello", ContentType.Text, false), en.GetField("home.hero.title"));
+        Assert.Equal(
+            new ContentValue("Hello", ContentType.Text, false) { DefaultLocaleValue = "Γεια" }, en.GetField("home.hero.title"));
         Assert.Null(en.GetField("home.hero.missing"));
+    }
+
+    [Fact]
+    public async Task Read_EnglishOnly_HasNoDefaultLocaleValue()
+    {
+        await Apply(Field("home.hero.title", "en", "Hello"));
+
+        var en = await Read("home", "en");
+
+        Assert.Null(en.GetField("home.hero.title")!.DefaultLocaleValue);
     }
 
     [Fact]
@@ -45,7 +56,8 @@ public sealed class ContentServiceTests : IAsyncLifetime
 
         var en = await Read("home", "en");
 
-        Assert.Equal(new ContentValue("Γεια", ContentType.Text, true), en.GetField("home.hero.title"));
+        Assert.Equal(
+            new ContentValue("Γεια", ContentType.Text, true) { DefaultLocaleValue = "Γεια" }, en.GetField("home.hero.title"));
     }
 
     [Theory]
@@ -57,7 +69,8 @@ public sealed class ContentServiceTests : IAsyncLifetime
 
         var en = await Read("home", "en");
 
-        Assert.Equal(new ContentValue("Γεια", ContentType.Text, true), en.GetField("home.hero.title"));
+        Assert.Equal(
+            new ContentValue("Γεια", ContentType.Text, true) { DefaultLocaleValue = "Γεια" }, en.GetField("home.hero.title"));
     }
 
     [Fact]
@@ -112,7 +125,9 @@ public sealed class ContentServiceTests : IAsyncLifetime
 
         var en = await Read("home", "en");
 
-        Assert.Equal(new ContentValue("Τίτλος", ContentType.Text, true), en.GetList("home.highlights")[0].Fields["title"]);
+        Assert.Equal(
+            new ContentValue("Τίτλος", ContentType.Text, true) { DefaultLocaleValue = "Τίτλος" },
+            en.GetList("home.highlights")[0].Fields["title"]);
     }
 
     [Fact]

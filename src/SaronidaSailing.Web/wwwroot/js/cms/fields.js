@@ -1,3 +1,4 @@
+import { createImageElement, createPlaceholder, layoutClassOf, recordImage } from './image-data.js';
 import { cleanFragment, cleanHtml } from './rich-html.js';
 import { normalize, parseLink } from './values.js';
 
@@ -18,6 +19,11 @@ export const createFields = ({ pending, config }) => {
                 original: originalOf(element),
                 hadFallback: element.hasAttribute('data-cms-fallback')
             };
+            if (typeOf(element) === 'image') {
+                state.alt = element.dataset.cmsAlt ?? '';
+                state.altEl = element.dataset.cmsAltEl ?? '';
+                state.pristine = element.cloneNode(true);
+            }
             states.set(element, state);
         }
         return state;
@@ -25,7 +31,7 @@ export const createFields = ({ pending, config }) => {
 
     const fieldOf = (element) => ({
         key: element.dataset.cmsKey,
-        locale: config.locale,
+        locale: typeOf(element) === 'image' ? 'el' : config.locale,
         type: typeOf(element),
         listItemId: itemOf(element)
     });
@@ -100,10 +106,10 @@ export const createFields = ({ pending, config }) => {
         document.dispatchEvent(new CustomEvent('cms:fieldchange', { detail: { element } }));
     };
 
-    const find = (key, listItemId) => {
+    const search = (selector, attribute, key, listItemId) => {
         const wantedItem = listItemId ? String(listItemId).toLowerCase() : null;
-        for (const element of document.querySelectorAll('[data-cms-key]')) {
-            if (element.dataset.cmsKey !== key) {
+        for (const element of document.querySelectorAll(selector)) {
+            if (element.dataset[attribute] !== key) {
                 continue;
             }
             const item = itemOf(element);
@@ -114,5 +120,86 @@ export const createFields = ({ pending, config }) => {
         return null;
     };
 
-    return { track, fieldOf, valueOf, write, find };
+    const find = (key, listItemId) => search('[data-cms-key]', 'cmsKey', key, listItemId);
+
+    const findImageByAlt = (altKey, listItemId) =>
+        search('[data-cms-type="image"][data-cms-alt-key]', 'cmsAltKey', altKey, listItemId);
+
+    const altField = (element, locale) => ({
+        key: element.dataset.cmsAltKey,
+        locale,
+        type: 'text',
+        listItemId: itemOf(element)
+    });
+
+    const imageValues = (element) => {
+        const state = track(element);
+        const alt = pending.get(altField(element, config.locale)) ?? state.alt;
+        return {
+            id: pending.get(fieldOf(element)) ?? state.original,
+            alt,
+            altEl: config.locale === 'el' ? alt : (pending.get(altField(element, 'el')) ?? state.altEl)
+        };
+    };
+
+    const writeImage = (element, { id, asset, alt, altEl }) => {
+        const state = track(element);
+        const field = fieldOf(element);
+        const unchanged = id === state.original && alt === state.alt && altEl === state.altEl;
+        const shownAlt = config.locale === 'el' || alt !== '' ? alt : altEl;
+
+        let target;
+        if (unchanged) {
+            target = state.pristine.cloneNode(true);
+        } else {
+            if (id === (element.dataset.cmsValue ?? '')) {
+                target = element;
+            } else if (id === '') {
+                target = createPlaceholder(layoutClassOf(element));
+            } else {
+                target = createImageElement({
+                    layoutClass: layoutClassOf(element),
+                    sizes: element.dataset.cmsSizes ?? '100vw',
+                    loading: element.dataset.cmsLoading ?? 'lazy',
+                    asset,
+                    alt: shownAlt
+                });
+            }
+            if (target !== element) {
+                for (const { name, value } of element.attributes) {
+                    if (name.startsWith('data-cms-')) {
+                        target.setAttribute(name, value);
+                    }
+                }
+            }
+            target.dataset.cmsValue = id;
+            target.dataset.cmsAlt = alt;
+            target.dataset.cmsAltEl = altEl;
+            if (target.localName === 'img') {
+                target.alt = shownAlt;
+            }
+            target.toggleAttribute('data-cms-empty', id === '');
+            target.toggleAttribute('data-cms-dirty', true);
+            target.toggleAttribute('data-cms-fallback', config.locale === 'en' && alt === '' && altEl !== '');
+        }
+
+        if (target !== element) {
+            states.set(target, state);
+            element.replaceWith(target);
+        }
+
+        recordImage({
+            pending,
+            config,
+            imageKey: field.key,
+            altKey: element.dataset.cmsAltKey,
+            listItemId: field.listItemId,
+            original: { id: state.original, alt: state.alt, altEl: state.altEl },
+            result: { id, alt, altEl }
+        });
+        document.dispatchEvent(new CustomEvent('cms:fieldchange', { detail: { element: target } }));
+        return target;
+    };
+
+    return { track, fieldOf, valueOf, write, find, findImageByAlt, imageValues, writeImage };
 };

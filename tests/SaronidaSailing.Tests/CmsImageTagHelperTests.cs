@@ -206,7 +206,7 @@ public sealed class CmsImageTagHelperTests
             + " width=\"3000\" height=\"2000\" alt=\"A boat\" loading=\"lazy\" decoding=\"async\""
             + " data-cms-key=\"home.hero.image\" data-cms-type=\"image\""
             + $" data-cms-value=\"{Id}\" data-cms-alt-key=\"home.hero.image-alt\" data-cms-alt=\"A boat\""
-            + " data-cms-alt-el=\"A boat\" data-cms-alt-proposal=\"Sail with us\">",
+            + " data-cms-alt-el=\"A boat\" data-cms-sizes=\"100vw\" data-cms-loading=\"lazy\" data-cms-alt-proposal=\"Sail with us\">",
             html);
     }
 
@@ -224,7 +224,7 @@ public sealed class CmsImageTagHelperTests
     }
 
     [Fact]
-    public async Task Editor_English_OwnAlt_IsNotFlagged_AndGreekAltIsUnknown()
+    public async Task Editor_English_OwnAlt_IsNotFlagged_AndGreekAltIsEmptyWhenUnknown()
     {
         var content = Standalone("en", new() { ["home.hero.image-alt"] = Text("English alt") });
 
@@ -232,7 +232,22 @@ public sealed class CmsImageTagHelperTests
 
         Assert.Contains(" data-cms-alt=\"English alt\"", html);
         Assert.DoesNotContain("data-cms-fallback", html);
-        Assert.DoesNotContain("data-cms-alt-el", html);
+        Assert.Contains(" data-cms-alt-el=\"\"", html);
+    }
+
+    [Fact]
+    public async Task Editor_English_OwnAlt_CarriesTheGreekAlt()
+    {
+        var content = Standalone("en", new()
+        {
+            ["home.hero.image-alt"] = new ContentValue("English alt", ContentType.Text, false) { DefaultLocaleValue = "Ελληνικό" },
+        });
+
+        var html = await Run(content, Editor);
+
+        Assert.Contains(" data-cms-alt=\"English alt\"", html);
+        Assert.Contains(" data-cms-alt-el=\"Ελληνικό\"", html);
+        Assert.DoesNotContain("data-cms-fallback", html);
     }
 
     [Fact]
@@ -294,7 +309,7 @@ public sealed class CmsImageTagHelperTests
         Assert.Equal(
             "<button type=\"button\" class=\"hero cms-image-placeholder\" data-cms-key=\"home.hero.image\""
             + " data-cms-type=\"image\" data-cms-value=\"\" data-cms-alt-key=\"home.hero.image-alt\""
-            + " data-cms-alt=\"\" data-cms-alt-el=\"\" data-cms-alt-proposal=\"T\" data-cms-empty>Add image</button>",
+            + " data-cms-alt=\"\" data-cms-alt-el=\"\" data-cms-sizes=\"100vw\" data-cms-loading=\"lazy\" data-cms-alt-proposal=\"T\" data-cms-empty>Add image</button>",
             html);
     }
 
@@ -526,7 +541,7 @@ public sealed class CmsImageWebHostTests(TempDatabaseWebApplicationFactory facto
         var html = await admin.GetStringAsync("/en/dev/cms-sandbox");
 
         Assert.Contains($"data-cms-key=\"shared.sandbox.image\" data-cms-type=\"image\" data-cms-value=\"{asset}\"", html);
-        Assert.Contains("data-cms-alt-key=\"shared.sandbox.image-alt\" data-cms-alt=\"\" data-cms-alt-el=\"Alt EL\" data-cms-fallback", html);
+        Assert.Contains("data-cms-alt-key=\"shared.sandbox.image-alt\" data-cms-alt=\"\" data-cms-alt-el=\"Alt EL\" data-cms-sizes=\"(min-width: 960px) 50vw, 100vw\" data-cms-loading=\"lazy\" data-cms-fallback", html);
         Assert.Contains("data-cms-alt-proposal=\"Τίτλος\"", html);
         Assert.Contains("class=\"cms-image-placeholder\" data-cms-key=\"shared.sandbox-items.image\"", html);
     }

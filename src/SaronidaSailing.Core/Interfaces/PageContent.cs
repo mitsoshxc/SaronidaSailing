@@ -2,7 +2,10 @@ using SaronidaSailing.Core.Entities;
 
 namespace SaronidaSailing.Core.Interfaces;
 
-public record ContentValue(string Value, ContentType Type, bool IsFallback);
+public record ContentValue(string Value, ContentType Type, bool IsFallback)
+{
+    public string? DefaultLocaleValue { get; init; }
+}
 
 public record ContentListEntry(
     Guid Id, int SortOrder, bool IsActive, IReadOnlyDictionary<string, ContentValue> Fields);

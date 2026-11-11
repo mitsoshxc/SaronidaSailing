@@ -83,7 +83,9 @@ public sealed partial class CmsImageTagHelper(
 
         var shownAlt = altValue?.Value ?? string.Empty;
         var inLocale = altValue is { IsFallback: false } ? altValue.Value : string.Empty;
-        var greekAlt = content.Locale == ContentLocales.Default || altValue is null or { IsFallback: true } ? shownAlt : null;
+        var greekAlt = content.Locale == ContentLocales.Default || altValue is { IsFallback: true }
+            ? shownAlt
+            : altValue?.DefaultLocaleValue ?? string.Empty;
 
         var attributes = output.Attributes;
         if (image is null)
@@ -122,10 +124,9 @@ public sealed partial class CmsImageTagHelper(
         attributes.SetAttribute("data-cms-value", image is null ? string.Empty : image.Id.ToString());
         attributes.SetAttribute("data-cms-alt-key", alt.Key);
         attributes.SetAttribute("data-cms-alt", inLocale);
-        if (greekAlt is not null)
-        {
-            attributes.SetAttribute("data-cms-alt-el", greekAlt);
-        }
+        attributes.SetAttribute("data-cms-alt-el", greekAlt);
+        attributes.SetAttribute("data-cms-sizes", Sizes);
+        attributes.SetAttribute("data-cms-loading", Loading);
 
         if (altValue is { IsFallback: true })
         {

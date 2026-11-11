@@ -200,14 +200,15 @@ public sealed class ContentService(
     {
         var all = rows.ToList();
         var requested = all.FirstOrDefault(r => r.Locale == locale);
+        var greek = locale == ContentLocales.Default ? null : all.FirstOrDefault(r => r.Locale == ContentLocales.Default);
         if (requested is not null && !string.IsNullOrWhiteSpace(requested.Value))
         {
-            return new ContentValue(requested.Value, requested.Type, false);
+            return new ContentValue(requested.Value, requested.Type, false) { DefaultLocaleValue = greek?.Value };
         }
 
-        if (locale != ContentLocales.Default && all.FirstOrDefault(r => r.Locale == ContentLocales.Default) is { } greek)
+        if (greek is not null)
         {
-            return new ContentValue(greek.Value, greek.Type, true);
+            return new ContentValue(greek.Value, greek.Type, true) { DefaultLocaleValue = greek.Value };
         }
 
         return new ContentValue(requested!.Value, requested.Type, false);

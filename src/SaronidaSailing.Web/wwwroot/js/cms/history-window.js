@@ -1,4 +1,5 @@
 import { el, openDialog } from './dialog.js';
+import { imagePreview, loadAsset } from './image-data.js';
 import { htmlToText } from './rich-html.js';
 import { parseLink, shorten } from './values.js';
 
@@ -8,6 +9,9 @@ const loadFailed = 'Could not load the history. Check your connection and try ag
 
 export const describeValue = (type, value, full = false) => {
     let text = '';
+    if (type === 'image') {
+        return value === '' ? '(no image)' : 'Image';
+    }
     if (type === 'richText') {
         text = htmlToText(value);
     } else if (type === 'link') {
@@ -44,12 +48,13 @@ const getJson = async (url) => {
 
 export const openHistoryWindow = ({ element, fields, pending, config, setStatus, returnFocus }) => {
     const field = fields.fieldOf(element);
-    const language = config.locale === 'en' ? 'English' : 'Greek';
+    const language = field.locale === 'en' ? 'English' : 'Greek';
+    let current = element;
     const present = fields.valueOf(element);
     const win = openDialog({
         title: 'History',
         subtitle: `${shorten(describeValue(field.type, present), 60)} (${language})`,
-        returnFocus
+        returnFocus: () => returnFocus(current)
     });
 
     const listView = el('div', 'cms-history');
@@ -79,8 +84,27 @@ export const openHistoryWindow = ({ element, fields, pending, config, setStatus,
         }
     };
 
-    const restore = (version) => {
-        fields.write(element, version.value);
+    const restore = async (version, actions) => {
+        if (field.type === 'image') {
+            let asset = null;
+            if (version.value !== '') {
+                try {
+                    asset = await loadAsset(version.value);
+                } catch {
+                    asset = null;
+                }
+                if (!asset) {
+                    const message = el('p', 'cms-error', 'That image is not available, so it cannot be restored.');
+                    message.setAttribute('role', 'alert');
+                    actions.after(message);
+                    return;
+                }
+            }
+            const values = fields.imageValues(current);
+            current = fields.writeImage(current, { id: version.value, asset, alt: values.alt, altEl: values.altEl });
+        } else {
+            fields.write(element, version.value);
+        }
         win.close();
         setStatus('Version restored — click Save page to keep it.');
     };
@@ -117,10 +141,28 @@ export const openHistoryWindow = ({ element, fields, pending, config, setStatus,
         renderUndo(result.body, version);
     };
 
+    const targetOf = (saved) =>
+        saved.type === 'image' || saved.locale === config.locale ? fields.find(saved.key, saved.listItemId) : null;
+
     const labelOf = (saved) => {
-        const target = saved.locale === config.locale ? fields.find(saved.key, saved.listItemId) : null;
-        const name = target ? shorten(describeValue(saved.type, fields.valueOf(target)), 60) : saved.key;
+        const target = targetOf(saved);
+        let name = saved.key;
+        if (saved.type === 'image') {
+            name = `Image ${saved.key}`;
+        } else if (target) {
+            name = shorten(describeValue(saved.type, fields.valueOf(target)), 60);
+        }
         return `${name} (${saved.locale === 'en' ? 'English' : 'Greek'})`;
+    };
+
+    const valueLine = (label, type, value) => {
+        const line = el('span', 'cms-undo-line', label);
+        if (type === 'image') {
+            line.append(imagePreview(value));
+        } else {
+            line.append(shorten(describeValue(type, value, true), 120));
+        }
+        return line;
     };
 
     const renderUndo = (save, version) => {
@@ -139,8 +181,8 @@ export const openHistoryWindow = ({ element, fields, pending, config, setStatus,
         for (const saved of toUndo) {
             const item = el('li', 'cms-undo-item');
             item.append(el('strong', 'cms-undo-field', labelOf(saved)));
-            item.append(el('span', 'cms-undo-line', `now: ${shorten(describeValue(saved.type, saved.currentValue, true), 120)}`));
-            item.append(el('span', 'cms-undo-line', `back to: ${shorten(describeValue(saved.type, saved.previousValue, true), 120)}`));
+            item.append(valueLine('now: ', saved.type, saved.currentValue));
+            item.append(valueLine('back to: ', saved.type, saved.previousValue));
             if (saved.currentValue !== saved.value) {
                 item.append(el('span', 'cms-flag', 'Changed again by a later save — undo overwrites that change'));
             }
@@ -164,11 +206,55 @@ export const openHistoryWindow = ({ element, fields, pending, config, setStatus,
         win.actions.querySelector('button:not([disabled])')?.focus();
     };
 
-    const undo = (toUndo) => {
+    const undo = async (toUndo) => {
+        const imageSaves = [];
         for (const saved of toUndo) {
-            const target = saved.locale === config.locale ? fields.find(saved.key, saved.listItemId) : null;
-            if (target) {
+            const target = targetOf(saved);
+            if (saved.type === 'image' && target) {
+                imageSaves.push({ saved, target });
+            } else if (target) {
                 fields.write(target, saved.previousValue);
+            } else {
+                pending.setField({
+                    key: saved.key,
+                    locale: saved.locale,
+                    type: saved.type,
+                    listItemId: saved.listItemId
+                }, saved.previousValue, saved.currentValue);
+            }
+        }
+
+        const rewritten = new Set(imageSaves.map(({ target }) => target));
+        for (const saved of toUndo.filter((item) => item.type === 'text' && item.key.endsWith('-alt'))) {
+            const imageElement = fields.findImageByAlt(saved.key, saved.listItemId);
+            if (imageElement && !rewritten.has(imageElement)) {
+                const values = fields.imageValues(imageElement);
+                fields.writeImage(imageElement, { id: values.id, asset: null, alt: values.alt, altEl: values.altEl });
+            }
+        }
+
+        for (const { saved, target } of imageSaves) {
+            let asset = null;
+            let available = saved.previousValue === '';
+            if (!available) {
+                try {
+                    asset = await loadAsset(saved.previousValue);
+                    available = asset !== null;
+                } catch {
+                    available = false;
+                }
+            }
+            if (available) {
+                const values = fields.imageValues(target);
+                const written = fields.writeImage(target, {
+                    id: saved.previousValue,
+                    asset,
+                    alt: values.alt,
+                    altEl: values.altEl
+                });
+                if (target === current) {
+                    current = written;
+                }
             } else {
                 pending.setField({
                     key: saved.key,
@@ -198,13 +284,19 @@ export const openHistoryWindow = ({ element, fields, pending, config, setStatus,
             const time = el('time', '', formatDate(version.createdAt));
             time.dateTime = version.createdAt;
             meta.append(time, ` · ${version.changedBy}`);
-            row.append(meta, el('p', 'cms-history-preview', shorten(describeValue(field.type, version.value, true), 300)));
+            const preview = el('p', 'cms-history-preview');
+            if (field.type === 'image') {
+                preview.append(imagePreview(version.value));
+            } else {
+                preview.textContent = shorten(describeValue(field.type, version.value, true), 300);
+            }
+            row.append(meta, preview);
 
             const actions = el('div', 'cms-history-actions');
             if (version.value !== present) {
                 const restoreButton = el('button', 'cms-button', 'Restore this version');
                 restoreButton.type = 'button';
-                restoreButton.addEventListener('click', () => restore(version));
+                restoreButton.addEventListener('click', () => restore(version, actions));
                 actions.append(restoreButton);
             }
             const undoButton = el('button', 'cms-button', 'Undo this whole save');

@@ -1,7 +1,8 @@
 import { isDialogOpen } from './dialog.js';
 
 const fieldSelector = '[data-cms-key]';
-const windowTypes = ['richText', 'link'];
+const windowTypes = ['richText', 'link', 'image'];
+const directActions = { richText: 'edit-text', link: 'edit-link', image: 'edit-image' };
 const gap = 4;
 const margin = 8;
 const scrollOptions = { capture: true, passive: true };
@@ -9,13 +10,15 @@ const scrollOptions = { capture: true, passive: true };
 const actions = {
     'edit-text': { label: 'Edit text', run: (windows, element, back) => windows.openRich(element, back) },
     'edit-link': { label: 'Edit link', run: (windows, element, back) => windows.openLink(element, back) },
+    'edit-image': { label: 'Edit image', run: (windows, element, back) => windows.openImage(element, back) },
     history: { label: 'History', run: (windows, element, back) => windows.openHistory(element, back) }
 };
 
 const actionsByType = {
     text: ['history'],
     richText: ['edit-text', 'history'],
-    link: ['edit-link', 'history']
+    link: ['edit-link', 'history'],
+    image: ['edit-image', 'history']
 };
 
 export const createFieldBar = ({ editMode, windows }) => {
@@ -73,12 +76,13 @@ export const createFieldBar = ({ editMode, windows }) => {
             return;
         }
         hide();
-        actions[name].run(windows, element, () => {
+        actions[name].run(windows, element, (replacement) => {
+            const target = replacement ?? element;
             if (button) {
-                show(element);
+                show(target);
                 bar.querySelector(`[data-cms-fieldaction="${name}"]`)?.focus();
             } else {
-                element.focus();
+                target.focus();
             }
         });
     };
@@ -182,7 +186,7 @@ export const createFieldBar = ({ editMode, windows }) => {
         const type = field.dataset.cmsType;
         if (windowTypes.includes(type)) {
             event.preventDefault();
-            openAction(type === 'richText' ? 'edit-text' : 'edit-link', field, null);
+            openAction(directActions[type], field, null);
         } else {
             show(field);
         }
@@ -197,7 +201,14 @@ export const createFieldBar = ({ editMode, windows }) => {
         const type = field?.dataset.cmsType;
         if (field && windowTypes.includes(type)) {
             event.preventDefault();
-            openAction(type === 'richText' ? 'edit-text' : 'edit-link', field, null);
+            openAction(directActions[type], field, null);
+        }
+    });
+
+    document.addEventListener('cms:fieldchange', (event) => {
+        const element = event.detail.element;
+        if (editMode.isEditing() && windowTypes.includes(element.dataset.cmsType)) {
+            element.setAttribute('tabindex', '0');
         }
     });
 
