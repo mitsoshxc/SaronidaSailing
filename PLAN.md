@@ -87,6 +87,7 @@ Agreed infrastructure (2026-11-11), supersedes the single-container Docker Compo
 - **Migrations:** no longer applied by every pod at startup. A `migrate` CLI command runs as a Kubernetes Job before each rollout; startup still migrates in Development.
 - **Shared folders:** media, originals and Data Protection keys stay on host folders under `/var/saronida`, mounted into every pod (single node).
 - **Logs:** ~~NLog file names include the pod name~~ → all pods write the **same daily files** (`app-YYYY-MM-DD.log`, `audit-YYYY-MM-DD.log`) and **every line names the pod** it came from (changed 2026-11-11 by the developer). Multi-process appends use the official `NLog.Targets.AtomicFile` target (NLog 6 removed `concurrentWrites` from the standard file target). The instance name is `Logs:Instance`, defaulting to the machine name (in k3s the container's hostname is the pod name).
+- **Diagnostics (agreed 2026-11-11):** log everything that helps find out later what went wrong. A pod killed by the out-of-memory killer or `SIGKILL` cannot log its own death, so the app logs what it can see (items below) and Kubernetes / the droplet record the kill from outside (Phase 8). A `Started` line with no `Stopped` before it means the previous run was killed.
 - **Login rate limiter:** stays in memory per pod (the limit is per pod with two pods — accepted; Identity lockout is in the database).
 - **Tests:** database tests run against real PostgreSQL via Testcontainers. They need Docker, so they run on the developer's PC, not in cloud sessions.
 - **Local development:** PostgreSQL in Docker on the developer's PC.
@@ -98,7 +99,12 @@ Agreed infrastructure (2026-11-11), supersedes the single-container Docker Compo
 - [x] `migrate` CLI command; startup migration only in Development. Flag `Database:MigrateAtStartup` (true only in `appsettings.Development.json`). `migrate` applies EF migrations **and** installs/upgrades the Hangfire schema (decided 2026-11-11: pods never install it; Hangfire `PrepareSchemaIfNecessary` follows the flag). With the flag off, startup fails if migrations are pending, naming them and the `migrate` command
 - [x] Cross-pod cache eviction via `LISTEN/NOTIFY` behind `IPageCacheInvalidator`, full eviction on listener (re)connect. Channel `saronida_cache_evict`, payload = JSON array of tags; the saving pod evicts locally first, then publishes (a failed publish is logged, the save still succeeds); an unreadable payload evicts everything; reconnect backoff 1 s → 30 s
 - [x] Shared daily NLog files written safely by several processes, with the pod name on every line (`NLog.Targets.AtomicFile` 6.2.2, type `AtomFile`, `concurrentWrites` + `keepFileOpen`; pod name is the 2nd field in app, audit and console lines; invalid `Logs:Instance` fails startup)
-- [ ] Two-instance check on the PC: two app processes on one database — a save on one evicts the other's cache, recurring jobs run once, an admin session works on both
+- [ ] Lifecycle lines: `Started` (version incl. commit when available, pod name, environment, memory limit seen by the GC, CPU count), `Stopping` (with the shutdown reason), `Stopped`
+- [ ] Crashes: unhandled exceptions (incl. unobserved task exceptions and `OutOfMemoryException`) logged as `FATAL` and flushed before the process dies; startup failures (bad config, pending migrations, database down) logged as `FATAL`, not only printed to the console
+- [ ] Resource snapshot every minute in its own daily file `metrics-YYYY-MM-DD.log` (pod name on every line, 30-day retention): working set, GC heap, % of the memory limit, GC counts, thread-pool threads and queue length, requests in progress, requests per minute. Warning in the app log when memory exceeds 80% of the limit or the thread-pool queue keeps growing
+- [ ] Requests: slow requests (over 2 s) logged as a Warning with method, path, status and duration; rate-limited (429) responses logged with IP and path (500s are already logged)
+- [ ] Health: when `/health` turns Unhealthy, log which check failed (and when it recovers)
+- [ ] Two-instance check on the PC: two app processes on one database — a save on one evicts the other's cache, recurring jobs run once, an admin session works on both, both pods' lines land in the same log files, and the diagnostics lines above appear
 
 ## Phase 5 — Media
 
@@ -143,7 +149,11 @@ Infrastructure as agreed on 2026-11-11 (see Phase 4.5); replaces the Docker Comp
 - [ ] `deploy/deploy.ps1`: build on the PC → `docker save | ssh k3s ctr images import` → `migrate` Job → rollout → `/health` check
 - [ ] Droplet setup: hardening, swap, k3s (Traefik disabled), nginx, certbot, firewall (NodePorts closed), read-only backup user, `saronida-admin` wrapper script (`kubectl exec`)
 - [ ] PC backup script (`deploy/backup.ps1`) + Task Scheduler entry + restore runbook, restore tested once
-- [ ] Two-pod rehearsal on the preview: `replicas: 2` → cache eviction across pods, jobs run once, admin login → back to 1; write the scale-up runbook (resize droplet → `replicas: 2`)
+- [ ] Kubernetes event recorder: a small service on the droplet writes cluster events (`OOMKilled`, failed liveness checks, restarts, evictions) to `/var/saronida/logs/k8s-events-YYYY-MM-DD.log` (Kubernetes forgets events after about an hour)
+- [ ] Memory requests/limits on the app pod and PostgreSQL, so .NET's GC works within the limit and a kill is recorded as `OOMKilled`
+- [ ] nginx access and error logs kept 30 days (logrotate)
+- [ ] Persistent systemd journal with a size cap, so the kernel's out-of-memory messages for the whole droplet are kept
+- [ ] Two-pod rehearsal on the preview: `replicas: 2` → cache eviction across pods, jobs run once, admin login, both pods in the shared log files, a forced pod kill shows up in `k8s-events` → back to 1; write the scale-up runbook (resize droplet → `replicas: 2`)
 - [ ] Cloudflare: DNS (apex + www, proxied), Full (strict) SSL, Always Use HTTPS, Web Analytics
 - [ ] Canonical redirects: http → https and no-www → `https://www.saronidasailing.gr` in one hop (nginx); certificate for both names
 - [ ] Security headers (CSP incl. Google Maps frame, nosniff, Referrer-Policy, frame-ancestors); HSTS after launch, short max-age first
