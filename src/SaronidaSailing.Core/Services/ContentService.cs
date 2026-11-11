@@ -8,6 +8,7 @@ public sealed class ContentService(
     IContentListItemRepository listItems,
     IContentSectionRepository sections,
     IContentHistoryRepository history,
+    IMediaAssetRepository media,
     IUnitOfWork unitOfWork,
     IRichTextSanitizer sanitizer,
     IPageCacheInvalidator cacheInvalidator,
@@ -73,11 +74,13 @@ public sealed class ContentService(
             return Reject(editor, ["Editor email is required."]);
         }
 
-        var batch = new ContentBatch(items, listItems, sections, history, sanitizer, editor.Email);
+        var batch = new ContentBatch(items, listItems, sections, history, media, sanitizer, editor.Email);
         foreach (var change in changes)
         {
             await batch.ApplyAsync(change, ct);
         }
+
+        await batch.ValidateImagesAsync(ct);
 
         if (batch.Errors.Count > 0)
         {

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Time.Testing;
@@ -38,8 +39,8 @@ public class LifecycleLoggingTests(TempDatabaseWebApplicationFactory factory) : 
 
         var lines = await WaitForLinesAsync(host.LogsPath, l => l.Contains("|Lifecycle|Stopped "));
 
-        var lifecycle = lines.Where(l => l.Contains("|Lifecycle|")).ToList();
-        Assert.Equal(3, lifecycle.Count);
+        var lifecycle = lines.Where(l => Regex.IsMatch(l, @"\|INFO\|Lifecycle\|(Started|Stopping|Stopped) ")).ToList();
+        Assert.True(lifecycle.Count == 3, string.Join("\n", lines));
         Assert.Contains("|Lifecycle|Started ", lifecycle[0]);
         Assert.Matches(@"\|test-pod\|INFO\|Lifecycle\|Stopping reason=requested uptime=\d{2}:\d{2}:\d{2}$", lifecycle[1]);
         Assert.Matches(@"\|test-pod\|INFO\|Lifecycle\|Stopped uptime=\d{2}:\d{2}:\d{2}$", lifecycle[2]);

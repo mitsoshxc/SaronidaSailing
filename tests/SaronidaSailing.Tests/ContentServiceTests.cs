@@ -867,6 +867,213 @@ public sealed class ContentServiceTests : IAsyncLifetime
         Assert.Equal(["home.hero.title"], details!.Fields.Select(f => f.Key));
     }
 
+    [Fact]
+    public async Task Image_InEnglish_IsRejected()
+    {
+        var id = await SeedMediaAsync();
+
+        var result = await Apply(Image("home.hero.image", "en", id.ToString()));
+
+        Assert.Equal(["Images are stored in Greek only: 'home.hero.image'."], result.Errors);
+        Assert.Empty(await HistoryRows());
+    }
+
+    [Fact]
+    public async Task Image_UnknownId_IsRejected()
+    {
+        var unknown = Guid.NewGuid();
+
+        var result = await Apply(
+            Image("home.hero.image", "el", unknown.ToString()), Field("home.hero.image-alt", "el", "Alt"));
+
+        Assert.Equal([$"Image '{unknown}' for 'home.hero.image' does not exist."], result.Errors);
+        Assert.Empty(await HistoryRows());
+    }
+
+    [Fact]
+    public async Task Image_NotAGuid_IsRejected()
+    {
+        var result = await Apply(Image("home.hero.image", "el", "not-a-guid"), Field("home.hero.image-alt", "el", "Alt"));
+
+        Assert.Equal(["'home.hero.image': image value must be a media id."], result.Errors);
+    }
+
+    [Fact]
+    public async Task Image_WithoutAlt_IsRejected()
+    {
+        var id = await SeedMediaAsync();
+
+        var result = await Apply(Image("home.hero.image", "el", id.ToString()));
+
+        Assert.Equal(["'home.hero.image': Greek alt text is required."], result.Errors);
+        Assert.Empty(await HistoryRows());
+    }
+
+    [Fact]
+    public async Task Image_WithOnlyEnglishAlt_IsRejected()
+    {
+        var id = await SeedMediaAsync();
+
+        var result = await Apply(Image("home.hero.image", "el", id.ToString()), Field("home.hero.image-alt", "en", "Alt"));
+
+        Assert.Equal(["'home.hero.image': Greek alt text is required."], result.Errors);
+    }
+
+    [Fact]
+    public async Task ImageAndAlt_InTheSameBatch_AreAccepted()
+    {
+        var id = await SeedMediaAsync();
+
+        var result = await Apply(Image("home.hero.image", "el", id.ToString()), Field("home.hero.image-alt", "el", "Alt"));
+
+        Assert.True(result.Succeeded);
+        var page = await Read("home", "el");
+        Assert.Equal(new ContentValue(id.ToString(), ContentType.Image, false), page.GetField("home.hero.image"));
+    }
+
+    [Fact]
+    public async Task Image_WithAltAlreadyStored_IsAccepted()
+    {
+        var id = await SeedMediaAsync();
+        await Apply(Field("home.hero.image-alt", "el", "Alt"));
+
+        var result = await Apply(Image("home.hero.image", "el", id.ToString()));
+
+        Assert.True(result.Succeeded);
+    }
+
+    [Fact]
+    public async Task ImageIdIsStoredNormalized()
+    {
+        var id = await SeedMediaAsync();
+
+        var result = await Apply(
+            Image("home.hero.image", "el", $" {id.ToString("N").ToUpperInvariant()} "), Field("home.hero.image-alt", "el", "Alt"));
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(id.ToString(), (await Read("home", "el")).GetField("home.hero.image")?.Value);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task ClearingAlt_WhileTheImageStays_IsRejected(string alt)
+    {
+        var id = await SeedMediaAsync();
+        await Apply(Image("home.hero.image", "el", id.ToString()), Field("home.hero.image-alt", "el", "Alt"));
+
+        var result = await Apply(Field("home.hero.image-alt", "el", alt));
+
+        Assert.Equal(["'home.hero.image': Greek alt text is required."], result.Errors);
+        Assert.Equal("Alt", (await Read("home", "el")).GetField("home.hero.image-alt")?.Value);
+    }
+
+    [Fact]
+    public async Task WhitespaceAlt_WithANewImage_IsRejected()
+    {
+        var id = await SeedMediaAsync();
+
+        var result = await Apply(Image("home.hero.image", "el", id.ToString()), Field("home.hero.image-alt", "el", "   "));
+
+        Assert.Equal(["'home.hero.image': Greek alt text is required."], result.Errors);
+    }
+
+    [Fact]
+    public async Task ClearingTheImage_IsAcceptedWithoutAlt()
+    {
+        var id = await SeedMediaAsync();
+        await Apply(Image("home.hero.image", "el", id.ToString()), Field("home.hero.image-alt", "el", "Alt"));
+
+        var clearBoth = await Apply(Image("home.hero.image", "el", ""), Field("home.hero.image-alt", "el", ""));
+        var neverHadAlt = await Apply(Image("home.other.image", "el", ""));
+
+        Assert.True(clearBoth.Succeeded);
+        Assert.True(neverHadAlt.Succeeded);
+        Assert.Equal("", (await Read("home", "el")).GetField("home.hero.image")?.Value);
+    }
+
+    [Fact]
+    public async Task ListItemImage_NeedsAltOnTheSameItem()
+    {
+        var first = Guid.NewGuid();
+        var second = Guid.NewGuid();
+        var id = await SeedMediaAsync();
+
+        var accepted = await Apply(
+            new AddListItem("home.gallery", first),
+            Image("home.gallery.image", "el", id.ToString(), first),
+            Field("home.gallery.image-alt", "el", "First", first));
+        var rejected = await Apply(
+            new AddListItem("home.gallery", second),
+            Image("home.gallery.image", "el", id.ToString(), second));
+
+        Assert.True(accepted.Succeeded);
+        Assert.Equal(["'home.gallery.image': Greek alt text is required."], rejected.Errors);
+    }
+
+    [Fact]
+    public async Task ListItemImage_AltStoredOnAnotherItem_DoesNotCount()
+    {
+        var first = Guid.NewGuid();
+        var second = Guid.NewGuid();
+        var id = await SeedMediaAsync();
+        await Apply(
+            new AddListItem("home.gallery", first),
+            new AddListItem("home.gallery", second),
+            Field("home.gallery.image-alt", "el", "First", first));
+
+        var result = await Apply(Image("home.gallery.image", "el", id.ToString(), second));
+
+        Assert.Equal(["'home.gallery.image': Greek alt text is required."], result.Errors);
+    }
+
+    [Fact]
+    public async Task ImageOfAListItemDeletedInTheSameBatch_IsNotChecked()
+    {
+        var item = Guid.NewGuid();
+        await Apply(new AddListItem("home.gallery", item));
+
+        var result = await Apply(
+            Image("home.gallery.image", "el", Guid.NewGuid().ToString(), item),
+            new DeleteListItem("home.gallery", item));
+
+        Assert.True(result.Succeeded);
+    }
+
+    [Fact]
+    public async Task BatchWithTwoImages_ChecksExistenceWithOneQuery()
+    {
+        var first = await SeedMediaAsync();
+        var second = await SeedMediaAsync();
+        _existCalls = 0;
+
+        var result = await Apply(
+            Image("home.hero.image", "el", first.ToString()),
+            Field("home.hero.image-alt", "el", "A"),
+            Image("home.boat.image", "el", second.ToString()),
+            Field("home.boat.image-alt", "el", "B"));
+        var withoutImages = await Apply(Field("home.hero.title", "el", "t"));
+
+        Assert.True(result.Succeeded);
+        Assert.True(withoutImages.Succeeded);
+        Assert.Equal(1, _existCalls);
+    }
+
+    private static SetField Image(string key, string locale, string value, Guid? listItemId = null) =>
+        new(key, locale, ContentType.Image, value, listItemId);
+
+    private int _existCalls;
+
+    private async Task<Guid> SeedMediaAsync()
+    {
+        var hash = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(Guid.NewGuid().ToByteArray()));
+        var asset = MediaAsset.Create("photo.jpg", hash, "photo", [480, 960], 1000, 800, ".jpg");
+        await using var context = CreateContext();
+        context.Set<MediaAsset>().Add(asset);
+        await context.SaveChangesAsync();
+        return asset.Id;
+    }
+
     private static SetField Field(string key, string locale, string value, Guid? listItemId = null) =>
         new(key, locale, ContentType.Text, value, listItemId);
 
@@ -890,6 +1097,7 @@ public sealed class ContentServiceTests : IAsyncLifetime
             new ContentListItemRepository(context),
             new ContentSectionRepository(context),
             new ContentHistoryRepository(context),
+            new CountingMediaAssetRepository(new MediaAssetRepository(context), () => _existCalls++),
             new UnitOfWork(context),
             new RichTextSanitizer(),
             _invalidator,
@@ -897,6 +1105,25 @@ public sealed class ContentServiceTests : IAsyncLifetime
 
     private AppDbContext CreateContext() =>
         new(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(_connectionString).Options, _time);
+
+    private sealed class CountingMediaAssetRepository(IMediaAssetRepository inner, Action onExist) : IMediaAssetRepository
+    {
+        public Task<MediaAsset?> GetByIdAsync(Guid id, CancellationToken ct = default) => inner.GetByIdAsync(id, ct);
+
+        public Task<MediaAsset?> GetByContentHashAsync(string contentHash, CancellationToken ct = default) =>
+            inner.GetByContentHashAsync(contentHash, ct);
+
+        public Task<IReadOnlyList<MediaAsset>> ListNewestFirstAsync(int skip, int take, CancellationToken ct = default) =>
+            inner.ListNewestFirstAsync(skip, take, ct);
+
+        public Task<IReadOnlySet<Guid>> ExistAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct = default)
+        {
+            onExist();
+            return inner.ExistAsync(ids, ct);
+        }
+
+        public void Add(MediaAsset asset) => inner.Add(asset);
+    }
 
     private sealed class RecordingInvalidator : IPageCacheInvalidator
     {

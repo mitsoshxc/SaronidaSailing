@@ -8,9 +8,12 @@ internal sealed class ContentBatch(
     IContentListItemRepository listItems,
     IContentSectionRepository sections,
     IContentHistoryRepository history,
+    IMediaAssetRepository media,
     IRichTextSanitizer sanitizer,
     string editorEmail)
 {
+    private const string AltSuffix = "-alt";
+
     private readonly List<string> _errors = [];
     private readonly HashSet<string> _touchedPages = [];
     private readonly Dictionary<FieldRef, FieldState> _fields = [];
@@ -68,6 +71,69 @@ internal sealed class ContentBatch(
         }
     }
 
+    public async Task ValidateImagesAsync(CancellationToken ct)
+    {
+        var filled = _fieldOrder
+            .Where(s => s.Item.Type == ContentType.Image
+                && s.Item.Locale == ContentLocales.Default
+                && s.Current.Length > 0
+                && !BelongsToDeletedItem(s.Item))
+            .ToList();
+
+        if (filled.Count > 0)
+        {
+            var ids = filled.Select(s => Guid.TryParse(s.Current, out var id) ? id : Guid.Empty).Distinct().ToList();
+            var existing = await media.ExistAsync(ids, ct);
+            foreach (var state in filled)
+            {
+                if (!Guid.TryParse(state.Current, out var id) || !existing.Contains(id))
+                {
+                    _errors.Add($"Image '{state.Current}' for '{KeyOf(state.Item)}' does not exist.");
+                }
+            }
+        }
+
+        var toCheck = new List<FieldRef>();
+        var seen = new HashSet<FieldRef>();
+        foreach (var state in filled)
+        {
+            var reference = RefOf(state.Item);
+            if (seen.Add(reference))
+            {
+                toCheck.Add(reference);
+            }
+        }
+
+        var clearedAlts = _fieldOrder
+            .Where(s => s.Item.Type == ContentType.Text
+                && s.Item.Locale == ContentLocales.Default
+                && s.Item.FieldKey.Length > AltSuffix.Length
+                && s.Item.FieldKey.EndsWith(AltSuffix, StringComparison.Ordinal)
+                && string.IsNullOrWhiteSpace(s.Current)
+                && !BelongsToDeletedItem(s.Item))
+            .ToList();
+        foreach (var state in clearedAlts)
+        {
+            var item = state.Item;
+            var imageRef = new FieldRef(
+                item.PageKey, item.SectionKey, item.FieldKey[..^AltSuffix.Length], item.Locale, item.ListItemId);
+            if (!seen.Contains(imageRef) && !string.IsNullOrEmpty(await CurrentValueAsync(imageRef, ct)))
+            {
+                seen.Add(imageRef);
+                toCheck.Add(imageRef);
+            }
+        }
+
+        foreach (var imageRef in toCheck)
+        {
+            var altRef = imageRef with { Field = imageRef.Field + AltSuffix };
+            if (string.IsNullOrWhiteSpace(await CurrentValueAsync(altRef, ct)))
+            {
+                _errors.Add($"'{imageRef.Page}.{imageRef.Section}.{imageRef.Field}': Greek alt text is required.");
+            }
+        }
+    }
+
     public void Finish()
     {
         foreach (var state in _fieldOrder.Where(s => s.IsChanged))
@@ -110,6 +176,24 @@ internal sealed class ContentBatch(
             sections.Add(section);
         }
     }
+
+    private async Task<string> CurrentValueAsync(FieldRef reference, CancellationToken ct)
+    {
+        if (_fields.TryGetValue(reference, out var state))
+        {
+            return state.Current;
+        }
+
+        var stored = reference.ListItemId is { } id
+            ? await items.FindListFieldAsync(id, reference.Field, reference.Locale, ct)
+            : await items.FindStandaloneAsync(reference.Page, reference.Section, reference.Field, reference.Locale, ct);
+        return stored?.Value ?? "";
+    }
+
+    private static FieldRef RefOf(ContentItem item) =>
+        new(item.PageKey, item.SectionKey, item.FieldKey, item.Locale, item.ListItemId);
+
+    private static string KeyOf(ContentItem item) => $"{item.PageKey}.{item.SectionKey}.{item.FieldKey}";
 
     private bool BelongsToDeletedItem(ContentItem item) =>
         item.ListItemId is { } id && _deletedIds.Contains(id);
@@ -166,6 +250,25 @@ internal sealed class ContentBatch(
             _errors.Add(
                 $"Invalid link for '{change.Key}' ({change.Locale}): URL must be https:, mailto: or tel: and label is required.");
             return;
+        }
+        else if (change.Type == ContentType.Image)
+        {
+            if (change.Locale != ContentLocales.Default)
+            {
+                _errors.Add($"Images are stored in Greek only: '{change.Key}'.");
+                return;
+            }
+
+            if (value.Length > 0)
+            {
+                if (!Guid.TryParse(value, out var mediaId))
+                {
+                    _errors.Add($"'{change.Key}': image value must be a media id.");
+                    return;
+                }
+
+                value = mediaId.ToString();
+            }
         }
 
         var reference = new FieldRef(page, section, field, change.Locale, change.ListItemId);

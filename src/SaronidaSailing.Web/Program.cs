@@ -208,6 +208,7 @@ try
     app.MapHealthChecks("/health");
     app.MapStaticAssets();
     app.MapContentEndpoints();
+    app.MapMediaEndpoints();
     app.MapRazorPages()
        .WithStaticAssets();
 
