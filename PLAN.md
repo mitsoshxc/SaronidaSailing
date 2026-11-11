@@ -15,15 +15,17 @@ Phases are the build order; the whole site goes live once, after all phases are 
 - [x] SEO: `sitemap.xml` + `robots.txt`
 - [x] Image processing: SkiaSharp; images served from the droplet
 - [x] No contact form, no email provider
-- [x] Backups: DO weekly backups (FRA1) + nightly `VACUUM INTO`
-- [x] Deploys: build on the developer's PC, `docker save | ssh docker load`
+- [x] Backups: ~~DO weekly backups (FRA1) + nightly `VACUUM INTO`~~ → nightly `pg_dump` on the droplet, pulled daily by a script on the developer's PC into a Proton Drive folder; no DO backups (changed 2026-11-11, see Phase 4.5)
+- [x] Deploys: build on the developer's PC, ~~`docker save | ssh docker load`~~ → `docker save | ssh k3s ctr images import`, no registry (changed 2026-11-11)
+- [x] Hosting: k3s (single node) on one DO droplet, 1 vCPU / 2 GiB ($12/mo); one app pod at launch, the app is built to run as two pods (decided 2026-11-11, see Phase 4.5)
+- [x] Database: PostgreSQL instead of SQLite (decided 2026-11-11, see Phase 4.5)
 - [x] Pages and sections: the "Saronida Sailing Redesign" design canvas
 - [x] Repeating blocks: editable lists (add / delete / reorder / active-inactive); sections can be deactivated too
 - [x] Analytics: Cloudflare Web Analytics (cookieless)
 - [x] Google Map embed with a cookie consent banner (Necessary + External content)
 - [x] Greek slugs transliterated and fixed in code; old site URLs mapped to 301 redirects
 - [x] Instagram feed included at launch; fetch twice a day
-- [x] Background jobs: Hangfire with SQLite storage
+- [x] Background jobs: Hangfire with ~~SQLite~~ PostgreSQL storage (changed 2026-11-11)
 
 ## Phase 1 — Foundation
 
@@ -73,6 +75,31 @@ Agreed (2026-11-09): HtmlSanitizer and link-URL validation run **inside** `Conte
 - [x] "Missing EN" markers; Page settings modal for `{page}.seo.*` (title + description; image is Phase 5)
 - [x] Phone layout for quick fixes (collapsed toolbar, full-screen modals)
 
+## Phase 4.5 — PostgreSQL & Two-Pod Readiness
+
+Agreed infrastructure (2026-11-11), supersedes the single-container Docker Compose + SQLite design in `docs/`; Doc updates `architecture.md`, `conventions.md`, `domain-model.md` and `deployment.md` (as agreed design) at the end of this phase.
+
+- **Hosting:** k3s, single node, on one DO Basic droplet, 1 vCPU / 2 GiB ($12/mo + VAT), FRA1, with swap. k3s's bundled Traefik is disabled: **nginx stays on the host** (certbot, `maintenance.on`, `/health` blocked externally) and proxies to the app Service's NodePort; NodePorts are blocked by the firewall.
+- **Scale-up path:** resize the droplet (2 vCPU / 4 GiB, $24/mo) and set the app Deployment to `replicas: 2`. The app must be correct with two pods from day one; launch runs one.
+- **Database:** PostgreSQL (exact version pinned at implementation), one pod (StatefulSet, 1 replica) inside the cluster, data on the droplet disk under `/var/saronida/pgdata`, never exposed outside the cluster. Not DO Managed Postgres (cost). SQL Server Express was rejected: it needs ≥2 GB RAM on its own.
+- **Hangfire:** `Hangfire.PostgreSql` in the same database, own schema `hangfire`. Every pod runs a Hangfire server; its distributed locks keep recurring jobs single. Resolves the "is `Hangfire.Storage.SQLite` maintained" check.
+- **Output cache across pods:** each pod keeps its in-memory output cache. `IPageCacheInvalidator` evicts locally and broadcasts the evicted tags with Postgres `NOTIFY`; every pod `LISTEN`s and evicts them. When a pod's listener connects or reconnects it evicts everything (`pages:all`), so a missed message can't leave stale pages. No Redis, no Elasticsearch.
+- **Migrations:** no longer applied by every pod at startup. A `migrate` CLI command runs as a Kubernetes Job before each rollout; startup still migrates in Development.
+- **Shared folders:** media, originals and Data Protection keys stay on host folders under `/var/saronida`, mounted into every pod (single node).
+- **Logs:** NLog file names include the pod name, so two pods never write the same file.
+- **Login rate limiter:** stays in memory per pod (the limit is per pod with two pods — accepted; Identity lockout is in the database).
+- **Tests:** database tests run against real PostgreSQL via Testcontainers. They need Docker, so they run on the developer's PC, not in cloud sessions.
+- **Local development:** PostgreSQL in Docker on the developer's PC.
+- **Backups:** a nightly `pg_dump` CronJob writes to `/var/saronida/backup` (last 7 kept on the droplet). A script on the developer's PC (Windows Task Scheduler, runs when missed) pulls the dumps, new files in `originals/` and the Data Protection keys over SSH with a dedicated read-only backup user into the Proton Drive sync folder; keeps 30 daily + 12 monthly; warns when the newest backup is more than 3 days old. No DO backups. A restore runbook is written and tested once.
+
+- [ ] PostgreSQL provider: Npgsql EF Core, fresh `InitialCreate` (SQLite migrations, WAL pragma and SQLite packages removed), UTC `DateTime` mapping, local dev PostgreSQL in Docker
+- [ ] Hangfire on `Hangfire.PostgreSql` (schema `hangfire`); `/health` storage check updated
+- [ ] Tests on Testcontainers PostgreSQL (replaces the temp SQLite databases)
+- [ ] `migrate` CLI command; startup migration only in Development
+- [ ] Cross-pod cache eviction via `LISTEN/NOTIFY` behind `IPageCacheInvalidator`, full eviction on listener (re)connect
+- [ ] NLog file names per pod
+- [ ] Two-instance check on the PC: two app processes on one database — a save on one evicts the other's cache, recurring jobs run once, an admin session works on both
+
 ## Phase 5 — Media
 
 - [ ] `MediaAsset` entity, `IMediaService`, storage under `Media:RootPath`
@@ -106,17 +133,20 @@ Agreed (2026-11-09): HtmlSanitizer and link-URL validation run **inside** `Conte
 
 ## Phase 8 — Preview & Production
 
-- [ ] Preview on the future production droplet at `https://saronida.visualpivot.net`: Basic Auth (one owner login, htpasswd on the droplet), `X-Robots-Tag: noindex, nofollow`, `robots.txt` disallow-all, no sitemap, `Site:BaseUrl` = preview URL; no DO backups until go-live
+- [ ] Preview on the future production droplet at `https://saronida.visualpivot.net`: Basic Auth (one owner login, htpasswd on the droplet), `X-Robots-Tag: noindex, nofollow`, `robots.txt` disallow-all, no sitemap, `Site:BaseUrl` = preview URL; PC backups run from the start (changed 2026-11-11: no DO backups)
 
-- [ ] `deploy/docker-compose.yml`, `deploy/nginx/` site config (incl. `/health` denied externally)
+Infrastructure as agreed on 2026-11-11 (see Phase 4.5); replaces the Docker Compose tasks.
+
+- [ ] `deploy/k8s/` manifests: namespace, app Deployment (`replicas: 1`, readiness/liveness probes) + NodePort Service, PostgreSQL StatefulSet, `migrate` Job, `pg_dump` CronJob, Secrets (DB password, Instagram app secret), host-folder mounts under `/var/saronida`
+- [ ] `deploy/nginx/` site config proxying to the NodePort (incl. `/health` denied externally); `ForwardedHeaders:KnownNetworks` set to the k3s network
 - [ ] nginx maintenance mode: `/var/saronida/maintenance.on` → 503 + `deploy/nginx/maintenance.html`
-- [ ] `deploy/deploy.ps1`
-- [ ] Nightly `VACUUM INTO` backup job
-- [ ] Droplet setup: hardening, swap, Docker, nginx, certbot, firewall, `saronida-admin` wrapper script
+- [ ] `deploy/deploy.ps1`: build on the PC → `docker save | ssh k3s ctr images import` → `migrate` Job → rollout → `/health` check
+- [ ] Droplet setup: hardening, swap, k3s (Traefik disabled), nginx, certbot, firewall (NodePorts closed), read-only backup user, `saronida-admin` wrapper script (`kubectl exec`)
+- [ ] PC backup script (`deploy/backup.ps1`) + Task Scheduler entry + restore runbook, restore tested once
+- [ ] Two-pod rehearsal on the preview: `replicas: 2` → cache eviction across pods, jobs run once, admin login → back to 1; write the scale-up runbook (resize droplet → `replicas: 2`)
 - [ ] Cloudflare: DNS (apex + www, proxied), Full (strict) SSL, Always Use HTTPS, Web Analytics
 - [ ] Canonical redirects: http → https and no-www → `https://www.saronidasailing.gr` in one hop (nginx); certificate for both names
-- [ ] Enable DO weekly backups
 - [ ] Security headers (CSP incl. Google Maps frame, nosniff, Referrer-Policy, frame-ancestors); HSTS after launch, short max-age first
-- [ ] `unattended-upgrades` with nightly auto-reboot; container `restart: unless-stopped`
+- [ ] `unattended-upgrades` with nightly auto-reboot; k3s and the pods come back on boot
 - [ ] UptimeRobot monitor (alerts to the developer's email)
 - [ ] Go-live: remove preview features (Basic Auth, noindex, Preview mode) → test via hosts file → copy all DNS records to Cloudflare → lower TTL → switch → verify → keep old site a few days → submit sitemap

@@ -2,20 +2,22 @@
 
 Public website for a sailing business in Saronida, Greece, with a custom built-in CMS. Page layouts and sections are fixed in code; the **content** of each section (texts, images) is data entered by the admin. An admin logs in, sees the site exactly as a visitor does, and edits each section in place (one or more admins, created with the `saronida-admin` CLI).
 
-Stack: ASP.NET Core 10 Razor Pages · Entity Framework Core 10 · SQLite · ASP.NET Core Identity · Output Caching · Hangfire (SQLite storage) · SkiaSharp · NLog · HtmlSanitizer · Quill 2 · SortableJS · plain JS/CSS (no frameworks) · xUnit · Playwright + axe-core · Docker · nginx · DigitalOcean · Cloudflare (Free). Full table with reasons: `docs/architecture.md` → Tech Stack.
+Stack: ASP.NET Core 10 Razor Pages · Entity Framework Core 10 · PostgreSQL · ASP.NET Core Identity · Output Caching · Hangfire (PostgreSQL storage) · SkiaSharp · NLog · HtmlSanitizer · Quill 2 · SortableJS · plain JS/CSS (no frameworks) · xUnit · Testcontainers · Playwright + axe-core · Docker · k3s · nginx · DigitalOcean · Cloudflare (Free). Full table with reasons: `docs/architecture.md` → Tech Stack.
+
+**Infrastructure changed on 2026-11-11:** SQLite → PostgreSQL; Docker Compose → k3s on one $12 droplet with one app pod, built to run two; backups pulled to the developer's PC instead of DO backups. `PLAN.md` → Phase 4.5 is authoritative until Doc updates `docs/` at the end of that phase.
 
 Languages: Greek (default, no URL prefix) and English (`/en/`). Pages and sections come from the "Saronida Sailing Redesign" design canvas: https://claude.ai/artifact/RcU5iMfQSTJ34rH5gFB7MC (read it with the Artifact tool; desktop artboards `Desktop*.dc.html` hold the full layouts, the canvas notes hold design decisions).
 
-Project status: **Phase 4 (Inline Editing) is complete**. Docs mark what is implemented and what is still agreed design; `PLAN.md` tracks the rest of the build.
+Project status: **Phase 4 (Inline Editing) is complete; Phase 4.5 (PostgreSQL & Two-Pod Readiness) is next**. Docs mark what is implemented and what is still agreed design; `PLAN.md` tracks the rest of the build.
 
 ## Before You Start (working agreements)
 
 - **People:** the developer (senior .NET back-end dev, works with Claude as tech lead) and the business owner (answers in [`OWNER-QUESTIONS.md`](OWNER-QUESTIONS.md)).
 - **Commit and push directly to `main`.** No feature branches, no PRs unless the developer asks.
 - **Never decide on your own** what hasn't been agreed — propose, ask, then record the decision in `docs/` / `PLAN.md`.
-- **Development and testing happen on the developer's PC.** Cloud sessions: the "SaronidaSailing" environment installs the .NET 10 SDK via its setup script; there is no Docker daemon in the cloud, so the `Dockerfile`/compose are only built and run locally.
+- **Development and testing happen on the developer's PC.** Cloud sessions: the "SaronidaSailing" environment installs the .NET 10 SDK via its setup script; there is no Docker daemon in the cloud, so the `Dockerfile` and k3s manifests are only built and run locally, and the database tests (Testcontainers PostgreSQL) run only on the developer's PC.
 - **Environments:** local → **preview** at `https://saronida.visualpivot.net` (password-protected, never crawlable, for showing the owner) → production at `https://www.saronidasailing.gr` on **the same droplet** (preview features removed, DNS switched). See `docs/deployment.md` → Preview.
-- **Verify during implementation** (flagged in the docs): `Hangfire.Storage.SQLite` still maintained (Phase 1), iPhone HEIC upload (Phase 5), Meta app development mode (Phase 6).
+- **Verify during implementation** (flagged in the docs): iPhone HEIC upload (Phase 5), Meta app development mode (Phase 6).
 
 ## Emergency: take the site offline
 
