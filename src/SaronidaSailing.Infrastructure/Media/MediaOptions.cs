@@ -7,4 +7,6 @@ public sealed class MediaOptions
     public string RootPath { get; set; } = "";
 
     public string OriginalsPath { get; set; } = "";
+
+    public int ProcessingWaitSeconds { get; set; } = 30;
 }

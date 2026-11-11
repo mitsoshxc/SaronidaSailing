@@ -36,7 +36,11 @@ public static class DependencyInjection
             {
                 options.RootPath = ResolveFolder(configuration, nameof(MediaOptions.RootPath), environment);
                 options.OriginalsPath = ResolveFolder(configuration, nameof(MediaOptions.OriginalsPath), environment);
+                options.ProcessingWaitSeconds = configuration.GetValue(
+                    $"{MediaOptions.SectionName}:{nameof(MediaOptions.ProcessingWaitSeconds)}",
+                    options.ProcessingWaitSeconds);
             })
+            .Validate(options => options.ProcessingWaitSeconds >= 0, "Media:ProcessingWaitSeconds must not be negative.")
             .Validate(options => !string.IsNullOrWhiteSpace(options.RootPath), "Media:RootPath is not configured.")
             .Validate(options => !string.IsNullOrWhiteSpace(options.OriginalsPath), "Media:OriginalsPath is not configured.")
             .Validate(options => !MediaFolder.IsInside(options.OriginalsPath, options.RootPath), "Media:OriginalsPath must not be inside Media:RootPath.")
@@ -53,6 +57,8 @@ public static class DependencyInjection
         services.AddScoped<IContentSectionRepository, ContentSectionRepository>();
         services.AddScoped<IContentHistoryRepository, ContentHistoryRepository>();
         services.AddScoped<IMediaAssetRepository, MediaAssetRepository>();
+        services.AddSingleton<MediaProcessingGate>();
+        services.AddScoped<IMediaService, MediaService>();
 
         services.AddSingleton<ICacheEvictionBus>(_ => new PostgresCacheEvictionBus(connectionString));
         services.AddHostedService(sp => new PostgresCacheEvictionListener(
