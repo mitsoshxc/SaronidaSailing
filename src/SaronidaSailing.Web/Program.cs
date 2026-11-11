@@ -24,7 +24,8 @@ using SaronidaSailing.Web.Identity;
 using SaronidaSailing.Web.Localization;
 
 var isAdminCommand = AdminCommandRunner.IsAdminCommand(args);
-var builder = WebApplication.CreateBuilder(isAdminCommand ? [] : args);
+var isMigrateCommand = MigrateCommand.IsMigrateCommand(args);
+var builder = WebApplication.CreateBuilder(isAdminCommand || isMigrateCommand ? [] : args);
 
 var logsPath = builder.Configuration["Logs:Path"];
 if (string.IsNullOrWhiteSpace(logsPath))
@@ -118,6 +119,14 @@ builder.Services.AddHealthChecks()
     .AddCheck<HomePageHealthCheck>("home-page");
 
 var app = builder.Build();
+
+if (isMigrateCommand)
+{
+    var migrateExitCode = await new MigrateCommand(app.Services, Console.Out, Console.Error).RunAsync(args);
+
+    LogManager.Shutdown();
+    return migrateExitCode;
+}
 
 await app.Services.InitializeDatabaseAsync();
 

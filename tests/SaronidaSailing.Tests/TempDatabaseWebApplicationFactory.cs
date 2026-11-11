@@ -39,6 +39,8 @@ public class TempDatabaseWebApplicationFactory: WebApplicationFactory<Program>
 
     protected virtual bool UseEmptyDatabase => false;
 
+    protected virtual bool? MigrateAtStartup => null;
+
     public string ContentConnectionString
     {
         get
@@ -67,6 +69,10 @@ public class TempDatabaseWebApplicationFactory: WebApplicationFactory<Program>
         builder.UseSetting("Logs:Path", LogsPath);
         builder.UseSetting("ConnectionStrings:Content", ContentConnectionString);
         builder.UseSetting("Media:RootPath", MediaPath);
+        if (MigrateAtStartup is { } migrate)
+        {
+            builder.UseSetting("Database:MigrateAtStartup", migrate ? "true" : "false");
+        }
         builder.UseSetting("DataProtection:KeysPath", KeysPath);
         builder.UseSetting("Site:BaseUrl", "https://localhost");
         builder.UseSetting("Health:HomePageUrl", "http://localhost/");

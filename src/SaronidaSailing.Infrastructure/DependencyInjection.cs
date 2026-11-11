@@ -25,6 +25,9 @@ public static class DependencyInjection
             throw new InvalidOperationException("Connection string 'ConnectionStrings:Content' is not configured.");
         }
 
+        var settings = new DatabaseSettings(configuration.GetValue<bool>(DatabaseSettings.MigrateAtStartupKey));
+        services.AddSingleton(settings);
+
         services.AddOptions<MediaOptions>()
             .Configure(options => options.RootPath = configuration[$"{MediaOptions.SectionName}:{nameof(MediaOptions.RootPath)}"] ?? "")
             .Validate(options => !string.IsNullOrWhiteSpace(options.RootPath), "Media:RootPath is not configured.")
@@ -47,7 +50,7 @@ public static class DependencyInjection
             .UseRecommendedSerializerSettings()
             .UsePostgreSqlStorage(
                 storage => storage.UseNpgsqlConnection(connectionString),
-                new PostgreSqlStorageOptions { SchemaName = "hangfire", PrepareSchemaIfNecessary = true }));
+                new PostgreSqlStorageOptions { SchemaName = "hangfire", PrepareSchemaIfNecessary = settings.MigrateAtStartup }));
         services.AddHangfireServer(options => options.WorkerCount = 2);
 
         return services;
