@@ -51,7 +51,7 @@ global.json, Directory.Build.props, Directory.Packages.props, nuget.config
 src/
   SaronidaSailing.Core/            Entities/ (BaseEntity, ApplicationUser, Content*, MediaAsset), Interfaces/ (repositories, IContentService, IMediaService, MediaImportResult, IRichTextSanitizer, IUnitOfWork, IPageCacheInvalidator, ICacheTagEvictor, ICacheEvictionBus, PageContent, PageImage), Services/ (ContentService, ContentBatch, ContentKeys, ContentLocales, ContentLink, MediaFileNames, MediaLimits, MediaDimensions, Slugs); no EF, no ASP.NET
   SaronidaSailing.Infrastructure/  Data/ (AppDbContext, DatabaseInitializer, DatabaseSettings, UnitOfWork, Configurations/, Migrations), Caching/ (PostgresCacheEvictionBus, PostgresCacheEvictionListener, CacheEvictionChannel), Repositories/, Content/ (RichTextSanitizer), Health/, Logging/ (AuditLog), Media/ (MediaService, ImageProcessor, MediaProcessingGate, MediaOptions, MediaFolder), DependencyInjection.cs
-  SaronidaSailing.Web/             Program.cs, SiteOptions.cs, LogInstance.cs, DevelopmentMediaFiles.cs, Caching/ (CacheTags, OutputCachePageInvalidator, OutputCacheTagEvictor), Diagnostics/ (lifecycle, crash, metrics, request and health logging), Content/ (PageContentAccessor, CmsEditContext, CmsEditorConfig), Endpoints/ (ContentEndpoints, ContentApiModels, MediaEndpoints, MediaApiModels), TagHelpers/, Cli/ (admin and migrate commands), Identity/, Localization/, Health/, Pages/ (Pages/Admin/, Pages/Dev/), wwwroot (css/, js/cms/, lib/quill/, lib/sortablejs/), appsettings*.json
+  SaronidaSailing.Web/             Program.cs, SiteOptions.cs, LogInstance.cs, DevelopmentMediaFiles.cs, Caching/ (CacheTags, OutputCachePageInvalidator, OutputCacheTagEvictor), Diagnostics/ (lifecycle, crash, metrics, request and health logging), Content/ (PageContentAccessor, CmsEditContext, CmsEditorConfig), Endpoints/ (ContentEndpoints, ContentApiModels, MediaEndpoints, MediaApiModels, AdminEndpoints), TagHelpers/, Cli/ (admin and migrate commands), Identity/, Localization/, Health/, Pages/ (Pages/Admin/, Pages/Dev/), wwwroot (css/ (`site.css` holds the base page rules, see docs/conventions.md -> CSS and fonts), js/cms/, lib/quill/, lib/sortablejs/), appsettings*.json
 tests/
   SaronidaSailing.Tests/           xUnit; one PostgreSQL Testcontainer, one database per test class (see docs/conventions.md -> Tests)
 Dockerfile, .dockerignore
@@ -216,13 +216,13 @@ Razor templates mark editable spots with tag helper **attributes on real element
 |---|---|
 | `<h1 cms="home.hero.title">` | Fills the element with a `Text` value (encoded). Add `cms-rich` (`<div cms="about.story.body" cms-rich>`) to declare a `RichText` field, emitted as HTML. If the stored type differs from what the template declares, a warning is logged and the element is omitted |
 | `<a cms-link="home.hero.cta">` | Link field: sets `href` and the label. An `https:` link also gets `target="_blank"`, `rel="noopener"` and a visually hidden "(opens in a new tab)" notice in the page language (`Localization/UiText.cs`). Invalid link JSON or a disallowed scheme logs a warning and omits the element for visitors; the admin sees it flagged `data-cms-invalid` |
-| `<li cms-list="home.highlights">` | Repeats the element once per **active** entry (the admin also sees inactive ones), in `SortOrder`. Inside it, `cms-field="title"` (with optional `cms-rich`) and `cms-link-field="link"` read that entry's fields. Lists cannot be nested; no active entries omits the element for visitors |
-| `<section cms-section="home.instagram">` | Omits the whole element when the section is inactive (a section with no row is active) |
+| `<li cms-list="home.highlights" cms-add-label="Add highlight">` | Repeats the element once per **active** entry (the admin also sees inactive ones), in `SortOrder`. Inside it, `cms-field="title"` (with optional `cms-rich`) and `cms-link-field="link"` read that entry's fields. Lists cannot be nested; no active entries omits the element for visitors. `cms-add-label` is **required**: it is the text of the list's Add button in edit mode |
+| `<section cms-section="home.instagram" cms-section-label="Instagram feed">` | Omits the whole element when the section is inactive (a section with no row is active). `cms-section-label` is **required**: the section's name in the admin's section bar and status messages |
 | `<a cms-section-link="home.instagram">` | A menu link to a section (`CmsSectionLinkTagHelper`): omitted for visitors when that section is inactive. Accepts only a section of the current page or of `shared`; any other page key throws at render time |
-| `<cms-image key="home.hero.image" sizes="..." />` | An element, not an attribute (`CmsImageTagHelper`, no end tag). Renders an `<img>` for an `Image` field (see Media Pipeline → `<cms-image>`) |
+| `<cms-image key="home.hero.image" label="Hero photo" sizes="..." />` | An element, not an attribute (`CmsImageTagHelper`, no end tag). Renders an `<img>` for an `Image` field; `label` is required (see Media Pipeline → `<cms-image>`) |
 | `<cms-seo fallback-title="...">` | Page `<title>`, description and Open Graph tags (see SEO) |
 
-A field with no value in either language omits its element for visitors; the admin gets an empty element flagged `data-cms-empty` to click into. An invalid key, or `cms-field` outside a `cms-list`, throws. `Web/TagHelpers/CmsFieldResolver.cs` holds the shared key checks.
+A field with no value in either language omits its element for visitors; the admin gets an empty element flagged `data-cms-empty` to click into. An invalid key, or `cms-field` outside a `cms-list`, throws. A missing or blank `cms-add-label`, `cms-section-label` or `<cms-image label>` also throws at render time (`CmsFieldResolver.RequireLabel`), so every admin control has a distinct name (see Editing UI → Distinct controls). `Web/TagHelpers/CmsFieldResolver.cs` holds the shared key checks.
 
 ### Content snapshot
 
@@ -236,11 +236,12 @@ Tag helpers read a per-request snapshot, `IPageContentAccessor` (`Web/Content/Pa
 |---|---|
 | `data-cms-key`, `data-cms-type` (`text`, `richText`, `link`, `image`) | Every field element |
 | `data-cms-value` | Rich-text and link fields: the stored HTML / link JSON, so the editors start from the saved value. Image: the media id (empty when none) |
-| `data-cms-alt-key`, `data-cms-alt`, `data-cms-alt-el`, `data-cms-alt-proposal`, `data-cms-sizes`, `data-cms-loading` | `<cms-image>` only: see Media Pipeline → `<cms-image>` |
+| `data-cms-alt-key`, `data-cms-alt`, `data-cms-alt-el`, `data-cms-alt-proposal`, `data-cms-sizes`, `data-cms-loading`, `data-cms-label` | `<cms-image>` only: see Media Pipeline → `<cms-image>` (`data-cms-label` is the required `label`) |
+| `data-cms-name` | Optional name of a field for the admin's field bar and window subtitles; read by `values.js` `fieldName`. No tag helper emits it yet |
 | `data-cms-fallback`, `data-cms-empty`, `data-cms-invalid` | Flags: English shows the Greek fallback, no value, invalid link |
 | `data-cms-list`, `data-cms-item` | Every list item copy (`data-cms-item` is the item's Id) |
-| `<template data-cms-list-template="{listKey}">` | After each list: one empty copy of the item markup, cloned by "Add item" |
-| `data-cms-section`, `data-cms-section-link` | Sections and their menu links |
+| `<template data-cms-list-template="{listKey}" data-cms-add-label="...">` | After each list: one empty copy of the item markup, cloned by the Add button; `data-cms-add-label` is the list's `cms-add-label` (the Add button's text) |
+| `data-cms-section`, `data-cms-section-label`, `data-cms-section-link` | Sections (with their required `cms-section-label`) and their menu links |
 | `data-cms-active="false"` | Inactive list items, sections and section links; shown dimmed |
 | `<script type="application/json" id="cms-config">` | `CmsEditorConfig` (`Web/Content/CmsEditorConfig.cs`): `pageKey`, `locale`, `saveUrl`, `historyUrl`, `savesUrl`, `antiforgeryToken`, `opensInNewTab` and `seo` (the page's SEO title and description, each with its Greek value when English falls back; the link-preview `image` (`{value, previewUrl}`, the 960 px file or the largest) and `imageAlt` (`{value, greek}`); null on non-site pages) |
 | `_AdminToolbar` partial, `~/css/cms-edit.css`, `~/js/cms-edit.js` (module) | Layout |
@@ -309,12 +310,12 @@ Both run inside `ContentService.ApplyChangesAsync` (`ContentBatch.SetFieldAsync`
 | Unsaved counter | "No unsaved changes" / "N unsaved changes" (fields plus list and section operations) |
 | More | Opens the panel with the rest; hidden from 720 px up, where the panel's controls sit inline |
 | Edit mode | Toggle, `aria-pressed`. Off = the page looks exactly as for a visitor |
-| Discard | Asks for confirmation, then reloads the page |
+| Discard | Does nothing when there are no pending changes; otherwise opens an in-page confirmation ("Discard changes?", buttons "Keep editing" (focused) and "Discard"), then reloads the page |
 | Page settings | Only on a site page |
 | "N missing in English" | English pages only; hidden when the count is 0 |
 | Language link, Jobs, Log out | Log out is a POST form with an antiforgery token |
 
-A status line and an error list (`role="alert"`) sit below the controls.
+A status line (`role="status"`, `aria-live="polite"`) and an error list (`role="alert"`) sit below the controls on a phone. From 720 px the status sits **between the unsaved counter and the buttons** (CSS `order`; it takes the remaining width and is cut with an ellipsis; the full text is in its `title` attribute and is announced through `aria-live`), so the buttons stay at the same place whatever the status says.
 
 ### Editing UI (client)
 
@@ -325,12 +326,12 @@ A status line and an error list (`role="alert"`) sit below the controls.
 | `pending.js` | The pending model. Field changes are keyed by key + locale + list item id and dropped when the value returns to the original; list and section operations live in named **op slots** (`list:{listKey}`, `section:{sectionKey}`) that are replaced as a whole. `toBatch()` puts the ops first, then the `setField` changes |
 | `fields.js` | Reads and writes one field element: original value, preview of the new value, `data-cms-dirty` / `-empty` / `-invalid` / `-fallback` flags, hand-off to `pending` |
 | `inline.js` | Inline editing of `text` fields (`contenteditable="plaintext-only"`). Enter finishes, Escape reverts. Clicks on editable links are blocked in edit mode |
-| `toolbar.js` | Save (one `fetch` POST with the `RequestVerificationToken` header; on an antiforgery 400 it reloads the page HTML once for a fresh token and retries), Discard, counter, More panel, `beforeunload` warning, the `--cms-toolbar-height` CSS variable, the "Saved" message after the reload, messages for 400 / 401 / 403 / 413 |
+| `toolbar.js` | Save (one `fetch` POST with the `RequestVerificationToken` header; on an antiforgery 400 it reloads the page HTML once for a fresh token and retries), Discard (through `confirmDialog`), counter, status text (also set as its `title`), More panel, `beforeunload` warning, the `--cms-toolbar-height` CSS variable, the "Saved" message after the reload, messages for 400 / 401 / 403 / 413 |
 | `edit-mode.js` | Edit mode on/off. Starts **on**; remembered per tab in `sessionStorage` (`cms-edit-mode`). Off adds the class `cms-view` to `<html>` |
-| `fieldbar.js` | The small bar next to a focused or clicked field: "History" for every field, plus "Edit text" / "Edit link" / "Edit image". Clicking a rich-text block, a link or an image opens its window directly |
-| `windows.js`, `dialog.js` | `dialog.js` builds the native `<dialog>` windows (focus return, Escape asks before discarding changes); `windows.js` opens the window types (rich text, link, image, history, page settings) |
+| `fieldbar.js` | The small bar next to a focused or clicked field: "History" for every field, plus "Edit text" / "Edit link" / "Edit image"; each button's accessible name adds the field name ("Edit text: title"). Clicking a rich-text block, a link or an image opens its window directly |
+| `windows.js`, `dialog.js` | `dialog.js` builds the native `<dialog>` windows (focus return) and the in-page confirmation; `windows.js` opens the window types (rich text, link, image, history, page settings). See **Windows and confirmations** below |
 | `rich-window.js`, `quill-loader.js`, `rich-html.js` | Rich-text window: Quill 2 limited to heading (h3), bold, italic, numbered and bulleted lists, link and clear formatting. `quill-loader.js` loads Quill lazily. `rich-html.js` is a client-side mirror of the sanitizer's allowed tags, for preview only; the server's sanitizer is the authority. Links not starting with `https://`, `mailto:` or `tel:` are refused |
-| `link-window.js`, `values.js` | Link window: type picker (Web page / Email / Phone, which adds `https://`, `mailto:` or `tel:`), label, "Remove link". `values.js` holds shared helpers (text normalize, link parse, allowed schemes) |
+| `link-window.js`, `values.js` | Link window: type picker (Web page / Email / Phone, which adds `https://`, `mailto:` or `tel:`), label, "Remove link" (asks through `confirmDialog`, "Remove link?"). `values.js` holds shared helpers (text normalize, link parse, allowed schemes, `fieldName`) |
 | `history-window.js` | Loads `historyUrl`; image versions show thumbnails (`imagePreview`) and restore as an image change, and an image that no longer exists cannot be restored; "Restore this version" sets the field as a pending change; "Undo this whole save" loads `savesUrl{saveId}`, lists the fields that differ from before the save, flags those changed again by a later save (undo overwrites them), and sets them back as pending changes |
 | `image-window.js`, `image-data.js` | Image window and its shared helpers (see Media Pipeline → Image window). `image-data.js` holds the media API client (`loadAsset` with a per-id cache), `imagePreview`, `recordImage` (puts the image id and the alt texts into `pending`), and builders for the placeholder button and the `<img>` element, so the page shows the new image before Save |
 | `settings-window.js` | Page settings: `{page}.seo.title` and `{page}.seo.description` in the current language, with the Greek value shown as guidance when English is empty, plus a "Link preview image" row (`{page}.seo.image` and its alt `{page}.seo.image-alt`) that opens the image window |
@@ -338,11 +339,15 @@ A status line and an error list (`role="alert"`) sit below the controls.
 | `lists.js` | List editing (below) |
 | `sections.js` | Section bar (below) |
 
-**Lists** (`lists.js`): each list item gets an **item bar** (drag handle, Move up, Move down, Hide/Show, Delete), shown while the pointer or keyboard focus is inside the item. Each list ends with **Add item**: it clones the `data-cms-list-template`, gives the copy a new GUID and focuses its first field. Delete asks first (Delete, "Hide instead", Cancel); a saved item has no history, so its deletion cannot be undone after Save. The list operations are **computed from the DOM** against the state at page load, not recorded as clicks: `addListItem` for new ids, `deleteListItem` for missing ids, `setListItemActive` for changed visibility, and one `reorderList` when the order differs from the expected one. The result goes into the slot `list:{listKey}`. Pending edits of a deleted item's fields are dropped. Drag-and-drop uses SortableJS, loaded lazily only when the page has a list; if it fails to load, the buttons still work.
+**Lists** (`lists.js`): each list item gets an **item bar** (drag handle, Move up, Move down, Hide/Show, Delete), shown while the pointer or keyboard focus is inside the item. Each list ends with an Add button whose text is the list's required `cms-add-label` (carried by `data-cms-add-label` on the list template; "Add item" only as a script fallback): it clones the `data-cms-list-template`, gives the copy a new GUID and focuses its first field. Delete asks first in a window titled with the item's name (Delete, "Hide instead", Cancel); a saved item has no history, so its deletion cannot be undone after Save. The list operations are **computed from the DOM** against the state at page load, not recorded as clicks: `addListItem` for new ids, `deleteListItem` for missing ids, `setListItemActive` for changed visibility, and one `reorderList` when the order differs from the expected one. The result goes into the slot `list:{listKey}`. Pending edits of a deleted item's fields are dropped. Drag-and-drop uses SortableJS, loaded lazily only when the page has a list; if it fails to load, the buttons still work.
 
-**Sections** (`sections.js`): every `data-cms-section` gets an always-visible **section bar** with Hide section / Show section. The toggle also dims or restores the section's menu links (`data-cms-section-link`) and sets the slot `section:{sectionKey}` with a `setSectionActive` op (empty when the state returns to the original). The same visibility applies to both languages.
+**Sections** (`sections.js`): every `data-cms-section` gets an always-visible **section bar** showing the section's name (`data-cms-section-label`) and the button "Hide section" / "Show section" (visible as "{label} · Hide section"; the bar's and the button's accessible names include the label). The toggle also dims or restores the section's menu links (`data-cms-section-link`) and sets the slot `section:{sectionKey}` with a `setSectionActive` op (empty when the state returns to the original). Status messages name the section ("Section 'Intro' hidden from visitors (both languages). Save page to apply."). The same visibility applies to both languages.
 
-**Phone layout** (under 720 px; `wwwroot/css/cms-edit.css` is mobile-first with `min-width: 720px` and `min-width: 960px` breakpoints; the media library grid has 2 columns on phones, 3 from 720 px and 4 from 960 px): the toolbar stays in one line (Save page, counter, More) and More opens a panel below; windows are full-screen (`100vw` x `100dvh`) and become centred dialogs from 720 px; the item drag handle is hidden, so items move with the up/down buttons; buttons in the item and section bars and the toolbar are 44 px (2.75rem) touch targets, shrinking from 720 px; `scroll-padding-top` follows `--cms-toolbar-height` so focused fields are not hidden under the toolbar.
+**Distinct controls.** Every admin control has a name that tells it from the others of its kind, for people using a screen reader or voice control. Templates must give: `cms-add-label` on every `cms-list`, `label` on every `<cms-image>`, `cms-section-label` on every `cms-section` (a missing or blank value throws at render time). The client adds: an **item bar** whose button names include the item title (`itemName` in `lists.js`: the first text field of the item, cut to 40 characters, else "item N"; "Move up: Intro", "Hide item: Intro"), kept current as the text changes; a **field bar** whose button names include the field name (`fieldName` in `values.js`: `data-cms-name`, else an image's `data-cms-label`, else the last segment of the key with `-` as spaces); and window **subtitles** that name the field ("{field name} · {key}") in the History, rich-text and link windows. An image placeholder reads "Add image: {label}" and the image window is titled "Edit image: {label}".
+
+**Windows and confirmations** (`dialog.js`): `openDialog` builds a native `<dialog>` opened with `showModal()`. Questions are asked in the page, not with the browser's `confirm()`, because some environments (in-app browsers, Chrome's "prevent additional dialogs") answer a native `confirm()` "no" without showing it. `confirmDialog({ title, message, confirmLabel, cancelLabel, returnFocus })` returns a promise of `true` / `false`; the Cancel button ("Keep editing" for discards) is focused, Escape means cancel, and it stacks on top of an open window. It is used by toolbar Discard, "Remove link" and closing a window that has edits (`requestCancel`: "Discard changes?" with "Keep editing" / "Discard"). A dialog that the browser closes by itself (Chromium's close watcher: a second Escape without a click or key in between) counts as **cancel without asking**: the pending confirmation is dismissed, the element is removed and focus returns. `isDialogOpen()` counts only dialogs that are open, so the field bar does not react while a window is up.
+
+**Phone layout** (under 720 px; `wwwroot/css/cms-edit.css` is mobile-first with `min-width: 720px` and `min-width: 960px` breakpoints; the media library grid has 2 columns on phones, 3 from 720 px and 4 from 960 px): the toolbar stays in one line (Save page, counter, More), the status sits below it, and More opens a panel below; windows are full-screen (`100vw` x `100dvh`) and become centred dialogs from 720 px; the item drag handle is hidden, so items move with the up/down buttons; buttons in the item and section bars and the toolbar are 44 px (2.75rem) touch targets, shrinking from 720 px; `scroll-padding-top` follows `--cms-toolbar-height` so focused fields are not hidden under the toolbar.
 
 ### Vendored libraries
 
@@ -397,7 +402,7 @@ MediaService.ImportAsync
 | Colour and orientation | Decoded into an sRGB RGBA bitmap, then drawn through the matrix of the EXIF orientation (all 8 origins), so portrait photos come out upright. Re-encoding drops all metadata, including GPS |
 | Widths | `MediaLimits.Widths` = 480, 960, 1600, 2400, **only those not wider than the oriented image** (never upscaled). An image narrower than 480 gets **one** file at its own width. Height = `MediaDimensions.ScaledHeight` (rounded, at least 1) |
 | Encoding | Lossy WebP, quality `MediaLimits.WebpQuality` = 80, whatever the upload format |
-| Files | Public: `{slug}-{first 16 hex chars of the hash}-{width}.webp` under `Media:RootPath` (`MediaFileNames.PublicFileName`, URL prefix `/media/`). Private original: `{full hash}{original extension}` (`.jpg`, `.png`, `.webp`) under `Media:OriginalsPath`, never served (it keeps its metadata, so every size can be regenerated). Every file is written to `{name}.{guid}.tmp` and renamed, so a half-written file is never visible; a failed write deletes the temp file |
+| Files | Public: `{slug}-{first 16 hex chars of the hash}-{width}.webp` under `Media:RootPath` (`MediaFileNames.PublicFileName`, URL prefix `/media/`). Private original: `{full hash}{original extension}` (`.jpg`, `.png`, `.webp`) under `Media:OriginalsPath`, never served (it keeps its metadata, so every size can be regenerated). Every file is written to `{name}.{guid}.tmp` and renamed, so a half-written file is never visible; a failed write deletes the temp file. File names contain the content hash, so a file that already exists is never rewritten (`WriteAtomicAsync` returns at once), and a lost rename race (an `IOException` or `UnauthorizedAccessException` while the final file is present, e.g. another pod or an open file on Windows) counts as success and deletes the temp file. `WriteAtomicAsync` is `internal`, visible to the tests through `InternalsVisibleTo` in `Infrastructure.csproj` |
 | Slug | `Slugs.FromFileName`: the file name without extension, lowercased, accents removed, Greek transliterated (`ου` = `ou`, `θ` = `th`, `χ` = `ch`, `ψ` = `ps`, ...), everything else outside `a-z0-9` becomes `-` (no doubles, none at the ends), at most 50 characters; `image` when nothing is left |
 | Row | `MediaAsset` (`docs/domain-model.md`); the stored original file name is cut to 255 characters |
 
@@ -443,24 +448,25 @@ Images of a list item deleted in the same batch are skipped. Clearing an image (
 
 ### `<cms-image>`
 
-`<cms-image key="home.hero.image" sizes="(min-width: 960px) 50vw, 100vw" alt-source="title" loading="lazy|eager" class="..." />`, or `field="image"` instead of `key` inside a `cms-list` (`CmsImageTagHelper`; the alt text is read from `{key}-alt` / `{field}-alt`).
+`<cms-image key="home.hero.image" label="Hero photo" sizes="(min-width: 960px) 50vw, 100vw" alt-source="title" loading="lazy|eager" class="..." />`, or `field="image"` instead of `key` inside a `cms-list` (`CmsImageTagHelper`; the alt text is read from `{key}-alt` / `{field}-alt`).
 
 | Attribute | Rule |
 |---|---|
 | `key` / `field` | One of them, resolved as for the other tag helpers (`CmsFieldResolver`) |
+| `label` | Required: the image's name for the admin (placeholder "Add image: {label}", window "Edit image: {label}"); missing or blank throws. Not rendered for visitors |
 | `sizes` | Required: the `sizes` attribute of the `<img>`; a missing value throws |
 | `loading` | `lazy` (default) or `eager` (above-the-fold images); anything else throws |
 | `alt-source` | Admin only: the field whose text proposes the alt text. With `key`, a full content key (`shared.sandbox.title`); inside a list, a field of the same item (`title`). Rich text is turned into plain text. Written to `data-cms-alt-proposal` |
 | other attributes (`class`, ...) | Kept on the `<img>` |
 
 - **Visitors:** an `<img>` with `src` (the 960 px file, else the widest), `srcset` of every generated width (`url 480w, ...`), `sizes`, `width` and `height` (the source dimensions, so the layout does not jump), `alt`, `loading`, `decoding="async"`. Nothing is rendered when the field is empty, holds a value of another type (warning logged) or refers to a missing asset (warning logged).
-- **Admin:** the same `<img>` plus `data-cms-key`, `data-cms-type="image"`, `data-cms-value` (media id), `data-cms-alt-key`, `data-cms-alt` (alt in the current language, empty when English falls back), `data-cms-alt-el` (the Greek alt), `data-cms-sizes`, `data-cms-loading`, `data-cms-alt-proposal` (when `alt-source` is set) and the flags `data-cms-fallback` (English alt falls back to Greek) and `data-cms-empty`. With no image the element is `<button type="button" class="... cms-image-placeholder">Add image</button>`; the layout `class` is kept.
+- **Admin:** the same `<img>` plus `data-cms-key`, `data-cms-type="image"`, `data-cms-label`, `data-cms-value` (media id), `data-cms-alt-key`, `data-cms-alt` (alt in the current language, empty when English falls back), `data-cms-alt-el` (the Greek alt), `data-cms-sizes`, `data-cms-loading`, `data-cms-alt-proposal` (when `alt-source` is set) and the flags `data-cms-fallback` (English alt falls back to Greek) and `data-cms-empty`. With no image the element is `<button type="button" class="... cms-image-placeholder">Add image: {label}</button>`; the layout `class` is kept.
 - One query per page loads every image the page refers to (see CMS Editing Flow → Content snapshot).
 - **`og:image`** for the page image: see SEO.
 
 ### Image window (client)
 
-`wwwroot/js/cms/image-window.js` (`openImageWindow`) opens from a click on an image or "Add image", from the field bar's "Edit image", and from Page settings. Helpers shared with Page settings and History are in `image-data.js`.
+`wwwroot/js/cms/image-window.js` (`openImageWindow`) opens (titled "Edit image: {label}") from a click on an image or its "Add image: {label}" placeholder, from the field bar's "Edit image", and from Page settings. Helpers shared with Page settings and History are in `image-data.js`.
 
 - **Upload new:** a file input with `accept="image/jpeg,image/png,image/webp"` (so iOS converts a HEIC photo to JPEG when it is picked). The upload is an `XMLHttpRequest` (for the "Uploading..." then "Processing..." status) with the antiforgery header. Each error code has its own message; `busy` and network errors show "Try again". The uploaded photo is selected at once.
 - **Choose existing:** the library grid (2, 3 or 4 columns by width), "Load more" 48 at a time, from `GET /admin/api/media`.
@@ -564,7 +570,8 @@ A health-check publisher also runs the checks every 30 s and logs state changes 
 
 | Path | Purpose |
 |---|---|
-| `/admin/login` | Email + password |
+| `/admin`, `/admin/` | `302` to `/admin/login` (GET and HEAD, `Cache-Control: no-store`; `Web/Endpoints/AdminEndpoints.cs`). A signed-in admin who follows it is sent on to `/` |
+| `/admin/login` | Email + password. An already signed-in admin is redirected to `/` |
 | `/admin/login/code` | TOTP code (second step) |
 | `/admin/login/recovery` | Recovery code instead of a TOTP code |
 | `/admin/two-factor/setup` | Mandatory authenticator setup |
