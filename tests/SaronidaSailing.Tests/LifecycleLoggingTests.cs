@@ -65,6 +65,7 @@ public class LifecycleLoggingTests(TempDatabaseWebApplicationFactory factory) : 
             info.Environment["ConnectionStrings__Content"] = connectionString;
             info.Environment["DataProtection__KeysPath"] = Path.Combine(directory, "keys");
             info.Environment["Media__RootPath"] = Path.Combine(directory, "media");
+            info.Environment["Media__OriginalsPath"] = Path.Combine(directory, "originals");
             info.Environment["Site__BaseUrl"] = "https://localhost";
 
             using var process = Process.Start(info)!;

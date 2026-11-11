@@ -70,6 +70,8 @@ public class TempDatabaseWebApplicationFactory: WebApplicationFactory<Program>
 
     public string MediaPath => Path.Combine(_directory, "media");
 
+    public string OriginalsPath => Path.Combine(_directory, "originals");
+
     public string LogsPath => Path.Combine(_directory, "logs");
 
     public string KeysPath => Path.Combine(_directory, "keys");
@@ -77,6 +79,7 @@ public class TempDatabaseWebApplicationFactory: WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         Directory.CreateDirectory(MediaPath);
+        Directory.CreateDirectory(OriginalsPath);
 
         builder.UseSetting("Logs:Path", LogsPath);
         if (LogInstanceName is { } instance)
@@ -85,6 +88,7 @@ public class TempDatabaseWebApplicationFactory: WebApplicationFactory<Program>
         }
         builder.UseSetting("ConnectionStrings:Content", ContentConnectionString);
         builder.UseSetting("Media:RootPath", MediaPath);
+        builder.UseSetting("Media:OriginalsPath", OriginalsPath);
         if (MigrateAtStartup is { } migrate)
         {
             builder.UseSetting("Database:MigrateAtStartup", migrate ? "true" : "false");

@@ -163,11 +163,16 @@ try
 
     if (app.Environment.IsDevelopment())
     {
-        MediaFolder.EnsureExists(app.Services.GetRequiredService<IOptions<MediaOptions>>().Value.RootPath);
+        MediaFolder.EnsureExists(app.Services.GetRequiredService<IOptions<MediaOptions>>().Value);
     }
 
     app.UseForwardedHeaders();
     app.UseRequestDiagnostics();
+
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseDevelopmentMediaFiles(app.Services.GetRequiredService<IOptions<MediaOptions>>().Value.RootPath);
+    }
 
     if (!app.Environment.IsDevelopment())
     {

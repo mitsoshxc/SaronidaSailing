@@ -10,14 +10,29 @@ public sealed class MediaFolderHealthCheck(IOptions<MediaOptions> options) : IHe
     {
         try
         {
-            var path = Path.Combine(options.Value.RootPath, ".health-" + Guid.NewGuid().ToString("N") + ".tmp");
-            await File.WriteAllTextAsync(path, "ok", cancellationToken);
-            File.Delete(path);
-            return HealthCheckResult.Healthy();
+            await ProbeAsync(options.Value.RootPath, cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return HealthCheckResult.Unhealthy("Media folder is not writable.", ex);
         }
+
+        try
+        {
+            await ProbeAsync(options.Value.OriginalsPath, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return HealthCheckResult.Unhealthy("Originals folder is not writable.", ex);
+        }
+
+        return HealthCheckResult.Healthy();
+    }
+
+    private static async Task ProbeAsync(string folder, CancellationToken cancellationToken)
+    {
+        var path = Path.Combine(folder, ".health-" + Guid.NewGuid().ToString("N") + ".tmp");
+        await File.WriteAllTextAsync(path, "ok", cancellationToken);
+        File.Delete(path);
     }
 }

@@ -108,7 +108,20 @@ Agreed infrastructure (2026-11-11), supersedes the single-container Docker Compo
 
 ## Phase 5 — Media
 
-- [ ] `MediaAsset` entity, `IMediaService`, storage under `Media:RootPath`
+Agreed (2026-11-11), on top of `docs/architecture.md` → Media Pipeline:
+
+- **Originals folder:** new setting `Media:OriginalsPath` (production `/var/saronida/data/originals`, dev `data/originals`). Same rules as `Media:RootPath`: missing setting fails startup, created by the app only in Development, checked by `/health`, never served.
+- **Duplicates:** an upload whose content hash already exists reuses that `MediaAsset` (no second row, no new files). Unique index on `ContentHash`; when two pods insert the same hash at once, the losing insert returns the existing row. Files are written to a temp name and renamed, so a half-written file is never visible.
+- **Slug:** from the original file name — Greek transliterated, lowercase ASCII `a-z0-9-`, max 50 chars, `image` when nothing is left.
+- **Memory:** each pod processes **one upload at a time** (a waiter gets 503 "busy, try again" after ~30 s); the upload request body is capped at 25 MB.
+- **Language:** the image field is stored in Greek only (English falls back to it); alt text is the localized `Text` field `{key}-alt`.
+- **Save checks:** `ContentBatch` rejects an `Image` value that is not the id of an existing `MediaAsset`, and an image without Greek alt text (in the same batch or already saved). The client blocks it too.
+- **`<cms-image>`:** `<cms-image key="…" sizes="…" alt-source="title" loading="lazy|eager" class="…">`, or `field="image"` inside a `cms-list`; renders `<img>` with `srcset`, `width`/`height`, `decoding="async"`. Visitors: nothing when empty; admin: a clickable placeholder.
+- **`og:image`:** the largest generated width ≤ 1600, absolute URL, plus `og:image:width`/`height` and `og:image:alt` from `{page}.seo.image-alt`.
+- **Media library:** grid of uploads, newest first; no delete at launch (cleanup job stays deferred).
+- **HEIC:** the file input uses `accept="image/jpeg,image/png,image/webp"` (iOS then converts HEIC to JPEG); the server rejects HEIC with a clear message. The real-iPhone test needs HTTPS, so it runs on the preview in Phase 8; that task stays open until then.
+
+- [x] `MediaAsset` entity, ~~`IMediaService`~~ (moved to the pipeline task), storage under `Media:RootPath`. Done: `MediaAsset` (original stored as `{ContentHash}{OriginalFileExtension}`, no absolute path), `MediaFileNames`, `IMediaAssetRepository`, migration `AddMediaAssets`, `Media:OriginalsPath`, both paths resolved against the content root, the `media` health check probes both folders, `/media` served by the app in Development only (`.webp` only, immutable). Startup also fails when `Media:OriginalsPath` is inside `Media:RootPath` (originals must never be served)
 - [ ] SkiaSharp pipeline: validate (JPEG/PNG/WebP, 25 MB, 50 MP), EXIF orientation, strip metadata, WebP 480/960/1600/2400 q~80, content-hash file names; original kept privately
 - [ ] `<cms-image>` tag helper (`srcset`, `alt-source`) + `og:image` from `{page}.seo.image` in `<cms-seo>` (deferred from Phase 3, 2026-11-09)
 - [ ] Image modal: upload new / choose existing (media library), required alt text pre-filled from the nearest title

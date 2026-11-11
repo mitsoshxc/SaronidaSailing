@@ -48,6 +48,24 @@ public class HealthTests(TempDatabaseWebApplicationFactory factory) : IClassFixt
     }
 
     [Fact]
+    public async Task Get_Health_WhenOriginalsFolderIsMissing_ReturnsUnhealthy()
+    {
+        var missing = Path.Combine(factory.OriginalsPath, "missing");
+        using var host = factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Production");
+            builder.UseSetting("Media:OriginalsPath", missing);
+        });
+        var client = host.CreateClient();
+
+        var response = await client.GetAsync("/health");
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.Equal("Unhealthy", await response.Content.ReadAsStringAsync());
+        Assert.False(Directory.Exists(missing));
+    }
+
+    [Fact]
     public async Task Get_Health_WhenHomePageDoesNotAnswerOk_ReturnsUnhealthy()
     {
         using var host = factory.WithWebHostBuilder(builder =>

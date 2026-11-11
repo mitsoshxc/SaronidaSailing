@@ -32,8 +32,14 @@ public static class DependencyInjection
         services.AddSingleton(settings);
 
         services.AddOptions<MediaOptions>()
-            .Configure(options => options.RootPath = configuration[$"{MediaOptions.SectionName}:{nameof(MediaOptions.RootPath)}"] ?? "")
+            .Configure<IHostEnvironment>((options, environment) =>
+            {
+                options.RootPath = ResolveFolder(configuration, nameof(MediaOptions.RootPath), environment);
+                options.OriginalsPath = ResolveFolder(configuration, nameof(MediaOptions.OriginalsPath), environment);
+            })
             .Validate(options => !string.IsNullOrWhiteSpace(options.RootPath), "Media:RootPath is not configured.")
+            .Validate(options => !string.IsNullOrWhiteSpace(options.OriginalsPath), "Media:OriginalsPath is not configured.")
+            .Validate(options => !MediaFolder.IsInside(options.OriginalsPath, options.RootPath), "Media:OriginalsPath must not be inside Media:RootPath.")
             .ValidateOnStart();
 
         services.TryAddSingleton(TimeProvider.System);
@@ -46,6 +52,7 @@ public static class DependencyInjection
         services.AddScoped<IContentListItemRepository, ContentListItemRepository>();
         services.AddScoped<IContentSectionRepository, ContentSectionRepository>();
         services.AddScoped<IContentHistoryRepository, ContentHistoryRepository>();
+        services.AddScoped<IMediaAssetRepository, MediaAssetRepository>();
 
         services.AddSingleton<ICacheEvictionBus>(_ => new PostgresCacheEvictionBus(connectionString));
         services.AddHostedService(sp => new PostgresCacheEvictionListener(
@@ -63,6 +70,12 @@ public static class DependencyInjection
         services.AddHangfireServer(options => options.WorkerCount = 2);
 
         return services;
+    }
+
+    private static string ResolveFolder(IConfiguration configuration, string key, IHostEnvironment environment)
+    {
+        var value = configuration[$"{MediaOptions.SectionName}:{key}"];
+        return string.IsNullOrWhiteSpace(value) ? "" : Path.GetFullPath(value, environment.ContentRootPath);
     }
 
     public static IdentityBuilder AddInfrastructureIdentity(this IServiceCollection services)

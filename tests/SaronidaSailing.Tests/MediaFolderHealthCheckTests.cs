@@ -9,24 +9,45 @@ public sealed class MediaFolderHealthCheckTests : IDisposable
 {
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "saronida-media-" + Guid.NewGuid().ToString("N"));
 
-    [Fact]
-    public async Task WritableFolder_IsHealthyAndLeavesNoFileBehind()
-    {
-        Directory.CreateDirectory(_directory);
+    private string Media => Path.Combine(_directory, "media");
 
-        var result = await CheckAsync(_directory);
+    private string Originals => Path.Combine(_directory, "originals");
+
+    [Fact]
+    public async Task WritableFolders_AreHealthyAndLeaveNoFileBehind()
+    {
+        Directory.CreateDirectory(Media);
+        Directory.CreateDirectory(Originals);
+
+        var result = await CheckAsync(Media, Originals);
 
         Assert.Equal(HealthStatus.Healthy, result.Status);
-        Assert.Empty(Directory.GetFileSystemEntries(_directory));
+        Assert.Empty(Directory.GetFileSystemEntries(Media));
+        Assert.Empty(Directory.GetFileSystemEntries(Originals));
     }
 
     [Fact]
-    public async Task MissingFolder_IsUnhealthyAndIsNotCreated()
+    public async Task MissingMediaFolder_IsUnhealthyAndIsNotCreated()
     {
-        var result = await CheckAsync(_directory);
+        Directory.CreateDirectory(Originals);
+
+        var result = await CheckAsync(Media, Originals);
 
         Assert.Equal(HealthStatus.Unhealthy, result.Status);
-        Assert.False(Directory.Exists(_directory));
+        Assert.Equal("Media folder is not writable.", result.Description);
+        Assert.False(Directory.Exists(Media));
+    }
+
+    [Fact]
+    public async Task MissingOriginalsFolder_IsUnhealthyAndIsNotCreated()
+    {
+        Directory.CreateDirectory(Media);
+
+        var result = await CheckAsync(Media, Originals);
+
+        Assert.Equal(HealthStatus.Unhealthy, result.Status);
+        Assert.Equal("Originals folder is not writable.", result.Description);
+        Assert.False(Directory.Exists(Originals));
     }
 
     public void Dispose()
@@ -37,9 +58,9 @@ public sealed class MediaFolderHealthCheckTests : IDisposable
         }
     }
 
-    private static Task<HealthCheckResult> CheckAsync(string rootPath)
+    private static Task<HealthCheckResult> CheckAsync(string rootPath, string originalsPath)
     {
-        var check = new MediaFolderHealthCheck(Options.Create(new MediaOptions { RootPath = rootPath }));
+        var check = new MediaFolderHealthCheck(Options.Create(new MediaOptions { RootPath = rootPath, OriginalsPath = originalsPath }));
         return check.CheckHealthAsync(new HealthCheckContext());
     }
 }
