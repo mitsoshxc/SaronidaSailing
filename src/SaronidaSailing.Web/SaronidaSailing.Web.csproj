@@ -3,6 +3,7 @@
   <ItemGroup>
     <PackageReference Include="Hangfire.AspNetCore" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+    <PackageReference Include="NLog.Targets.AtomicFile" />
     <PackageReference Include="NLog.Web.AspNetCore" />
     <PackageReference Include="QRCoder" />
   </ItemGroup>

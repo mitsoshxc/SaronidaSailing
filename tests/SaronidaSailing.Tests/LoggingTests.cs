@@ -22,9 +22,9 @@ public class LoggingTests(TempDatabaseWebApplicationFactory factory) : IClassFix
 
         var lines = ReadLines(factory.LogsPath, $"audit-{Today}.log");
         Assert.Matches(
-            new Regex(@"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{7}Z\|login-succeeded\|user=a@b\.gr\|ip=1\.2\.3\.4\|from test$"),
+            new Regex(@"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{7}Z\|test-pod\|login-succeeded\|user=a@b\.gr\|ip=1\.2\.3\.4\|from test$"),
             lines.Single(l => l.Contains("login-succeeded")));
-        Assert.EndsWith("|admin-list|user=-|ip=-", lines.Single(l => l.Contains("admin-list")));
+        Assert.EndsWith("|test-pod|admin-list|user=-|ip=-", lines.Single(l => l.Contains("admin-list")));
         Assert.DoesNotContain(ReadLines(factory.LogsPath, $"app-{Today}.log"), l => l.Contains("login-succeeded"));
     }
 
@@ -39,10 +39,11 @@ public class LoggingTests(TempDatabaseWebApplicationFactory factory) : IClassFix
         var lines = ReadLines(factory.LogsPath, $"audit-{Today}.log");
         var line = lines.Single(l => l.Contains("sanitize-test"));
         var fields = line.Split('|');
-        Assert.Equal(5, fields.Length);
-        Assert.Equal("user=evil  2026-01-01/fake-event/user=x  ", fields[2]);
-        Assert.Equal("ip=1.2.3.4/5", fields[3]);
-        Assert.Equal(256, fields[4].Length);
+        Assert.Equal(6, fields.Length);
+        Assert.Equal("test-pod", fields[1]);
+        Assert.Equal("user=evil  2026-01-01/fake-event/user=x  ", fields[3]);
+        Assert.Equal("ip=1.2.3.4/5", fields[4]);
+        Assert.Equal(256, fields[5].Length);
         Assert.DoesNotContain(lines, l => l.StartsWith("2026-01-01"));
     }
 
@@ -56,7 +57,7 @@ public class LoggingTests(TempDatabaseWebApplicationFactory factory) : IClassFix
         LogManager.Flush();
 
         var app = ReadLines(factory.LogsPath, $"app-{Today}.log");
-        Assert.Contains(app, l => l.Contains("|WARN|Saronida.Tests.Ordinary|warning-marker-1"));
+        Assert.Contains(app, l => l.Contains("|test-pod|WARN|Saronida.Tests.Ordinary|warning-marker-1"));
         Assert.DoesNotContain(app, l => l.Contains("information-marker"));
         var all = Directory.GetFiles(factory.LogsPath).SelectMany(f => ReadLines(Path.GetDirectoryName(f)!, Path.GetFileName(f)));
         Assert.DoesNotContain(all, l => l.Contains("information-marker"));

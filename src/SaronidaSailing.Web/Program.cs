@@ -33,9 +33,12 @@ if (string.IsNullOrWhiteSpace(logsPath))
     throw new InvalidOperationException("Logs:Path is not configured.");
 }
 
+var logInstance = LogInstance.Resolve(builder.Configuration);
+
 builder.Logging.ClearProviders();
 LogManager.Setup().LoadConfigurationFromSection(builder.Configuration);
 LogManager.Configuration!.Variables["logDir"] = Path.GetFullPath(logsPath, builder.Environment.ContentRootPath);
+LogManager.Configuration.Variables["instance"] = logInstance;
 builder.Logging.AddNLog();
 
 ForwardedHeadersSetup.Configure(new ForwardedHeadersOptions(), builder.Configuration);

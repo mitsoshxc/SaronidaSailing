@@ -86,7 +86,7 @@ Agreed infrastructure (2026-11-11), supersedes the single-container Docker Compo
 - **Output cache across pods:** each pod keeps its in-memory output cache. `IPageCacheInvalidator` evicts locally and broadcasts the evicted tags with Postgres `NOTIFY`; every pod `LISTEN`s and evicts them. When a pod's listener connects or reconnects it evicts everything (`pages:all`), so a missed message can't leave stale pages. No Redis, no Elasticsearch.
 - **Migrations:** no longer applied by every pod at startup. A `migrate` CLI command runs as a Kubernetes Job before each rollout; startup still migrates in Development.
 - **Shared folders:** media, originals and Data Protection keys stay on host folders under `/var/saronida`, mounted into every pod (single node).
-- **Logs:** NLog file names include the pod name, so two pods never write the same file.
+- **Logs:** ~~NLog file names include the pod name~~ → all pods write the **same daily files** (`app-YYYY-MM-DD.log`, `audit-YYYY-MM-DD.log`) and **every line names the pod** it came from (changed 2026-11-11 by the developer). Multi-process appends use the official `NLog.Targets.AtomicFile` target (NLog 6 removed `concurrentWrites` from the standard file target). The instance name is `Logs:Instance`, defaulting to the machine name (in k3s the container's hostname is the pod name).
 - **Login rate limiter:** stays in memory per pod (the limit is per pod with two pods — accepted; Identity lockout is in the database).
 - **Tests:** database tests run against real PostgreSQL via Testcontainers. They need Docker, so they run on the developer's PC, not in cloud sessions.
 - **Local development:** PostgreSQL in Docker on the developer's PC.
@@ -97,7 +97,7 @@ Agreed infrastructure (2026-11-11), supersedes the single-container Docker Compo
 - [x] Tests on Testcontainers PostgreSQL (replaces the temp SQLite databases)
 - [x] `migrate` CLI command; startup migration only in Development. Flag `Database:MigrateAtStartup` (true only in `appsettings.Development.json`). `migrate` applies EF migrations **and** installs/upgrades the Hangfire schema (decided 2026-11-11: pods never install it; Hangfire `PrepareSchemaIfNecessary` follows the flag). With the flag off, startup fails if migrations are pending, naming them and the `migrate` command
 - [x] Cross-pod cache eviction via `LISTEN/NOTIFY` behind `IPageCacheInvalidator`, full eviction on listener (re)connect. Channel `saronida_cache_evict`, payload = JSON array of tags; the saving pod evicts locally first, then publishes (a failed publish is logged, the save still succeeds); an unreadable payload evicts everything; reconnect backoff 1 s → 30 s
-- [ ] NLog file names per pod
+- [x] Shared daily NLog files written safely by several processes, with the pod name on every line (`NLog.Targets.AtomicFile` 6.2.2, type `AtomFile`, `concurrentWrites` + `keepFileOpen`; pod name is the 2nd field in app, audit and console lines; invalid `Logs:Instance` fails startup)
 - [ ] Two-instance check on the PC: two app processes on one database — a save on one evicts the other's cache, recurring jobs run once, an admin session works on both
 
 ## Phase 5 — Media

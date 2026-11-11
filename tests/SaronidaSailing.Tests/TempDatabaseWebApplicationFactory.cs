@@ -42,6 +42,8 @@ public class TempDatabaseWebApplicationFactory: WebApplicationFactory<Program>
 
     protected virtual bool? MigrateAtStartup => null;
 
+    protected virtual string? LogInstanceName => "test-pod";
+
     public string ContentConnectionString
     {
         get
@@ -77,6 +79,10 @@ public class TempDatabaseWebApplicationFactory: WebApplicationFactory<Program>
         Directory.CreateDirectory(MediaPath);
 
         builder.UseSetting("Logs:Path", LogsPath);
+        if (LogInstanceName is { } instance)
+        {
+            builder.UseSetting("Logs:Instance", instance);
+        }
         builder.UseSetting("ConnectionStrings:Content", ContentConnectionString);
         builder.UseSetting("Media:RootPath", MediaPath);
         if (MigrateAtStartup is { } migrate)
