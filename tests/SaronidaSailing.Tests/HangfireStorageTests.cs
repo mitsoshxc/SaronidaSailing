@@ -24,8 +24,7 @@ public class HangfireStorageTests(TempDatabaseWebApplicationFactory factory) : I
         using var _ = factory.CreateClient();
 
         Assert.True(File.Exists(factory.HangfirePath));
-        Assert.True(File.Exists(factory.DatabasePath));
-        Assert.NotEqual(Path.GetFullPath(factory.DatabasePath), Path.GetFullPath(factory.HangfirePath));
+        Assert.NotEqual(factory.ContentConnectionString, factory.HangfirePath);
     }
 
     [Fact]

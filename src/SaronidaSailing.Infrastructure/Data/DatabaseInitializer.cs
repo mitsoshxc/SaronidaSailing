@@ -1,4 +1,3 @@
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -10,22 +9,6 @@ public static class DatabaseInitializer
     {
         await using var scope = services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var isSqlite = db.Database.IsSqlite();
-
-        if (isSqlite)
-        {
-            var connectionString = db.Database.GetConnectionString();
-            if (!string.IsNullOrWhiteSpace(connectionString))
-            {
-                DatabaseDirectory.EnsureExistsForFile(new SqliteConnectionStringBuilder(connectionString).DataSource);
-            }
-        }
-
         await db.Database.MigrateAsync();
-
-        if (isSqlite)
-        {
-            await db.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;");
-        }
     }
 }

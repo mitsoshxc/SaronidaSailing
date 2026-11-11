@@ -1,4 +1,3 @@
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Time.Testing;
 using SaronidaSailing.Core.Entities;
@@ -7,19 +6,16 @@ using SaronidaSailing.Infrastructure.Repositories;
 
 namespace SaronidaSailing.Tests;
 
-public sealed class ContentPersistenceTests : IDisposable
+public sealed class ContentPersistenceTests : IAsyncLifetime
 {
     private const string Editor = "admin@example.com";
 
-    private readonly SqliteConnection _connection = new("Data Source=:memory:");
+    private string _connectionString = "";
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 3, 1, 10, 0, 0, TimeSpan.Zero));
 
-    public ContentPersistenceTests()
-    {
-        _connection.Open();
-        using var context = CreateContext();
-        context.Database.Migrate();
-    }
+    public async Task InitializeAsync() => _connectionString = await PostgresTestServer.CreateDatabaseAsync();
+
+    public Task DisposeAsync() => PostgresTestServer.DropDatabaseAsync(PostgresTestServer.DatabaseName(_connectionString));
 
     [Fact]
     public async Task StandaloneItems_DuplicateKeySameLocale_Throws()
@@ -326,10 +322,8 @@ public sealed class ContentPersistenceTests : IDisposable
         Assert.Equal("other@example.com", stored.UpdatedBy);
     }
 
-    public void Dispose() => _connection.Dispose();
-
     private AppDbContext CreateContext() =>
-        new(new DbContextOptionsBuilder<AppDbContext>().UseSqlite(_connection).Options, _time);
+        new(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(_connectionString).Options, _time);
 
     private static ContentItem Standalone(
         string locale,

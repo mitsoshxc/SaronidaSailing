@@ -28,13 +28,31 @@ public sealed class TestRemoteIpStartupFilter : IStartupFilter
     };
 }
 
-public sealed class TempDatabaseWebApplicationFactory: WebApplicationFactory<Program>
+public class TempDatabaseWebApplicationFactory: WebApplicationFactory<Program>
 {
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "saronida-tests-" + Guid.NewGuid().ToString("N"));
 
+    private readonly object _databaseLock = new();
+    private string? _contentConnectionString;
+
     public TempDatabaseWebApplicationFactory() => ClientOptions.BaseAddress = new Uri("https://localhost");
 
-    public string DatabasePath => Path.Combine(_directory, "saronida.db");
+    protected virtual bool UseEmptyDatabase => false;
+
+    public string ContentConnectionString
+    {
+        get
+        {
+            lock (_databaseLock)
+            {
+                // Task.Run keeps the blocking wait off xunit's synchronization context.
+                return _contentConnectionString ??= Task.Run(
+                    () => UseEmptyDatabase
+                        ? PostgresTestServer.CreateEmptyDatabaseAsync()
+                        : PostgresTestServer.CreateDatabaseAsync()).GetAwaiter().GetResult();
+            }
+        }
+    }
 
     public string HangfirePath => Path.Combine(_directory, "hangfire.db");
 
@@ -49,7 +67,7 @@ public sealed class TempDatabaseWebApplicationFactory: WebApplicationFactory<Pro
         Directory.CreateDirectory(MediaPath);
 
         builder.UseSetting("Logs:Path", LogsPath);
-        builder.UseSetting("ConnectionStrings:Content", $"Data Source={DatabasePath};Pooling=False");
+        builder.UseSetting("ConnectionStrings:Content", ContentConnectionString);
         builder.UseSetting("ConnectionStrings:Hangfire", HangfirePath);
         builder.UseSetting("Media:RootPath", MediaPath);
         builder.UseSetting("DataProtection:KeysPath", KeysPath);
@@ -72,7 +90,19 @@ public sealed class TempDatabaseWebApplicationFactory: WebApplicationFactory<Pro
         if (disposing)
         {
             DeleteDirectory();
+            DropDatabase();
         }
+    }
+
+    private void DropDatabase()
+    {
+        if (_contentConnectionString is null)
+        {
+            return;
+        }
+
+        var name = PostgresTestServer.DatabaseName(_contentConnectionString);
+        Task.Run(() => PostgresTestServer.DropDatabaseAsync(name)).GetAwaiter().GetResult();
     }
 
     // Hangfire.Storage.SQLite releases hangfire.db a moment after the host has stopped (its background threads

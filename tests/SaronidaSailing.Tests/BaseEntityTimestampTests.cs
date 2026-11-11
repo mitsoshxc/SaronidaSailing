@@ -1,4 +1,3 @@
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Time.Testing;
 using SaronidaSailing.Core.Entities;
@@ -6,17 +5,19 @@ using SaronidaSailing.Infrastructure.Data;
 
 namespace SaronidaSailing.Tests;
 
-public sealed class BaseEntityTimestampTests : IDisposable
+public sealed class BaseEntityTimestampTests : IAsyncLifetime
 {
-    private readonly SqliteConnection _connection = new("Data Source=:memory:");
+    private string _connectionString = "";
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 3, 1, 10, 0, 0, TimeSpan.Zero));
 
-    public BaseEntityTimestampTests()
+    public async Task InitializeAsync()
     {
-        _connection.Open();
-        using var context = CreateContext();
-        context.Database.EnsureCreated();
+        _connectionString = await PostgresTestServer.CreateEmptyDatabaseAsync();
+        await using var context = CreateContext();
+        await context.Database.EnsureCreatedAsync();
     }
+
+    public Task DisposeAsync() => PostgresTestServer.DropDatabaseAsync(PostgresTestServer.DatabaseName(_connectionString));
 
     [Fact]
     public async Task Added_SetsCreatedAtAndUpdatedAtToNow()
@@ -75,10 +76,8 @@ public sealed class BaseEntityTimestampTests : IDisposable
         Assert.Equal(DateTimeKind.Utc, loaded.UpdatedAt.Kind);
     }
 
-    public void Dispose() => _connection.Dispose();
-
     private TestDbContext CreateContext() =>
-        new(new DbContextOptionsBuilder<TestDbContext>().UseSqlite(_connection).Options, _time);
+        new(new DbContextOptionsBuilder<TestDbContext>().UseNpgsql(_connectionString).Options, _time);
 
     private sealed class TestDbContext(DbContextOptions options, TimeProvider timeProvider)
         : AppDbContext(options, timeProvider)

@@ -39,7 +39,7 @@ public static class DependencyInjection
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<IAuditLog, AuditLog>();
         services.AddSingleton<IRichTextSanitizer, RichTextSanitizer>();
-        services.AddDbContext<AppDbContext>(options => options.UseSqlite(connectionString));
+        services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IContentItemRepository, ContentItemRepository>();

@@ -1,4 +1,3 @@
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Time.Testing;
 using SaronidaSailing.Core.Entities;
@@ -10,22 +9,19 @@ using SaronidaSailing.Infrastructure.Repositories;
 
 namespace SaronidaSailing.Tests;
 
-public sealed class ContentServiceTests : IDisposable
+public sealed class ContentServiceTests : IAsyncLifetime
 {
     private const string Email = "admin@example.com";
 
-    private readonly SqliteConnection _connection = new("Data Source=:memory:");
+    private string _connectionString = "";
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 3, 1, 10, 0, 0, TimeSpan.Zero));
     private readonly RecordingInvalidator _invalidator = new();
     private readonly RecordingAuditLog _audit = new();
     private readonly ContentEditor _editor = new(Email, "10.0.0.1");
 
-    public ContentServiceTests()
-    {
-        _connection.Open();
-        using var context = CreateContext();
-        context.Database.Migrate();
-    }
+    public async Task InitializeAsync() => _connectionString = await PostgresTestServer.CreateDatabaseAsync();
+
+    public Task DisposeAsync() => PostgresTestServer.DropDatabaseAsync(PostgresTestServer.DatabaseName(_connectionString));
 
     [Fact]
     public async Task Read_ReturnsRequestedLocaleValue()
@@ -871,8 +867,6 @@ public sealed class ContentServiceTests : IDisposable
         Assert.Equal(["home.hero.title"], details!.Fields.Select(f => f.Key));
     }
 
-    public void Dispose() => _connection.Dispose();
-
     private static SetField Field(string key, string locale, string value, Guid? listItemId = null) =>
         new(key, locale, ContentType.Text, value, listItemId);
 
@@ -902,7 +896,7 @@ public sealed class ContentServiceTests : IDisposable
             _audit);
 
     private AppDbContext CreateContext() =>
-        new(new DbContextOptionsBuilder<AppDbContext>().UseSqlite(_connection).Options, _time);
+        new(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(_connectionString).Options, _time);
 
     private sealed class RecordingInvalidator : IPageCacheInvalidator
     {
