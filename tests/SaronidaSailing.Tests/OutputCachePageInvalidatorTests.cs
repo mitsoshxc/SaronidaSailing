@@ -1,43 +1,70 @@
-using Microsoft.AspNetCore.OutputCaching;
+using Microsoft.Extensions.Logging.Abstractions;
+using SaronidaSailing.Core.Interfaces;
 using SaronidaSailing.Web.Caching;
 
 namespace SaronidaSailing.Tests;
 
 public sealed class OutputCachePageInvalidatorTests
 {
+    private readonly List<string> _events = [];
+
+    private OutputCachePageInvalidator Create(ICacheEvictionBus? bus = null) =>
+        new(new RecordingEvictor(_events), bus ?? new RecordingBus(_events), NullLogger<OutputCachePageInvalidator>.Instance);
+
     [Fact]
-    public async Task EvictPages_EvictsEachPageTag()
+    public async Task EvictPages_EvictsEachPageTagLocally_AndPublishesTheSameTags()
     {
-        var store = new RecordingStore();
+        await Create().EvictPagesAsync(["home", "boat"]);
 
-        await new OutputCachePageInvalidator(store).EvictPagesAsync(["home", "boat"]);
-
-        Assert.Equal(["page:home", "page:boat"], store.Tags);
+        Assert.Equal(["evict:page:home,page:boat", "publish:page:home,page:boat"], _events);
     }
 
     [Fact]
-    public async Task EvictPages_SharedEvictsOnlyAllPages()
+    public async Task EvictPages_SharedEvictsOnlyAllPages_LocallyAndPublished()
     {
-        var store = new RecordingStore();
+        await Create().EvictPagesAsync(["home", "shared"]);
 
-        await new OutputCachePageInvalidator(store).EvictPagesAsync(["home", "shared"]);
-
-        Assert.Equal(["pages:all"], store.Tags);
+        Assert.Equal(["evict:pages:all", "publish:pages:all"], _events);
     }
 
-    private sealed class RecordingStore : IOutputCacheStore
+    [Fact]
+    public async Task EvictPages_PublishFailure_IsSwallowed_AfterLocalEviction()
     {
-        public List<string> Tags { get; } = [];
+        await Create(new ThrowingBus()).EvictPagesAsync(["home"]);
 
-        public ValueTask EvictByTagAsync(string tag, CancellationToken cancellationToken)
+        Assert.Equal(["evict:page:home"], _events);
+    }
+
+    [Fact]
+    public async Task EvictPages_PublishCancellation_Propagates()
+    {
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => Create(new ThrowingBus(new OperationCanceledException())).EvictPagesAsync(["home"]));
+    }
+
+    private sealed class RecordingEvictor(List<string> events) : ICacheTagEvictor
+    {
+        public Task EvictTagsAsync(IReadOnlyCollection<string> tags, CancellationToken ct = default)
         {
-            Tags.Add(tag);
-            return ValueTask.CompletedTask;
+            events.Add("evict:" + string.Join(",", tags));
+            return Task.CompletedTask;
         }
 
-        public ValueTask<byte[]?> GetAsync(string key, CancellationToken cancellationToken) => ValueTask.FromResult<byte[]?>(null);
+        public Task EvictAllAsync(CancellationToken ct = default) => Task.CompletedTask;
+    }
 
-        public ValueTask SetAsync(string key, byte[] value, string[]? tags, TimeSpan validFor, CancellationToken cancellationToken) =>
-            ValueTask.CompletedTask;
+    private sealed class RecordingBus(List<string> events) : ICacheEvictionBus
+    {
+        public Task PublishAsync(IReadOnlyCollection<string> tags, CancellationToken ct = default)
+        {
+            events.Add("publish:" + string.Join(",", tags));
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class ThrowingBus(Exception? exception = null) : ICacheEvictionBus
+    {
+        public Task PublishAsync(IReadOnlyCollection<string> tags, CancellationToken ct = default) =>
+            throw (exception ?? new InvalidOperationException("db down"));
     }
 }

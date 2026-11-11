@@ -34,6 +34,7 @@ public class TempDatabaseWebApplicationFactory: WebApplicationFactory<Program>
 
     private readonly object _databaseLock = new();
     private string? _contentConnectionString;
+    private bool _ownsDatabase = true;
 
     public TempDatabaseWebApplicationFactory() => ClientOptions.BaseAddress = new Uri("https://localhost");
 
@@ -53,6 +54,15 @@ public class TempDatabaseWebApplicationFactory: WebApplicationFactory<Program>
                         ? PostgresTestServer.CreateEmptyDatabaseAsync()
                         : PostgresTestServer.CreateDatabaseAsync()).GetAwaiter().GetResult();
             }
+        }
+    }
+
+    public void UseDatabaseOf(TempDatabaseWebApplicationFactory owner)
+    {
+        lock (_databaseLock)
+        {
+            _contentConnectionString = owner.ContentConnectionString;
+            _ownsDatabase = false;
         }
     }
 
@@ -99,7 +109,7 @@ public class TempDatabaseWebApplicationFactory: WebApplicationFactory<Program>
 
     private void DropDatabase()
     {
-        if (_contentConnectionString is null)
+        if (_contentConnectionString is null || !_ownsDatabase)
         {
             return;
         }

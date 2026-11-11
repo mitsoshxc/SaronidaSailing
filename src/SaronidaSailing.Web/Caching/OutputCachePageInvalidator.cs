@@ -1,22 +1,28 @@
-using Microsoft.AspNetCore.OutputCaching;
 using SaronidaSailing.Core.Interfaces;
 using SaronidaSailing.Core.Services;
 
 namespace SaronidaSailing.Web.Caching;
 
-public sealed class OutputCachePageInvalidator(IOutputCacheStore store) : IPageCacheInvalidator
+public sealed class OutputCachePageInvalidator(
+    ICacheTagEvictor evictor,
+    ICacheEvictionBus bus,
+    ILogger<OutputCachePageInvalidator> logger) : IPageCacheInvalidator
 {
     public async Task EvictPagesAsync(IReadOnlyCollection<string> pageKeys, CancellationToken ct = default)
     {
-        if (pageKeys.Contains(ContentKeys.Shared))
-        {
-            await store.EvictByTagAsync(CacheTags.AllPages, ct);
-            return;
-        }
+        string[] tags = pageKeys.Contains(ContentKeys.Shared)
+            ? [CacheTags.AllPages]
+            : [.. pageKeys.Select(CacheTags.Page)];
 
-        foreach (var pageKey in pageKeys)
+        await evictor.EvictTagsAsync(tags, ct);
+
+        try
         {
-            await store.EvictByTagAsync(CacheTags.Page(pageKey), ct);
+            await bus.PublishAsync(tags, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Publishing cache eviction for tags {Tags} failed; other instances will catch up on expiry or reconnect.", string.Join(", ", tags));
         }
     }
 }

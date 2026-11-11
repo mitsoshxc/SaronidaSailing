@@ -67,6 +67,7 @@ builder.Services.AddOutputCache(options => options.AddPolicy(CacheTags.PolicyNam
     .Tag(CacheTags.AllPages)
     .SetVaryByQuery([])));
 builder.Services.AddScoped<IContentService, ContentService>();
+builder.Services.AddSingleton<ICacheTagEvictor, OutputCacheTagEvictor>();
 builder.Services.AddSingleton<IPageCacheInvalidator, OutputCachePageInvalidator>();
 builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme).AddIdentityCookies();
 builder.Services.AddAuthorizationBuilder()

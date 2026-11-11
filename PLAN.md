@@ -96,7 +96,7 @@ Agreed infrastructure (2026-11-11), supersedes the single-container Docker Compo
 - [x] Hangfire on `Hangfire.PostgreSql` (schema `hangfire`); `/health` storage check updated. The schema installer takes no lock; its scripts are idempotent (`IF NOT EXISTS` + version guards), so concurrent installs are only theoretically racy (60 concurrent installs in a test: no error) — the `migrate` task decides whether the Job installs it first (2026-11-11)
 - [x] Tests on Testcontainers PostgreSQL (replaces the temp SQLite databases)
 - [x] `migrate` CLI command; startup migration only in Development. Flag `Database:MigrateAtStartup` (true only in `appsettings.Development.json`). `migrate` applies EF migrations **and** installs/upgrades the Hangfire schema (decided 2026-11-11: pods never install it; Hangfire `PrepareSchemaIfNecessary` follows the flag). With the flag off, startup fails if migrations are pending, naming them and the `migrate` command
-- [ ] Cross-pod cache eviction via `LISTEN/NOTIFY` behind `IPageCacheInvalidator`, full eviction on listener (re)connect
+- [x] Cross-pod cache eviction via `LISTEN/NOTIFY` behind `IPageCacheInvalidator`, full eviction on listener (re)connect. Channel `saronida_cache_evict`, payload = JSON array of tags; the saving pod evicts locally first, then publishes (a failed publish is logged, the save still succeeds); an unreadable payload evicts everything; reconnect backoff 1 s → 30 s
 - [ ] NLog file names per pod
 - [ ] Two-instance check on the PC: two app processes on one database — a save on one evicts the other's cache, recurring jobs run once, an admin session works on both
 

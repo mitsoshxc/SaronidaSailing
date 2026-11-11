@@ -5,7 +5,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using SaronidaSailing.Core.Entities;
+using SaronidaSailing.Infrastructure.Caching;
 using SaronidaSailing.Infrastructure.Content;
 using SaronidaSailing.Infrastructure.Data;
 using SaronidaSailing.Core.Interfaces;
@@ -43,6 +46,12 @@ public static class DependencyInjection
         services.AddScoped<IContentListItemRepository, ContentListItemRepository>();
         services.AddScoped<IContentSectionRepository, ContentSectionRepository>();
         services.AddScoped<IContentHistoryRepository, ContentHistoryRepository>();
+
+        services.AddSingleton<ICacheEvictionBus>(_ => new PostgresCacheEvictionBus(connectionString));
+        services.AddHostedService(sp => new PostgresCacheEvictionListener(
+            connectionString,
+            sp.GetRequiredService<ICacheTagEvictor>(),
+            sp.GetRequiredService<ILogger<PostgresCacheEvictionListener>>()));
 
         services.AddHangfire(config => config
             .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
