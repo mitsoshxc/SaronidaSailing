@@ -16,6 +16,11 @@ export const createToolbar = ({ config, pending, editMode }) => {
 
     const setStatus = (text) => {
         status.textContent = text;
+        if (text === '') {
+            status.removeAttribute('title');
+        } else {
+            status.title = text;
+        }
     };
 
     const showErrors = (messages) => {

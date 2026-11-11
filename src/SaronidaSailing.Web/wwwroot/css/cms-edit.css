@@ -556,8 +556,8 @@ html:not(.cms-view) [data-cms-type="image"]:focus-visible {
 
 @media (min-width: 720px) {
     .cms-toolbar-counter {
-        flex: 1 1 auto;
-        min-width: 10rem;
+        flex: none;
+        order: 1;
     }
 
     .cms-toolbar-more-toggle {
@@ -569,10 +569,24 @@ html:not(.cms-view) [data-cms-type="image"]:focus-visible {
         display: contents;
     }
 
+    .cms-toolbar-more .cms-toolbar-button,
+    .cms-toolbar-more .cms-toolbar-link {
+        order: 3;
+    }
+
     .cms-toolbar-status,
     .cms-toolbar-status:empty {
         display: block;
-        flex: 0 1 auto;
+        flex: 1 1 0;
+        min-width: 0;
+        order: 2;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+    }
+
+    .cms-toolbar-errors {
+        order: 4;
     }
 
     .cms-dialog {
