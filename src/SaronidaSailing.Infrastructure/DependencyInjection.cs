@@ -1,5 +1,5 @@
 using Hangfire;
-using Hangfire.Storage.SQLite;
+using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -25,12 +25,6 @@ public static class DependencyInjection
             throw new InvalidOperationException("Connection string 'ConnectionStrings:Content' is not configured.");
         }
 
-        var hangfirePath = configuration.GetConnectionString("Hangfire");
-        if (string.IsNullOrWhiteSpace(hangfirePath))
-        {
-            throw new InvalidOperationException("Connection string 'ConnectionStrings:Hangfire' is not configured.");
-        }
-
         services.AddOptions<MediaOptions>()
             .Configure(options => options.RootPath = configuration[$"{MediaOptions.SectionName}:{nameof(MediaOptions.RootPath)}"] ?? "")
             .Validate(options => !string.IsNullOrWhiteSpace(options.RootPath), "Media:RootPath is not configured.")
@@ -47,12 +41,13 @@ public static class DependencyInjection
         services.AddScoped<IContentSectionRepository, ContentSectionRepository>();
         services.AddScoped<IContentHistoryRepository, ContentHistoryRepository>();
 
-        DatabaseDirectory.EnsureExistsForFile(hangfirePath);
         services.AddHangfire(config => config
             .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
             .UseSimpleAssemblyNameTypeSerializer()
             .UseRecommendedSerializerSettings()
-            .UseSQLiteStorage(hangfirePath));
+            .UsePostgreSqlStorage(
+                storage => storage.UseNpgsqlConnection(connectionString),
+                new PostgreSqlStorageOptions { SchemaName = "hangfire", PrepareSchemaIfNecessary = true }));
         services.AddHangfireServer(options => options.WorkerCount = 2);
 
         return services;

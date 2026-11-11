@@ -54,8 +54,6 @@ public class TempDatabaseWebApplicationFactory: WebApplicationFactory<Program>
         }
     }
 
-    public string HangfirePath => Path.Combine(_directory, "hangfire.db");
-
     public string MediaPath => Path.Combine(_directory, "media");
 
     public string LogsPath => Path.Combine(_directory, "logs");
@@ -68,7 +66,6 @@ public class TempDatabaseWebApplicationFactory: WebApplicationFactory<Program>
 
         builder.UseSetting("Logs:Path", LogsPath);
         builder.UseSetting("ConnectionStrings:Content", ContentConnectionString);
-        builder.UseSetting("ConnectionStrings:Hangfire", HangfirePath);
         builder.UseSetting("Media:RootPath", MediaPath);
         builder.UseSetting("DataProtection:KeysPath", KeysPath);
         builder.UseSetting("Site:BaseUrl", "https://localhost");
@@ -105,21 +102,11 @@ public class TempDatabaseWebApplicationFactory: WebApplicationFactory<Program>
         Task.Run(() => PostgresTestServer.DropDatabaseAsync(name)).GetAwaiter().GetResult();
     }
 
-    // Hangfire.Storage.SQLite releases hangfire.db a moment after the host has stopped (its background threads
-    // finish asynchronously), so the delete is retried briefly; a persistent lock still fails the test run.
     private void DeleteDirectory()
     {
-        var deadline = DateTime.UtcNow.AddSeconds(10);
-        while (Directory.Exists(_directory))
+        if (Directory.Exists(_directory))
         {
-            try
-            {
-                Directory.Delete(_directory, recursive: true);
-            }
-            catch (IOException) when (DateTime.UtcNow < deadline)
-            {
-                Thread.Sleep(50);
-            }
+            Directory.Delete(_directory, recursive: true);
         }
     }
 }

@@ -93,7 +93,7 @@ Agreed infrastructure (2026-11-11), supersedes the single-container Docker Compo
 - **Backups:** a nightly `pg_dump` CronJob writes to `/var/saronida/backup` (last 7 kept on the droplet). A script on the developer's PC (Windows Task Scheduler, runs when missed) pulls the dumps, new files in `originals/` and the Data Protection keys over SSH with a dedicated read-only backup user into the Proton Drive sync folder; keeps 30 daily + 12 monthly; warns when the newest backup is more than 3 days old. No DO backups. A restore runbook is written and tested once.
 
 - [x] PostgreSQL provider: Npgsql EF Core, fresh `InitialCreate` (SQLite migrations, WAL pragma and SQLite packages removed), UTC `DateTime` mapping, local dev PostgreSQL in Docker
-- [ ] Hangfire on `Hangfire.PostgreSql` (schema `hangfire`); `/health` storage check updated
+- [x] Hangfire on `Hangfire.PostgreSql` (schema `hangfire`); `/health` storage check updated. The schema installer takes no lock; its scripts are idempotent (`IF NOT EXISTS` + version guards), so concurrent installs are only theoretically racy (60 concurrent installs in a test: no error) — the `migrate` task decides whether the Job installs it first (2026-11-11)
 - [x] Tests on Testcontainers PostgreSQL (replaces the temp SQLite databases)
 - [ ] `migrate` CLI command; startup migration only in Development
 - [ ] Cross-pod cache eviction via `LISTEN/NOTIFY` behind `IPageCacheInvalidator`, full eviction on listener (re)connect
