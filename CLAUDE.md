@@ -4,11 +4,11 @@ Public website for a sailing business in Saronida, Greece, with a custom built-i
 
 Stack: ASP.NET Core 10 Razor Pages · Entity Framework Core 10 · PostgreSQL · ASP.NET Core Identity · Output Caching · Hangfire (PostgreSQL storage) · SkiaSharp · NLog · HtmlSanitizer · Quill 2 · SortableJS · plain JS/CSS (no frameworks) · xUnit · Testcontainers · Playwright + axe-core · Docker · k3s · nginx · DigitalOcean · Cloudflare (Free). Full table with reasons: `docs/architecture.md` → Tech Stack.
 
-**Infrastructure changed on 2026-11-11:** SQLite → PostgreSQL; Docker Compose → k3s on one $12 droplet with one app pod, built to run two; backups pulled to the developer's PC instead of DO backups. `PLAN.md` → Phase 4.5 is authoritative until Doc updates `docs/` at the end of that phase.
+**Infrastructure changed on 2026-11-11** (Phase 4.5): SQLite → PostgreSQL; Docker Compose → k3s on one $12 droplet with one app pod, built to run two (cross-pod cache eviction, shared logs with the pod name); backups pulled to the developer's PC instead of DO backups. Local development needs Docker Desktop running: `docker compose -f deploy/dev/docker-compose.yml up -d` starts the dev PostgreSQL, and the tests start their own via Testcontainers.
 
 Languages: Greek (default, no URL prefix) and English (`/en/`). Pages and sections come from the "Saronida Sailing Redesign" design canvas: https://claude.ai/artifact/RcU5iMfQSTJ34rH5gFB7MC (read it with the Artifact tool; desktop artboards `Desktop*.dc.html` hold the full layouts, the canvas notes hold design decisions).
 
-Project status: **Phase 4 (Inline Editing) is complete; Phase 4.5 (PostgreSQL & Two-Pod Readiness) is next**. Docs mark what is implemented and what is still agreed design; `PLAN.md` tracks the rest of the build.
+Project status: **Phase 4.5 (PostgreSQL & Two-Pod Readiness) is complete; Phase 5 (Media) is next**. Docs mark what is implemented and what is still agreed design; `PLAN.md` tracks the rest of the build.
 
 ## Before You Start (working agreements)
 
@@ -63,9 +63,9 @@ On the droplet: `touch /var/saronida/maintenance.on` (ON) · `rm /var/saronida/m
 
 | Doc | Contents |
 |---|---|
-| [`docs/architecture.md`](docs/architecture.md) | Tech stack and why, pages, localization, caching, CMS editing flow, media pipeline, Instagram feed, background jobs, security, accessibility, owner-provided open items |
+| [`docs/architecture.md`](docs/architecture.md) | Tech stack and why, pages, localization, caching (incl. cross-pod eviction), CMS editing flow, media pipeline, Instagram feed, background jobs, logging and diagnostics, security, accessibility, owner-provided open items |
 | [`docs/domain-model.md`](docs/domain-model.md) | Entities, fields, keys, indexes, content key format |
-| [`docs/conventions.md`](docs/conventions.md) | Layering, naming, EF Core / SQLite portability rules, caching rules, views, CSS, JS |
-| [`docs/deployment.md`](docs/deployment.md) | Production infrastructure: droplet, Docker, nginx, Let's Encrypt, Cloudflare, deploy script, backups |
+| [`docs/conventions.md`](docs/conventions.md) | Layering, naming, EF Core / PostgreSQL portability rules, caching rules, views, CSS, JS |
+| [`docs/deployment.md`](docs/deployment.md) | Production infrastructure: droplet, k3s, PostgreSQL, nginx, Let's Encrypt, Cloudflare, deploy script, backups, crash diagnostics, scaling to two pods |
 | [`docs/workflow.md`](docs/workflow.md) | Team structure, mandatory step sequence, skills, branch strategy, doc cadence |
 | [`OWNER-QUESTIONS.md`](OWNER-QUESTIONS.md) | Open questions for the business owner (domain, prices, photos, legal, Instagram) |

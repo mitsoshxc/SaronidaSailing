@@ -1,6 +1,6 @@
 # Architecture
 
-Status: **Phases 0-4 are implemented (decisions, foundation, admin authentication, CMS core, inline editing: save API, sanitizing, history, admin rendering and the editing UI); everything else (media, Instagram, jobs, public pages, deploy) is agreed design, not yet built.** Update as phases land.
+Status: **Phases 0-4.5 are implemented (decisions, foundation, admin authentication, CMS core, inline editing, PostgreSQL and two-pod readiness: cross-pod cache eviction, shared logs, runtime diagnostics); everything else (media, Instagram, jobs, public pages, k3s deploy) is agreed design, not yet built.** Update as phases land.
 
 ## Tech Stack
 
@@ -8,31 +8,34 @@ Status: **Phases 0-4 are implemented (decisions, foundation, admin authenticatio
 |---|---|---|
 | Web framework | ASP.NET Core 10, Razor Pages | Team's main stack; fixed page templates fit Razor Pages well |
 | ORM | EF Core 10 | Keeps the app independent of the database engine |
-| Database | SQLite (WAL mode) | Few admins, rare writes, tiny data set; no DB server to run. Swap to Postgres/SQL Server later via EF Core if needed |
+| Database | PostgreSQL (Npgsql EF Core provider; `postgres:18.6-alpine` locally and in tests, production version pinned in Phase 8) | One pod inside the cluster, data on the droplet disk. Lets two app pods share one database, and carries the cross-pod cache eviction (`LISTEN/NOTIFY`) and Hangfire storage |
 | Auth | ASP.NET Core Identity, cookie auth, mandatory TOTP 2FA | One or more admins, managed by CLI commands |
-| Logging | NLog to files, 90-day retention | Audit log (logins, admin actions) + app log |
-| Caching | ASP.NET Core Output Caching (in-memory, in the app process) | Visitors are served rendered pages from memory; DB is hit only after a cache miss |
-| Background jobs | Hangfire, SQLite storage (`Hangfire.Storage.SQLite`, community package) in its own file | Recurring jobs: Instagram fetch, token refresh, nightly DB backup copy |
+| Logging | NLog to files (`NLog.Targets.AtomicFile`), 90-day retention | Audit log (logins, admin actions), app log and metrics log, shared by all pods, the pod name on every line |
+| Caching | ASP.NET Core Output Caching (in-memory, per app process); evictions broadcast between pods with Postgres `LISTEN/NOTIFY` | Visitors are served rendered pages from memory; DB is hit only after a cache miss |
+| Background jobs | Hangfire with `Hangfire.PostgreSql` storage, schema `hangfire` in the content database | Recurring jobs: Instagram fetch, token refresh. Every pod runs a server; Hangfire's distributed locks keep recurring jobs single |
 | Image processing | SkiaSharp (MIT) | Resize, fix orientation, strip metadata, encode WebP |
 | Media | Files on the droplet disk, served by nginx, cached by Cloudflare | Zero extra cost |
 | Analytics | Cloudflare Web Analytics | Free, cookieless — needs no consent category |
-| Hosting | DigitalOcean Basic droplet (FRA1), Docker | See `docs/deployment.md` |
+| Hosting | DigitalOcean Basic droplet (FRA1), k3s single node (agreed design, Phase 8) | One app pod at launch, built to run two. See `docs/deployment.md` |
 | Reverse proxy / TLS | nginx + Let's Encrypt (certbot) on the host | |
 | DNS / CDN | Cloudflare Free | DNS, edge caching of static files, DDoS protection |
 | Rich-text editor | Quill 2 (BSD-3), self-hosted | Small, limited to our formats; TinyMCE rejected (GPLv2+) |
 | List reordering | SortableJS (MIT), self-hosted | Drag-and-drop, plus up/down buttons |
 | HTML sanitizing | HtmlSanitizer | Rich text cleaned server-side before storage |
 | Frontend | Plain JS and custom CSS, no frameworks; self-hosted Commissioner font | Small, matches the design canvas |
-| Tests | xUnit (SQLite in-memory); Playwright + axe-core for accessibility | |
-| Deploy | PowerShell 7 script (`deploy/deploy.ps1`), `docker save \| ssh` | No CI, no registry |
+| Tests | xUnit on real PostgreSQL via Testcontainers; Playwright + axe-core for accessibility | Database tests need Docker, so they run on the developer's PC, not in cloud sessions |
+| Deploy | PowerShell 7 script (`deploy/deploy.ps1`): `docker save \| ssh` + `ctr images import` into k3s, `migrate` Job, rollout (agreed design, Phase 8) | No CI, no registry |
 
 **Explicitly rejected**
 
 | Option | Reason |
 |---|---|
 | Elasticsearch | Second datastore to sync; needs ≥1 GB RAM on its own. Output caching already avoids DB reads |
-| SQL Server | SQL Server on Linux needs ≥2 GB RAM. Not needed for this data volume |
-| Redis | Only useful with multiple app instances; we run one |
+| SQL Server / SQL Server Express | Needs ≥2 GB RAM on its own. Not needed for this data volume |
+| Redis | A second moving part. Cross-pod cache eviction uses Postgres `LISTEN/NOTIFY` on the database we already run |
+| DigitalOcean Managed PostgreSQL | Cost; Postgres runs as one pod on the droplet disk instead |
+| DigitalOcean Kubernetes (DOKS) | A one-node DOKS cluster costs about $25/mo against $12 for k3s on a plain droplet: the $12 worker node plus a $12 DigitalOcean Load Balancer to expose it (the control plane is free). DOKS also replaces nodes during upgrades, so data on the node's disk would be lost and the database, media and keys would need a Block Storage volume. k3s on one droplet keeps the agreed host-folder layout under `/var/saronida` |
+| SQLite | Replaced on 2026-11-11: two app pods cannot share a SQLite file safely, and the cache bus and Hangfire storage need a database server |
 | DigitalOcean Spaces | Paid; local disk + Cloudflare is enough |
 | Own booking system | Bookings happen on external platforms; the site links out |
 | Contact form / email provider | Contact page has no form (phone, email link, Instagram DM) |
@@ -46,13 +49,14 @@ SaronidaSailing.slnx
 global.json, Directory.Build.props, Directory.Packages.props, nuget.config
 .config/dotnet-tools.json          dotnet-ef local tool
 src/
-  SaronidaSailing.Core/            Entities/ (BaseEntity, ApplicationUser, Content*), Interfaces/ (repositories, IContentService, IRichTextSanitizer, IUnitOfWork, IPageCacheInvalidator, PageContent), Services/ (ContentService, ContentBatch, ContentKeys, ContentLocales, ContentLink); no EF, no ASP.NET
-  SaronidaSailing.Infrastructure/  Data/ (AppDbContext, DatabaseInitializer, UnitOfWork, Configurations/, Migrations), Repositories/, Content/ (RichTextSanitizer), Health/, Logging/ (AuditLog), Media/, DependencyInjection.cs
-  SaronidaSailing.Web/             Program.cs, SiteOptions.cs, Caching/ (CacheTags, OutputCachePageInvalidator), Content/ (PageContentAccessor, CmsEditContext, CmsEditorConfig), Endpoints/ (ContentEndpoints, ContentApiModels), TagHelpers/, Cli/, Identity/, Localization/, Health/, Pages/ (Pages/Admin/, Pages/Dev/), wwwroot (css/, js/cms/, lib/quill/, lib/sortablejs/), appsettings*.json
+  SaronidaSailing.Core/            Entities/ (BaseEntity, ApplicationUser, Content*), Interfaces/ (repositories, IContentService, IRichTextSanitizer, IUnitOfWork, IPageCacheInvalidator, ICacheTagEvictor, ICacheEvictionBus, PageContent), Services/ (ContentService, ContentBatch, ContentKeys, ContentLocales, ContentLink); no EF, no ASP.NET
+  SaronidaSailing.Infrastructure/  Data/ (AppDbContext, DatabaseInitializer, DatabaseSettings, UnitOfWork, Configurations/, Migrations), Caching/ (PostgresCacheEvictionBus, PostgresCacheEvictionListener, CacheEvictionChannel), Repositories/, Content/ (RichTextSanitizer), Health/, Logging/ (AuditLog), Media/, DependencyInjection.cs
+  SaronidaSailing.Web/             Program.cs, SiteOptions.cs, LogInstance.cs, Caching/ (CacheTags, OutputCachePageInvalidator, OutputCacheTagEvictor), Diagnostics/ (lifecycle, crash, metrics, request and health logging), Content/ (PageContentAccessor, CmsEditContext, CmsEditorConfig), Endpoints/ (ContentEndpoints, ContentApiModels), TagHelpers/, Cli/ (admin and migrate commands), Identity/, Localization/, Health/, Pages/ (Pages/Admin/, Pages/Dev/), wwwroot (css/, js/cms/, lib/quill/, lib/sortablejs/), appsettings*.json
 tests/
-  SaronidaSailing.Tests/           xUnit; temp-file databases (see docs/conventions.md -> Tests)
+  SaronidaSailing.Tests/           xUnit; one PostgreSQL Testcontainer, one database per test class (see docs/conventions.md -> Tests)
 Dockerfile, .dockerignore
-deploy/                            planned (Phase 8): deploy.ps1, docker-compose.yml, nginx/
+deploy/dev/docker-compose.yml      local development PostgreSQL only, never used in production
+deploy/                            planned (Phase 8): deploy.ps1, k8s/, nginx/, backup.ps1
 ```
 
 `Core` references nothing. `Infrastructure` references `Core`. `Web` references both.
@@ -67,14 +71,17 @@ Root build files:
 | `nuget.config` | `nuget.org` is the only source (machine-level feeds are cleared), so local and Docker restores behave the same |
 | `.config/dotnet-tools.json` | `dotnet-ef` 10.0.14 (restore with `dotnet tool restore`) |
 
-`Web` has no in-app HTTPS redirect and no HSTS: TLS ends at nginx / Cloudflare and the container only speaks HTTP on 8080.
+`Web` has no in-app HTTPS redirect and no HSTS: TLS ends at nginx / Cloudflare and the container only speaks HTTP on 8080. `Web` also references `NLog.Targets.AtomicFile`; `Infrastructure` references `Npgsql.EntityFrameworkCore.PostgreSQL`, `Hangfire.PostgreSql` and `Newtonsoft.Json` 13.0.4. The Newtonsoft.Json reference exists only to pin a safe version: Hangfire.Core's minimum dependency (11.0.1) has a high-severity advisory (NU1903), and the solution builds with NuGet audit warnings as errors, never suppressed.
 
 Data layer (`Infrastructure/Data/`):
 
-- `AppDbContext` stamps `CreatedAt` / `UpdatedAt` on every `SaveChanges*` from the injected `TimeProvider` (see `docs/domain-model.md` -> Entities). A convention converter makes every `DateTime` come back from SQLite as UTC.
-- `DatabaseInitializer.InitializeDatabaseAsync` runs in `Web/Program.cs` before the app accepts requests: creates the database folder, applies migrations, then sets `PRAGMA journal_mode=WAL`. Migrations so far: an empty `InitialCreate`, `AddIdentity` (the Identity tables) and `AddContent` (`ContentItems`, `ContentListItems`, `ContentSections`, `ContentHistory`; see `docs/domain-model.md`) and `AddContentHistorySaveId` (adds `ContentHistory.SaveId`, backfills `SaveId = Id` for existing rows, adds an index).
+- `AppDbContext` stamps `CreatedAt` / `UpdatedAt` on every `SaveChanges*` from the injected `TimeProvider` (see `docs/domain-model.md` -> Entities). A convention converter (`UtcDateTimeConverter`) marks every `DateTime` read back as `DateTimeKind.Utc`; the columns are `timestamp with time zone`.
+- **Migrations:** one `InitialCreate` (`20261111081638_InitialCreate`) holds the Identity tables and the four content tables (see `docs/domain-model.md`). The earlier SQLite migrations were deleted when the provider changed.
+- **Who applies migrations** (`Infrastructure/Data/DatabaseInitializer.cs`, flag `Database:MigrateAtStartup`, `DatabaseSettings`): `InitializeDatabaseAsync` runs in `Web/Program.cs` before the app accepts requests. With the flag `true` (set only in `appsettings.Development.json`) it calls `MigrateAsync`: applies pending EF migrations **and** installs or upgrades the Hangfire schema (`PostgreSqlObjectsInstaller.Install`, schema `hangfire`). With the flag `false` (the default in `appsettings.json`, so preview and production) it calls `EnsureUpToDateAsync`, which throws "The database is behind: N pending migration(s): ... Run the 'migrate' command first." Pods never migrate or install the Hangfire schema themselves (Hangfire's `PrepareSchemaIfNecessary` follows the flag). In production the `migrate` command runs as a Kubernetes Job before each rollout (agreed design, Phase 8).
 - Entity configurations are in `Infrastructure/Data/Configurations/` (one per content entity). Repositories (`Infrastructure/Repositories/`: `ContentItemRepository`, `ContentListItemRepository`, `ContentSectionRepository`, `ContentHistoryRepository`) only **stage** changes; `IUnitOfWork` (`Infrastructure/Data/UnitOfWork.cs`) has `SaveChangesAsync` (one commit, one transaction) and `DiscardChanges`. All are scoped (`AddInfrastructure`).
-- Connection string `ConnectionStrings:Content`; a missing value fails startup.
+- Connection string `ConnectionStrings:Content` is an Npgsql string; a missing value fails startup. The same string serves EF Core, Hangfire storage and the cache-eviction bus and listener. `appsettings.json` has no password (`Host=postgres;Port=5432;Database=saronida;Username=saronida`); `appsettings.Development.json` points at the local container (`Host=localhost`).
+- **Local PostgreSQL:** `docker compose -f deploy/dev/docker-compose.yml up -d` starts `postgres:18.6-alpine` on `127.0.0.1:5432` (database and user `saronida`, named volume `saronida-dev-pgdata`).
+- **`migrate` command** (`Web/Cli/MigrateCommand.cs`): `dotnet SaronidaSailing.Web.dll migrate`. When the first argument is `migrate`, `Program.cs` builds the host without the command-line args, runs `MigrateAsync` and exits without starting the web server. Prints `Applied N migration(s): ... Hangfire schema up to date.` (or `No pending migrations.`). Exit codes: `0` success, `1` failure (message and exception on stderr), `2` wrong usage (any extra argument).
 
 ## Pages (from the "Saronida Sailing Redesign" design canvas)
 
@@ -140,11 +147,11 @@ The cookie-consent banner and the footer "Cookie settings" link from the design 
 
 ```
 Visitor ─► Cloudflare ─► nginx (host) ─┬─► /media/*  → files on disk (immutable cache headers)
-                                       └─► everything else → app container (127.0.0.1:5000)
+                                       └─► everything else → app pod (Service NodePort; Phase 8)
                                                               │
                                                   Output cache hit? ─ yes ─► cached HTML
                                                               │ no
-                                                        Razor Page → ContentService → SQLite
+                                                        Razor Page → ContentService → PostgreSQL
 ```
 
 Cloudflare by default caches static file types (images, CSS, JS), not HTML, so HTML freshness is controlled by the app's output cache only.
@@ -155,10 +162,36 @@ Implemented in Phase 3 (`Web/Program.cs`, `Web/Caching/`).
 
 - Named policy `CmsPage` (`CacheTags.PolicyName`): expiration **1 hour**, tag `pages:all`, built on the default policy, with the query string ignored (`SetVaryByQuery([])`), so `?x=1` variants share one entry.
 - Each page declares the policy and its own tag on its page model: `[OutputCache(PolicyName = CacheTags.PolicyName, Tags = [CacheTags.HomePage])]` (tag `page:{pageKey}`, e.g. `page:home`). Only `IndexModel` is cached so far; a guard test (`OutputCacheTests`) requires every built site page to carry the policy and its page tag, so a new page without it fails the tests.
-- `IContentService.ApplyChangesAsync` calls `IPageCacheInvalidator` once per save with the touched page keys. `OutputCachePageInvalidator` (singleton, `IOutputCacheStore.EvictByTagAsync`) evicts `page:X` for each touched page; if `shared` is touched it evicts `pages:all` only.
+- `IContentService.ApplyChangesAsync` calls `IPageCacheInvalidator` once per save with the touched page keys. `OutputCachePageInvalidator` (singleton) turns them into tags: `page:X` for each touched page, or `pages:all` only if `shared` is touched. It evicts them locally through `ICacheTagEvictor`, then publishes them with `ICacheEvictionBus`.
 - A successful Instagram fetch evicts `page:home` (planned, Phase 6).
 - Authenticated requests (the admin) are neither served from nor stored in the cache — built-in default policy behaviour (and admin-rendered pages are sent with `Cache-Control: no-store`). `app.UseOutputCache()` is placed **after** `UseAuthentication()`/`UseAuthorization()`.
 - Cache is lost on restart/redeploy; pages rebuild on first request.
+
+### Cache eviction across pods
+
+Each pod keeps its own in-memory output cache. A save on one pod must evict the other pods' copies too, so evictions travel through PostgreSQL `LISTEN/NOTIFY` (no Redis).
+
+```
+Save on pod A ─► ICacheTagEvictor.EvictTagsAsync (local, first)
+              └► ICacheEvictionBus.PublishAsync ─► pg_notify('saronida_cache_evict', ["page:home"])
+                                                        │
+                       every pod's PostgresCacheEvictionListener (LISTEN) ◄┘ ─► EvictTagsAsync
+```
+
+| Part | File | Behaviour |
+|---|---|---|
+| `ICacheTagEvictor` | `Core/Interfaces/`; implemented by `Web/Caching/OutputCacheTagEvictor` (singleton, `IOutputCacheStore.EvictByTagAsync`) | `EvictTagsAsync(tags)`; `EvictAllAsync()` = evict tag `pages:all` |
+| `ICacheEvictionBus` | `Core/Interfaces/`; implemented by `Infrastructure/Caching/PostgresCacheEvictionBus` | `PublishAsync(tags)` opens a connection and runs `SELECT pg_notify(channel, payload)`; empty tag list publishes nothing |
+| Channel | `Infrastructure/Caching/CacheEvictionChannel` | Name `saronida_cache_evict`; payload = JSON array of tags |
+| Listener | `Infrastructure/Caching/PostgresCacheEvictionListener` (hosted service) | Own non-pooled connection (`ApplicationName` `saronida-cache-listener`, `KeepAlive` 30 s). Runs `LISTEN`, then evicts everything, then waits for notifications |
+
+Rules:
+
+- **Full eviction on (re)connect:** every time the listener connects or reconnects it calls `EvictAllAsync`, so a notification missed while disconnected cannot leave stale pages.
+- **Unreadable payload** (not a JSON string array) logs a warning and evicts everything.
+- **Reconnect backoff** 1 s, doubling to a 30 s maximum; reset after a successful connect. A lost connection logs a warning in the app log.
+- **A failed publish never fails the save:** the local eviction has already happened; the failure is logged as a warning ("other instances will catch up on expiry or reconnect"). The worst case is the other pod serving a page for up to the 1-hour expiration.
+- The login rate limiter stays in memory per pod, so with two pods the limit is per pod (accepted; Identity lockout is in the database).
 
 ## CMS Editing Flow
 
@@ -363,23 +396,23 @@ Linux native assets: `SkiaSharp.NativeAssets.Linux.NoDependencies` (nothing to i
 |---|---|
 | Instagram fetch | Twice a day |
 | Instagram token refresh | Weekly |
-| Database backup copy (`VACUUM INTO`) | Nightly |
 
-- Storage: `Hangfire.Storage.SQLite` 0.4.3 in a separate file (`hangfire.db`; `ConnectionStrings:Hangfire` is a plain file path, not a connection string) so job polling never locks the content database.
-- Server: Hangfire 1.8.25, **2 workers**, registered in `Infrastructure/DependencyInjection.cs` (`AddInfrastructure`). **Implemented so far: storage, server and the dashboard** - no jobs yet.
-- **Known defect:** `SQLiteStorage.Dispose()` in 0.4.3 can hang or crash. Production disposes it only at process exit; the test factory therefore retries deleting its temp folder instead of relying on a clean dispose.
+The database backup is not a Hangfire job: a nightly `pg_dump` Kubernetes CronJob does it (agreed design, see `docs/deployment.md` → Backups).
+
+- Storage: `Hangfire.PostgreSql` 1.21.1 (`Infrastructure/DependencyInjection.cs`), schema `hangfire` in the content database, same connection string (`ConnectionStrings:Hangfire` no longer exists). The schema is installed by `migrate` (or at startup in Development), never by a pod in production: `PrepareSchemaIfNecessary` equals `Database:MigrateAtStartup`.
+- Server: Hangfire 1.8.25, **2 workers**, registered in `AddInfrastructure`. **Every pod runs a server**; Hangfire's distributed locks keep each recurring job running once. **Implemented so far: storage, server and the dashboard** - no jobs yet, so the single-run behaviour is checked in the Phase 8 two-pod rehearsal.
 - Dashboard at `/admin/jobs`, mapped in `Web/Program.cs` with `MapHangfireDashboardWithAuthorizationPolicy(AdminPolicy.Name, ...)`: only requests that satisfy the `Admin` policy (authenticated + `amr=mfa`) get in; the dashboard's own authorization filter list is empty. Hangfire's antiforgery works with our `Secure` / `SameSite=Strict` cookies (`HangfireDashboardTests`).
 - Every job must be safe to run twice.
 - Possible later job: delete media files never referenced by any content or history (uploads discarded before Save). Not in scope until needed.
 
 ## Health Check — `/health`
 
-Returns **200 "Healthy"** only if every check passes, otherwise **503 "Unhealthy"** (ASP.NET Core defaults). Body is the status word only — no details. Mapped in `Web/Program.cs`. Migrations run before the app accepts requests, so a failed migration means no answer at all.
+Returns **200 "Healthy"** only if every check passes, otherwise **503 "Unhealthy"** (ASP.NET Core defaults). Body is the status word only — no details. Mapped in `Web/Program.cs`. The startup migration check runs before the app accepts requests, so a database that is down or behind means no answer at all (and a `FATAL Startup failed` line, see Logging).
 
 | Check (name) | Where | How |
 |---|---|---|
 | `database` | `Infrastructure/Health/DatabaseHealthCheck.cs` | `CanConnectAsync` on the content database |
-| `hangfire` | `Infrastructure/Health/HangfireStorageHealthCheck.cs` | `GetMonitoringApi().GetStatistics()` against `hangfire.db` |
+| `hangfire` | `Infrastructure/Health/HangfireStorageHealthCheck.cs` | `GetMonitoringApi().GetStatistics()` against the Hangfire storage (schema `hangfire`) |
 | `media` | `Infrastructure/Health/MediaFolderHealthCheck.cs` | Write and delete a temp file under `Media:RootPath` |
 | `home-page` | `Web/Health/HomePageHealthCheck.cs` | GET of `Health:HomePageUrl` through a named `HttpClient` (5 s timeout, redirects not followed); must return exactly 200 |
 
@@ -396,13 +429,15 @@ The media folder is created at startup **only in Development** (`MediaFolder.Ens
 
 **Not checked:** Instagram (an outage there must not fail health and roll back a good deploy) and maintenance mode (handled by nginx, see `docs/deployment.md`).
 
-Reachable only from the droplet itself — nginx denies `/health` from the internet (nginx config planned, Phase 8). Used by `deploy.ps1` after every deploy.
+Reachable only from the droplet itself — nginx denies `/health` from the internet (nginx config planned, Phase 8). Used by `deploy.ps1` after every deploy and, planned, by the pod's readiness and liveness probes.
+
+A health-check publisher also runs the checks every 30 s and logs state changes (see Logging → Diagnostics).
 
 ## Admin Accounts
 
 - No registration page. Admins are managed only with CLI commands built into the web app, run on the droplet (they go through Identity, so password hashes and stamps are always valid — never insert users with SQL).
 
-**CLI** (`Web/Cli/AdminCommandRunner.cs`): `dotnet SaronidaSailing.Web.dll admin <command>`. When the first argument is `admin`, `Program.cs` builds the host without the command-line args, runs migrations, runs the command and exits without starting the web server.
+**CLI** (`Web/Cli/AdminCommandRunner.cs`): `dotnet SaronidaSailing.Web.dll admin <command>`. When the first argument is `admin`, `Program.cs` builds the host without the command-line args, runs `InitializeDatabaseAsync` (migrates in Development; elsewhere it only fails if migrations are pending), runs the command and exits without starting the web server.
 
 | Command | Does |
 |---|---|
@@ -412,7 +447,7 @@ Reachable only from the droplet itself — nginx denies `/health` from the inter
 | `admin remove <email>` | Asks `[y/N]`, then deletes the admin |
 
 - Exit codes: `0` success, `1` failure (password mismatch, policy error, unknown admin, remove not confirmed, no TTY), `2` wrong usage.
-- Passwords are never arguments (shell history). They are typed twice with hidden input (`ConsolePasswordPrompt`), which needs an interactive terminal: with redirected input the command fails with a message. Run on the droplet as `docker compose exec web dotnet SaronidaSailing.Web.dll admin <command>` (no `-T`), wrapped by the host script `saronida-admin` (still Phase 8).
+- Passwords are never arguments (shell history). They are typed twice with hidden input (`ConsolePasswordPrompt`), which needs an interactive terminal: with redirected input the command fails with a message. Run on the droplet through the host script `saronida-admin`, which wraps `kubectl exec` into the app pod (no `-T`/non-TTY mode; agreed design, Phase 8).
 - Every command writes an audit line (user `cli`).
 - The first admin is created with `admin add` after the first deploy — no passwords in config or environment variables.
 - **Password policy** (`AddInfrastructureIdentity` in `Infrastructure/DependencyInjection.cs`): minimum 12 characters, no character-class rules. Email is the user name and must be unique.
@@ -457,15 +492,25 @@ Implemented. Configuration is the `NLog` section of `appsettings.json`, loaded i
 | File | Contents |
 |---|---|
 | `audit-YYYY-MM-DD.log` | Everything written by the `Audit` logger (see below) |
-| `app-YYYY-MM-DD.log` | Warnings and errors from all other loggers |
+| `app-YYYY-MM-DD.log` | Warnings and errors from all loggers, plus the `Lifecycle` and `Diagnostics` loggers from Info up |
+| `metrics-YYYY-MM-DD.log` | The per-minute resource snapshot (see Diagnostics) |
 
-- Lines start with a UTC ISO 8601 timestamp. Warnings and errors also go to the console (Docker log). Never in the database.
-- Routing rules, first match wins: `Audit` → audit file only; `Microsoft.Hosting.Lifetime` Info → console; `Microsoft.*`, `System.*`, `Hangfire.*` up to Info → dropped; everything else from Warn → app file and console.
-- **Retention 90 days**: `maxArchiveDays: 90` on both file targets. Because the file names carry the date, NLog deletes older files when a new day's file is opened — no Hangfire cleanup job needed. Verified by `LogRetentionTests`.
-- Docker's console log for the container is size-capped (json-file `max-size` / `max-file`).
+- **Shared by all pods.** Every pod writes the **same daily files**; the targets are `NLog.Targets.AtomicFile` (type `AtomFile`, `concurrentWrites` and `keepFileOpen` on; NLog 6's standard file target has no `concurrentWrites`), so appends from several processes neither lose nor interleave lines (`AtomicFileConcurrencyTests`).
+- **Pod name on every line:** the second field of every app, audit, metrics and console line. It comes from `Logs:Instance`, defaulting to the machine name (in Kubernetes the container's hostname is the pod name). `Web/LogInstance.cs` rejects a value that is empty or contains `|` or a control character, which fails startup.
+- Lines start with a UTC ISO 8601 timestamp. Never in the database.
+- Line layouts (fields separated by `|`):
+
+| Target | Layout |
+|---|---|
+| Audit | `time|pod|event|user=…|ip=…[|details]` |
+| App file and console | `time|pod|LEVEL|logger|message[|exception]` |
+| Metrics | `time|pod|key=value key=value …` |
+
+- Routing rules in `appsettings.json`, first match wins: `Audit` → audit file only; `Lifecycle` Info and up → app file and console; `Metrics` Info and up → metrics file only; `Diagnostics` Info and up → app file and console; `Microsoft.Hosting.Lifetime` Info → console; `Microsoft.*`, `System.*`, `Hangfire.*` up to Info → dropped; everything else from Warn → app file and console. The console feeds the container log (`kubectl logs`).
+- **Retention:** `maxArchiveDays: 90` on the audit and app files, **30** on the metrics file. Because the file names carry the date, NLog deletes older files when a new day's file is opened — no Hangfire cleanup job needed. Verified by `LogRetentionTests`.
 - IP addresses in logs are personal data: the Privacy page must mention the logs and the 90-day retention.
 
-**Audit line format** (`Infrastructure/Logging/AuditLog.cs`): `time|event|user=…|ip=…[|details]`; an empty user or IP is written as `-`. Fields can carry attacker input (the email typed on the login form), so each is sanitized: control and line/paragraph-separator characters become a space, `|` becomes `/`, and it is cut at 256 characters.
+**Audit line format** (`Infrastructure/Logging/AuditLog.cs`): the event part is `event|user=…|ip=…[|details]` (the pod name comes right before it, see above); an empty user or IP is written as `-`. Fields can carry attacker input (the email typed on the login form), so each is sanitized: control and line/paragraph-separator characters become a space, `|` becomes `/`, and it is cut at 256 characters.
 
 | Event | Written when |
 |---|---|
@@ -486,12 +531,85 @@ Implemented. Configuration is the `NLog` section of `appsettings.json`, loaded i
 
 The user field of the content events is the editor's email.
 
+### Diagnostics
+
+Code in `Web/Diagnostics/`. Goal: find out afterwards what went wrong. A pod killed by the out-of-memory killer or `SIGKILL` cannot log its own death, so **a `Started` line with no `Stopped` before it means the previous run was killed**; Kubernetes and the droplet record the kill from outside (event recorder, memory limits, journal: Phase 8, `docs/deployment.md`).
+
+**Lifecycle** (logger `Lifecycle`, level Info; web app only, not the `admin` / `migrate` commands; `LifecycleLogger`):
+
+| Line | Written when |
+|---|---|
+| `Started version=… environment=… dotnet=… cpus=N memoryLimit=NMiB gcHeapLimit=NMiB pid=N` | `ApplicationStarted`. `version` is the assembly informational version (includes the commit when the build provides it, else `unknown`) |
+| `Stopping reason=… uptime=HH:mm:ss` | `ApplicationStopping`. `reason` is `SIGTERM`, `SIGINT`, `SIGQUIT` or `requested` (no signal seen; `ShutdownSignalRecorder` waits up to 250 ms for the signal handler) |
+| `Stopped uptime=HH:mm:ss` | `ApplicationStopped`; flushes the log targets |
+
+**Crashes** (`CrashLogging`, logger `Lifecycle`, flushed for up to 5 s before the process dies):
+
+| Line | Level | When |
+|---|---|---|
+| `Unhandled exception terminating=True/False` + exception | FATAL | `AppDomain.UnhandledException`, including an `OutOfMemoryException` escaping a thread |
+| `Unobserved task exception` + exception | ERROR | `TaskScheduler.UnobservedTaskException`; the process keeps running, so it is not FATAL |
+| `Startup failed` + exception | FATAL | An exception escaped `Program.cs` before the host started (bad config, pending migrations, database down) |
+| `Host terminated unexpectedly` + exception | FATAL | The same, after the host had started |
+
+`OperationCanceledException` and `HostAbortedException` are not logged as a crash.
+
+**Resource snapshot** (`ResourceSnapshotService`, logger `Metrics`, file `metrics-YYYY-MM-DD.log`): one line per `Diagnostics:SnapshotIntervalSeconds`, the counters reset at each snapshot:
+
+`workingSetMiB= gcHeapMiB= memoryLimitMiB= gcHeapLimitMiB= memoryPct= cpuPct= gc0= gc1= gc2= threads= queue= inFlight= requestsPerMin= errors5xxPerMin= rateLimitedPerMin=`
+
+| Field | Source |
+|---|---|
+| `memoryLimitMiB` | The **container's** limit (`ContainerMemoryLimit`): cgroup v2 `/sys/fs/cgroup/memory.max`, else cgroup v1 `/sys/fs/cgroup/memory/memory.limit_in_bytes`, else the machine's memory (`max`, a non-number or a value of 2^60 and more counts as unlimited) |
+| `gcHeapLimitMiB` | `GC.GetGCMemoryInfo().TotalAvailableMemoryBytes`: the GC's own cap, which .NET defaults to 75% of the container limit; logged next to the container limit on purpose |
+| `memoryPct` | `workingSet / memoryLimit` (0 when no limit is known) |
+| `cpuPct` | Process CPU time since the previous snapshot, divided by elapsed time and CPU count |
+| `threads`, `queue` | Thread-pool thread count and pending work items |
+| `inFlight`, `requestsPerMin`, `errors5xxPerMin`, `rateLimitedPerMin` | `RequestCounters`, fed by `RequestDiagnosticsMiddleware`; it counts every request the app handles, so `requestsPerMin` includes `/health` and the home-page health check's own request to `/` |
+
+**Threshold warnings** (logger `Diagnostics`, app file and console; `ThresholdAlert` logs on crossing, repeats every `WarningRepeatMinutes` while still breached, and logs once when back to normal):
+
+| Warning (Info when cleared) | Condition |
+|---|---|
+| `Memory high memoryPct= workingSetMiB= memoryLimitMiB=` / `Memory back to normal …` | `memoryPct` above `MemoryWarningPercent` |
+| `Thread pool queue high queue= threads=` / `Thread pool queue back to normal …` | `queue` at or above `ThreadPoolQueueWarning` |
+| `Resource snapshot failed` | Reading the process values threw |
+
+**Requests** (`RequestDiagnosticsMiddleware`, logger `Diagnostics`, Warning; placed right after `UseForwardedHeaders`, so it sees every request and the client IP is the forwarded one). A request that throws through the middleware is counted as 500.
+
+| Line | When |
+|---|---|
+| `Slow request method= path= status= duration=Nms` | Duration above `SlowRequestMilliseconds` |
+| `Rate limited method= path= ip=` | Status 429; at most `RateLimitedLinesPerMinute` lines per UTC minute (the counter in `rateLimitedPerMin` is not capped) |
+
+`path` is the path without the query string, cut at 256 characters; `|` becomes `/` and control or whitespace characters become a space (log injection).
+
+**Health transitions** (`HealthTransitionPublisher`, an `IHealthCheckPublisher`, first run 5 s after start, then every `HealthCheckPeriodSeconds`): logs changes only, per check (`database`, `hangfire`, `media`, `home-page`) and for `overall`.
+
+| Line | Level |
+|---|---|
+| `Health check {name} {previous} -> {status}: {description}` (`overall` lists `failing: a, b`) | Warning |
+| `Health check {name} recovered: {previous} -> Healthy` | Info |
+| `Health check {name} {status} at startup: {description}` | Warning; first run only, per check (not for `overall`) |
+
+**Settings** (`Diagnostics:*`, `Web/Diagnostics/DiagnosticsOptions.cs`; defaults are in code, `appsettings.json` has no `Diagnostics` section; every value must be greater than 0 or startup fails):
+
+| Key | Default | Meaning |
+|---|---|---|
+| `SnapshotIntervalSeconds` | 60 | Metrics line interval |
+| `SlowRequestMilliseconds` | 2000 | Slow-request threshold |
+| `MemoryWarningPercent` | 80 | Memory warning threshold (% of container limit) |
+| `ThreadPoolQueueWarning` | 100 | Thread-pool queue warning threshold |
+| `WarningRepeatMinutes` | 10 | How often a still-active warning repeats |
+| `RateLimitedLinesPerMinute` | 20 | Cap on `Rate limited` lines per minute |
+| `HealthCheckPeriodSeconds` | 30 | Health publisher period |
+
 ## Security
 
 | Concern | Measure |
 |---|---|
 | Admin login | Identity cookie auth + mandatory TOTP 2FA; lockout; per-IP rate limiter on login (see Admin Accounts) |
-| Real client IP | nginx `realip` module sets the client IP from `CF-Connecting-IP` (Cloudflare ranges only) and forwards it in `X-Forwarded-For`. The app (`UseForwardedHeaders`, `Web/ForwardedHeadersSetup.cs`) reads `X-Forwarded-For` and `X-Forwarded-Proto` with `ForwardLimit = 1`, and trusts them **only** from the networks in `ForwardedHeaders:KnownNetworks` = `172.30.0.0/24`, the docker compose network subnet. It is not `127.0.0.1`: host nginx reaches the container through the published port, so the app sees the request coming from the compose network gateway. The compose file must pin that subnet (see `docs/deployment.md`) |
+| Real client IP | nginx `realip` module sets the client IP from `CF-Connecting-IP` (Cloudflare ranges only) and forwards it in `X-Forwarded-For`. The app (`UseForwardedHeaders`, `Web/ForwardedHeadersSetup.cs`) reads `X-Forwarded-For` and `X-Forwarded-Proto` with `ForwardLimit = 1`, and trusts them **only** from the networks in `ForwardedHeaders:KnownNetworks`. It is not `127.0.0.1`: host nginx reaches the pod through the Service NodePort, so the app sees the request coming from the cluster network. `appsettings.json` still carries the compose-era value `172.30.0.0/24`; Phase 8 sets it to the k3s network (see `docs/deployment.md`) |
 | Rate limiting | `UseRateLimiter` with one global partitioned limiter (`Web/Identity/AdminLoginRateLimit.cs`): only **POSTs** to `/admin/login`, `/admin/login/code`, `/admin/login/recovery` and `/admin/two-factor/setup` are limited, 10 per minute per client IP, fixed window, no queue. Rejection: 429, `Retry-After: 60`, plain-text message, audit event `login-rate-limited`. GETs and all other paths are not limited |
 | Lockout | 5 failed attempts → 15 minutes, per account; TOTP and recovery failures count |
 | CSRF | Antiforgery tokens on all admin write endpoints (the save API reads the `RequestVerificationToken` header, token from `#cms-config`); antiforgery cookie `Secure`, `HttpOnly`, `SameSite=Strict` |

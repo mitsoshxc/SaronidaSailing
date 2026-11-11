@@ -56,14 +56,15 @@ Local development:
 
 1. `dotnet tool restore` once — installs `dotnet-ef` from `.config/dotnet-tools.json`.
 2. `dotnet restore` / `dotnet build` work independently of machine-level NuGet feeds: the repo `nuget.config` clears them and uses nuget.org only.
-3. `dotnet run --project src/SaronidaSailing.Web` serves http://localhost:5000 (Development environment, from `launchSettings.json`).
-4. Development data (content DB, `hangfire.db`, media) goes to `src/SaronidaSailing.Web/data/`, which is gitignored; delete the folder to start fresh. The media folder is created automatically in Development only.
-5. `dotnet test` runs the xUnit tests (see `docs/conventions.md` -> Tests).
-6. To try the editing UI before real pages exist, sign in at `https://localhost:5001/admin/login` and open `/dev/cms-sandbox` (or `/en/dev/cms-sandbox`), a Development-only page (404 elsewhere). The editing UI is verified through the Claude browser there, not with Playwright (see `docs/architecture.md` -> CMS Editing Flow).
+3. Start the local PostgreSQL (Docker Desktop must be running): `docker compose -f deploy/dev/docker-compose.yml up -d`.
+4. `dotnet run --project src/SaronidaSailing.Web` serves http://localhost:5000 (Development environment, from `launchSettings.json`). In Development the app applies migrations and installs the Hangfire schema at startup.
+5. Development files (media, keys, logs) go to `src/SaronidaSailing.Web/data/`, which is gitignored; the database lives in the Docker volume `saronida-dev-pgdata` (`docker compose -f deploy/dev/docker-compose.yml down -v` resets it). The media folder is created automatically in Development only.
+6. `dotnet test` runs the xUnit tests (see `docs/conventions.md` -> Tests). The database tests start their own PostgreSQL through Testcontainers, so Docker must be running.
+7. To try the editing UI before real pages exist, sign in at `https://localhost:5001/admin/login` and open `/dev/cms-sandbox` (or `/en/dev/cms-sandbox`), a Development-only page (404 elsewhere). The editing UI is verified through the Claude browser there, not with Playwright (see `docs/architecture.md` -> CMS Editing Flow).
 
 ## Cloud Sessions
 
-Claude Code cloud sessions for this repo use the personal environment **"SaronidaSailing"**: Default network rules plus `saronidasailing.gr` / `www.saronidasailing.gr` (the old site, used for the redirect map). Its setup script installs the .NET 10 SDK (Ubuntu package `dotnet-sdk-10.0`). No Docker daemon is available in cloud sessions.
+Claude Code cloud sessions for this repo use the personal environment **"SaronidaSailing"**: Default network rules plus `saronidasailing.gr` / `www.saronidasailing.gr` (the old site, used for the redirect map). Its setup script installs the .NET 10 SDK (Ubuntu package `dotnet-sdk-10.0`). No Docker daemon is available in cloud sessions, so the database tests (Testcontainers PostgreSQL) and the local PostgreSQL run only on the developer's PC.
 
 ## Branch Strategy
 

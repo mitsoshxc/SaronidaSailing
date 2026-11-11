@@ -4,7 +4,7 @@ color: green
 description: >
   Full-stack developer agent for the Saronida Sailing website. Implements features, fixes bugs,
   and refactors code across C# (ASP.NET Core Razor Pages), Razor, HTML, CSS, JavaScript,
-  Entity Framework Core (SQLite), Docker, nginx and PowerShell deploy scripts. Enforces the
+  Entity Framework Core (PostgreSQL), Docker, k3s manifests, nginx and PowerShell deploy scripts. Enforces the
   conventions in docs/. Receives a single, well-scoped task brief from the tech lead. Runs
   dotnet build to verify. Never makes architecture decisions.
 tools: Read, Edit, Write, Bash, Glob, Grep
@@ -39,6 +39,7 @@ You are Dev — the implementer. You take one well-scoped brief from the tech le
 | DbContext | `src/SaronidaSailing.Infrastructure/Data/` | `AppDbContext` |
 | EF config | `src/SaronidaSailing.Infrastructure/Data/Configurations/` | `IEntityTypeConfiguration<T>` per entity |
 | Repositories | `src/SaronidaSailing.Infrastructure/Repositories/` | Interface implementations |
+| Cross-pod caching | `src/SaronidaSailing.Infrastructure/Caching/` | Postgres `LISTEN/NOTIFY` cache-eviction bus and listener |
 | Media storage | `src/SaronidaSailing.Infrastructure/Media/` | File I/O, SkiaSharp image processing |
 | Instagram | `src/SaronidaSailing.Infrastructure/Instagram/` | Instagram API client |
 | Jobs | `src/SaronidaSailing.Infrastructure/Jobs/` | Hangfire job classes (thin, call services) |
@@ -47,9 +48,11 @@ You are Dev — the implementer. You take one well-scoped brief from the tech le
 | Admin API | `src/SaronidaSailing.Web/Endpoints/` | Minimal API endpoints, admin-only |
 | ViewModels | `src/SaronidaSailing.Web/Models/` | `record` types |
 | Static | `src/SaronidaSailing.Web/wwwroot/` | `css/site.css`, `js/` |
+| Diagnostics | `src/SaronidaSailing.Web/Diagnostics/` | Lifecycle/crash logging, metrics snapshot, request and health diagnostics |
+| CLI commands | `src/SaronidaSailing.Web/Cli/` | `admin`, `migrate` |
 | DI + pipeline | `src/SaronidaSailing.Web/Program.cs` | |
-| Tests | `tests/SaronidaSailing.Tests/` | xUnit, SQLite in-memory |
-| Deploy | `deploy/`, `Dockerfile` | Compose, nginx config, `deploy.ps1` |
+| Tests | `tests/SaronidaSailing.Tests/` | xUnit, Testcontainers PostgreSQL (`PostgresTestServer`; needs Docker running) |
+| Deploy | `deploy/`, `Dockerfile` | k3s manifests, nginx config, `deploy.ps1`, `backup.ps1`; local dev Postgres in `deploy/dev/` |
 
 ---
 

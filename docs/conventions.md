@@ -29,11 +29,14 @@ These rules apply to every file in the codebase. The Dev agent enforces them on 
 | Razor Pages, tag helpers, admin API endpoints live in `Web` | No business logic in page models or endpoints — delegate to services. |
 | ViewModels live in `Web/Models/` | Never pass entities to pages/views. |
 | Auth policy and helpers live in `Web/Identity/` | `AdminPolicy`, `AdminLoginRateLimit`, `MfaClaimPreserver`, `AuthenticatorQr`. Admin pages are in `Web/Pages/Admin/` |
-| CLI commands live in `Web/Cli/` | `AdminCommandRunner` and its console prompts; selected in `Program.cs` when the first argument is `admin` |
+| CLI commands live in `Web/Cli/` | `AdminCommandRunner` and its console prompts (first argument `admin`), `MigrateCommand` (first argument `migrate`); both selected in `Program.cs`, which builds the host without command-line args and exits without starting the web server |
+| Runtime diagnostics live in `Web/Diagnostics/` | Lifecycle and crash logging, the resource snapshot, request and health-transition logging, `DiagnosticsOptions`; registered with `AddRuntimeDiagnostics`. Settings are `Diagnostics:*` with defaults in code |
+| Cross-pod cache eviction is split across layers | Interfaces `ICacheTagEvictor` (evict tags in this pod) and `ICacheEvictionBus` (publish tags to the other pods) in `Core/Interfaces/`; `OutputCacheTagEvictor` in `Web/Caching/` (needs the output-cache store); the Postgres bus, listener and channel name in `Infrastructure/Caching/` |
+| The log instance (pod) name is resolved in one place | `Web/LogInstance.cs` (`Logs:Instance`); never read the machine name directly for logging |
 | Audit logger writer `AuditLog` lives in `Infrastructure/Logging/` | Behind `IAuditLog` in `Core/Interfaces/` |
 | Repositories only stage changes | They never call `SaveChanges`; the service commits once through `IUnitOfWork` (`Core/Interfaces/`, implemented in `Infrastructure/Data/UnitOfWork.cs`) |
 | Content key parsing, locales and link validation live in `Core/Services/` | `ContentKeys`, `ContentLocales`, `ContentLink`; do not re-parse keys or locales elsewhere |
-| Output-cache code lives in `Web/Caching/` | `CacheTags` (policy and tag names), `OutputCachePageInvalidator` (implements `IPageCacheInvalidator` from `Core/Interfaces/`) |
+| Output-cache code lives in `Web/Caching/` | `CacheTags` (policy and tag names), `OutputCachePageInvalidator` (implements `IPageCacheInvalidator` from `Core/Interfaces/`: evicts locally, then publishes), `OutputCacheTagEvictor` |
 | The per-request content snapshot lives in `Web/Content/` | `IPageContentAccessor`; tag helpers in `Web/TagHelpers/` read content only through it |
 | Strongly typed options live in `Web/` | e.g. `SiteOptions` (`Site:BaseUrl`), validated on start |
 | The HTML sanitizer lives behind `IRichTextSanitizer` | Interface in `Core/Interfaces/`, `RichTextSanitizer` (HtmlSanitizer) in `Infrastructure/Content/`. Sanitizing and link validation run inside `ContentService`, never only in an endpoint |
@@ -71,20 +74,19 @@ These rules apply to every file in the codebase. The Dev agent enforces them on 
 
 ---
 
-## EF Core and SQLite — portability rules
+## EF Core and PostgreSQL — portability rules
 
-The database must stay swappable (Postgres / SQL Server) with only a provider and migration change.
+The database is PostgreSQL (Npgsql provider). The data layer stays provider-neutral so that a provider switch is only a provider change plus a fresh initial migration.
 
 | Rule | Reason |
 |---|---|
-| LINQ only — no raw SQL, no SQLite-specific functions. **Exceptions:** the startup `PRAGMA journal_mode=WAL` in `Infrastructure/Data/DatabaseInitializer.cs`, and the data backfill in migration `AddContentHistorySaveId` (`UPDATE "ContentHistory" SET "SaveId" = "Id"`, standard SQL; migrations are provider-specific anyway) | Provider portability |
-| Money (if ever needed) as `long` cents, or display-only | SQLite provider can't compare/order `decimal` in queries |
-| Dates as `DateTime`, always UTC — not `DateTimeOffset` | SQLite provider has limited `DateTimeOffset` query support |
-| Migrations are provider-specific | A provider switch means a fresh initial migration |
-| Enable WAL mode at startup (`PRAGMA journal_mode=WAL`, done by `DatabaseInitializer` after migrations) | Concurrent readers while the admin writes |
+| LINQ only — no raw SQL, no PostgreSQL-specific functions in queries. **Exceptions** (the only ones, all in `Infrastructure/`): the cache-eviction bus and listener use Npgsql directly for `pg_notify` / `LISTEN` (`Infrastructure/Caching/`), and `MigrateAsync` installs the Hangfire schema through `PostgreSqlObjectsInstaller` (`DatabaseInitializer`) | Provider portability; `LISTEN/NOTIFY` and the Hangfire installer have no EF equivalent |
+| Dates as `DateTime`, always UTC — not `DateTimeOffset` | Npgsql maps `DateTime` to `timestamp with time zone` and rejects non-UTC values; one type everywhere |
+| Migrations are provider-specific | A provider switch means a fresh initial migration (this is how SQLite was replaced) |
+| Migrations are applied by `migrate`, not by pods | With `Database:MigrateAtStartup` false a pod only checks that no migration is pending and fails startup otherwise; the flag is true only in `appsettings.Development.json` (see `docs/architecture.md` → Data layer) |
 | `CreatedAt` / `UpdatedAt` are stamped by `AppDbContext.SaveChanges*` from `TimeProvider` — never set by hand, never read `DateTime.UtcNow` for them | One clock, testable with a fake `TimeProvider`; the setters on `BaseEntity` are private |
-| Every `DateTime` is read back as UTC by a convention converter in `AppDbContext` | SQLite stores no time zone or `Kind` |
-| Backups via `VACUUM INTO`, never a raw file copy while running | Avoid corrupt copies |
+| Every `DateTime` is read back as UTC by a convention converter in `AppDbContext` | Npgsql returns `Kind=Utc` for `timestamptz`; the converter keeps that guaranteed |
+| Backups are `pg_dump`, never a copy of the data folder while PostgreSQL runs | Avoid corrupt copies (agreed design, Phase 8; see `docs/deployment.md` → Backups) |
 
 ---
 
@@ -93,6 +95,8 @@ The database must stay swappable (Postgres / SQL Server) with only a provider an
 - Every public page model uses `[OutputCache(PolicyName = CacheTags.PolicyName, Tags = [CacheTags.HomePage])]` — the policy `CmsPage` plus its own tag `page:{pageKey}` (add a constant or use `CacheTags.Page(pageKey)` for other pages). A guard test fails if a built site page lacks either.
 - Every content write — field save, list item add/delete/reorder/activate — evicts `page:{pageKey}`; writes to page key `shared` evict `pages:all`. A write without eviction is a bug.
 - `UseOutputCache()` comes after `UseAuthentication()` and `UseAuthorization()`.
+- Evict only through `IPageCacheInvalidator` (content writers) or `ICacheTagEvictor` (the listener): the invalidator evicts locally and publishes to the other pods. Never call `IOutputCacheStore` directly to evict, or the other pod keeps serving the old page.
+- The app must be correct with two pods: no state that matters lives only in one pod's memory, except the output cache (kept right by the eviction bus) and the login rate limiter (accepted: the limit is per pod).
 
 ---
 
@@ -100,24 +104,27 @@ The database must stay swappable (Postgres / SQL Server) with only a provider an
 
 - NLog only. Audit events (logins, admin actions, content changes) go through `IAuditLog.Record(event, user, ip, details)` (`Core/Interfaces`); never write to the `Audit` logger directly, because `IAuditLog` sanitizes the fields (see `docs/architecture.md` -> Logging). Warnings/errors go to the app log.
 - Never log passwords, 2FA codes, recovery codes, tokens or cookies.
-- Logs go to files, never to the database.
+- Logs go to files, never to the database. All pods share the same daily files; the pod name is the 2nd field of every line (`Logs:Instance`), so a log line format must not contain `|` inside a field without sanitizing it.
+- Diagnostics lines (`Lifecycle`, `Metrics`, `Diagnostics` loggers) are written through NLog loggers of those names so the routing rules in `appsettings.json` apply; values taken from requests (paths) go through `RequestDiagnosticsMiddleware.CleanForLog`. Formats are in `docs/architecture.md` → Logging → Diagnostics.
 
 ---
 
 ## Tests
 
 - xUnit in `tests/SaronidaSailing.Tests/`.
-- Tests that need the web host use `TempDatabaseWebApplicationFactory`: a temp folder per factory holding the content database, `hangfire.db` and the media folder, plus the home-page health client routed to the in-memory test server. The folder is deleted on dispose (the delete is retried because Hangfire's SQLite storage releases its file late).
+- **Database tests run on real PostgreSQL.** `PostgresTestServer` (`tests/SaronidaSailing.Tests/PostgresTestServer.cs`) starts one `postgres:18.6-alpine` Testcontainer per test run (durability off for speed), migrates a template database once, and hands out a fresh database per test class (`CreateDatabaseAsync` = copy of the migrated template, `CreateEmptyDatabaseAsync` = empty); the database is dropped afterwards. **This needs Docker**, so these tests run on the developer's PC, not in cloud sessions.
+- Tests that need the web host use `TempDatabaseWebApplicationFactory`: a temp folder per factory holding the media, logs and keys folders, a PostgreSQL database from `PostgresTestServer` (dropped on dispose; `UseDatabaseOf(owner)` lets a second host share another's database, as the two-pod tests do), `Logs:Instance` = `test-pod`, plus the home-page health client routed to the in-memory test server. Override `UseEmptyDatabase`, `MigrateAtStartup` or `LogInstanceName` in a subclass for tests that need them (`ProductionModeWebApplicationFactory` runs with the flag off).
 - Every test class that uses the factory is marked `[Collection(WebHostCollection.Name)]`. Hangfire's `JobStorage.Current` is static, so web-host tests must not run in parallel.
+- Cross-pod behaviour is tested with two hosts on one database in `CrossInstanceCacheEvictionTests` (save on A evicts B, listener reconnect evicts everything, malformed payload evicts everything); `AtomicFileConcurrencyTests` covers two writers on one log file; `MigrateCommandTests` covers `migrate` and startup with the flag off; `DiagnosticsTests`, `LifecycleLoggingTests`, `LogInstanceTests` and `ContainerMemoryLimitTests` cover the diagnostics.
 - The factory sets its base address to `https://localhost`, because the auth and antiforgery cookies are `Secure`.
 - The login rate limiter is per client IP, so every test client gets its own IP through the test-only `X-Test-Remote-Ip` header, applied by `TestRemoteIpStartupFilter` in `TempDatabaseWebApplicationFactory.cs`. Do not share one client across tests that post to the login paths.
 - NLog's `LogManager` is static, so tests that read log files keep their own factory class (the `LogRetentionTests` pattern: `[Collection(WebHostCollection.Name)]` plus `IClassFixture<TempDatabaseWebApplicationFactory>`).
 - Output-cache behaviour is tested against the real host in `OutputCacheTests` (`OutputCacheWebHostTests`, with its own factory class per the rule above); the policy itself is tested without a host (`CmsPageCachePolicyTests`).
 - Tag helpers are unit-tested without a host through `TagHelperTestSupport` (builds a `PageContent` snapshot and a `FakePageContentAccessor`); `PageContentAccessorWebHostTests` uses the web host.
-- The save API is tested against the real host in `ContentApiTests` (antiforgery header, 256 KB limit, 400/401/403/413, history endpoints); `RichTextSanitizerTests`, `ContentServiceTests` and `ContentHistorySaveIdMigrationTests` cover sanitizing, save ids and the migration backfill; `CmsAdminRenderingTests` and `CmsEditorTagHelperTests` cover the `data-cms-*` output.
+- The save API is tested against the real host in `ContentApiTests` (antiforgery header, 256 KB limit, 400/401/403/413, history endpoints); `RichTextSanitizerTests` and `ContentServiceTests` cover sanitizing and save ids; `CmsAdminRenderingTests` and `CmsEditorTagHelperTests` cover the `data-cms-*` output.
 - **No Playwright in Phase 4.** The editing UI (JS and CSS) has no automated tests; it is verified by driving the built-in Claude browser against `/dev/cms-sandbox`. Playwright + axe-core stays planned for the public pages.
 - A fake clock (`FakeTimeProvider`) controls `CreatedAt`/`UpdatedAt` only. `BaseEntity.Id` is `Guid.CreateVersion7()` from the real clock, so it does not follow the fake clock. History reads sort by `CreatedAt` descending, then `Id` descending (`ContentHistoryRepository`); a test that needs a deterministic tie-break passes explicit ids built with `Guid.CreateVersion7(timestamp)` (see `ContentPersistenceTests.HistoryReads_AreNewestFirst`).
-- Tests that only need the `DbContext` (e.g. `BaseEntityTimestampTests`) use a plain SQLite in-memory connection and a fake `TimeProvider`.
+- Tests that only need the `DbContext` (e.g. `BaseEntityTimestampTests`, `ContentPersistenceTests`) take a database from `PostgresTestServer` directly and use a fake `TimeProvider`.
 
 ---
 
@@ -182,4 +189,6 @@ The database must stay swappable (Postgres / SQL Server) with only a provider an
 ## Local Development
 
 - The launch profile serves `https://localhost:5001` and `http://localhost:5000` (`Properties/launchSettings.json`). Admin pages need HTTPS: the antiforgery and auth cookies are `Secure` always, so over plain HTTP the browser drops them and login cannot work. Run `dotnet dev-certs https --trust` once.
-- Development data lives under `src/SaronidaSailing.Web/data/` (databases, `media`, `keys`, `logs`).
+- Development needs PostgreSQL: `docker compose -f deploy/dev/docker-compose.yml up -d` (port 5432; the connection string is in `appsettings.Development.json`). In Development the app applies migrations and installs the Hangfire schema at startup (`Database:MigrateAtStartup` is true there).
+- Development files live under `src/SaronidaSailing.Web/data/` (`media`, `keys`, `logs`); the database lives in the Docker volume `saronida-dev-pgdata`, so deleting the folder does not reset it (`docker compose -f deploy/dev/docker-compose.yml down -v` does).
+- To try two pods locally, run two processes against the same database with different ports and `--Logs:Instance` (the `web-a` / `web-b` entries in `.claude/launch.json`).

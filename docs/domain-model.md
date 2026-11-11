@@ -1,6 +1,8 @@
 # Domain Model
 
-Status: **`BaseEntity`, `ApplicationUser` and the four content entities (`ContentItem`, `ContentListItem`, `ContentSection`, `ContentHistory`; migrations `AddContent` and `AddContentHistorySaveId`) are implemented. `MediaAsset`, `InstagramPost` and `IntegrationSetting` are planned, not yet implemented.**
+Status: **`BaseEntity`, `ApplicationUser` and the four content entities (`ContentItem`, `ContentListItem`, `ContentSection`, `ContentHistory`) are implemented on PostgreSQL, all in the single migration `InitialCreate`. `MediaAsset`, `InstagramPost` and `IntegrationSetting` are planned, not yet implemented.**
+
+Storage: PostgreSQL through the Npgsql EF Core provider. `Guid` columns are `uuid`; every `DateTime` (`CreatedAt`, `UpdatedAt`) is `timestamp with time zone` and read back as UTC (`docs/conventions.md` → EF Core and PostgreSQL). Table names are the ones below (`ContentItems`, `ContentListItems`, `ContentSections`, `ContentHistory`, plus the Identity `AspNet*` tables) in the default `public` schema. Hangfire's tables are not EF entities: they live in the separate schema `hangfire` of the same database, created by the `migrate` command (`docs/architecture.md` → Background Jobs).
 
 ## Content Keys
 
@@ -37,7 +39,7 @@ Implemented (`Core/Entities/ContentItem.cs`, table `ContentItems`). The current 
 | `Value` | string | Plain text, sanitized HTML, link JSON (`url`, `label`), or `MediaAsset.Id` |
 | `UpdatedBy` | string (max 256) | The editing admin's **email**, plain text, no FK to `ApplicationUser` — history survives `admin remove` and continues if the same email is re-added |
 
-SQLite and Postgres treat NULLs as distinct in unique indexes, so uniqueness is two filtered unique indexes (`Infrastructure/Data/Configurations/ContentItemConfiguration.cs`):
+PostgreSQL treats NULLs as distinct in unique indexes, so uniqueness is two filtered (partial) unique indexes (`Infrastructure/Data/Configurations/ContentItemConfiguration.cs`):
 
 | Index | Columns | Filter |
 |---|---|---|
@@ -45,7 +47,7 @@ SQLite and Postgres treat NULLs as distinct in unique indexes, so uniqueness is 
 | `UX_ContentItems_ListField` (unique) | `ListItemId`, `FieldKey`, `Locale` | `ListItemId IS NOT NULL` |
 | `IX_ContentItems_PageKey_Locale` | `PageKey`, `Locale` | none; serves the page read |
 
-A list item's fields carry the list's `PageKey` and its `ListKey` as `SectionKey`. `ContentPersistenceTests` proves both indexes on SQLite.
+A list item's fields carry the list's `PageKey` and its `ListKey` as `SectionKey`. `ContentPersistenceTests` proves both indexes on PostgreSQL.
 
 `Value` is sanitized and validated by `ContentService.ApplyChangesAsync` before it is stored: `RichText` goes through `IRichTextSanitizer`, `Link` JSON must pass `ContentLink.TryParse` (see `docs/architecture.md` → CMS Editing Flow). Link JSON is read and checked by `Core/Services/ContentLink.cs` (`https:`, `tel:`, `mailto:` only).
 
@@ -87,7 +89,7 @@ Implemented (`Core/Entities/ContentHistory.cs`, table `ContentHistory`). Append-
 
 The change time is `CreatedAt`. There is no `ChangedAt` and no `PreviousValue`; the current value stays in `ContentItem`, and a version's previous value is the next-older row of the same item.
 
-A field gets **one history row per field per save**: a batch with two `SetField` for the same key, locale and list item keeps only the last. Migration `AddContentHistorySaveId` added the column and backfilled `SaveId = Id` for existing rows (each old row is its own save); it uses one `migrationBuilder.Sql` statement for the backfill. History covers field values only, not list structure or section toggles.
+A field gets **one history row per field per save**: a batch with two `SetField` for the same key, locale and list item keeps only the last. History covers field values only, not list structure or section toggles.
 
 ### MediaAsset
 
@@ -127,4 +129,4 @@ Planned. Key/value store for integration state, e.g. the Instagram access token 
 
 ### ApplicationUser
 
-Extends `IdentityUser` (string PK) in `Core/Entities/ApplicationUser.cs`; implemented with no extra fields. The Identity `AspNet*` tables live in `saronida.db` (migration `AddIdentity`). One or more admins, created only with the `admin add` command (see `docs/architecture.md` → Admin Accounts). No registration page, no seeding from configuration.
+Extends `IdentityUser` (string PK) in `Core/Entities/ApplicationUser.cs`; implemented with no extra fields. The Identity `AspNet*` tables live in the same database as the content tables (migration `InitialCreate`). One or more admins, created only with the `admin add` command (see `docs/architecture.md` → Admin Accounts). No registration page, no seeding from configuration.

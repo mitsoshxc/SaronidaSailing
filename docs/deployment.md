@@ -1,56 +1,66 @@
 # Deployment
 
-Status: **the `Dockerfile` and app configuration are implemented (Phase 1); the droplet, nginx, compose file and deploy script are agreed design, not yet built.** They land in the Preview & Production phase of `PLAN.md`.
+Status: **the `Dockerfile`, the app configuration and the local development PostgreSQL (`deploy/dev/docker-compose.yml`) are implemented. Everything about the droplet, k3s, nginx, the deploy script and backups is agreed design (2026-11-11, `PLAN.md` → Phase 4.5 and Phase 8), not yet built.** The earlier Docker Compose + SQLite + DigitalOcean-backups design is gone.
+
+The app itself is ready for it (Phase 4.5): it runs correctly as two pods against one PostgreSQL database (cache eviction across pods, shared log files, migrations by a separate command). Launch runs one pod.
 
 ## Quick Actions (run on the droplet)
+
+Maintenance mode is plain nginx on the host and works as described. The `kubectl` rows are **agreed design (Phase 8)**; the Deployment, namespace and Service names are fixed when `deploy/k8s/` is written.
 
 | Need | Command |
 |---|---|
 | **Take the site offline (maintenance mode ON)** | `touch /var/saronida/maintenance.on` |
 | **Bring the site back (maintenance mode OFF)** | `rm /var/saronida/maintenance.on` |
-| Check app health | `curl -i http://127.0.0.1:5000/health` |
-| Restart the app | `cd /opt/saronida && docker compose restart` |
-| App logs | `/var/saronida/logs/app-YYYY-MM-DD.log` (console: `cd /opt/saronida && docker compose logs --tail 200 -f`) |
+| Check app health | `curl -i http://127.0.0.1:<NodePort>/health` (the app Service's NodePort; nginx denies `/health` from the internet) |
+| Restart the app | `kubectl rollout restart` on the app Deployment |
+| App logs | `/var/saronida/logs/app-YYYY-MM-DD.log` (all pods write the same file; the pod name is the 2nd field of every line); console: `kubectl logs` |
 | Audit log (logins, admin actions) | `/var/saronida/logs/audit-YYYY-MM-DD.log` |
+| Resource metrics (memory, CPU, requests, per minute) | `/var/saronida/logs/metrics-YYYY-MM-DD.log` |
+| Kubernetes events (OOMKilled, restarts, failed probes) | `/var/saronida/logs/k8s-events-YYYY-MM-DD.log` |
 | Add an admin | `saronida-admin add <email>` (prompts for the password) |
 | Reset an admin's password | `saronida-admin reset-password <email>` |
 | List / remove admins | `saronida-admin list` · `saronida-admin remove <email>` |
 
-Maintenance mode takes effect immediately — no restart, no deploy. Details under nginx → Maintenance Mode.
+Maintenance mode takes effect immediately — no restart, no deploy. Details under nginx → Maintenance Mode. A `Started` line in `app-*.log` with no `Stopped` before it means the previous run was killed (see `docs/architecture.md` → Logging → Diagnostics).
 
 ## Infrastructure
 
 | Item | Choice | Notes |
 |---|---|---|
-| Server | DigitalOcean Basic droplet, Regular CPU, 1 vCPU / 1 GiB RAM / 25 GiB SSD, 1,000 GiB monthly outbound transfer | ~$6/mo per third-party sources — confirm in the DO control panel. Add a 1–2 GB swap file. Upgrade path: CPU/RAM-only resize to 2 GiB (reversible) |
+| Server | DigitalOcean Basic droplet, 1 vCPU / 2 GiB RAM, about $12/mo + VAT | Add a swap file. Scale-up path: resize to 2 vCPU / 4 GiB (about $24/mo) and set the app Deployment to `replicas: 2` (see Scaling to two pods) |
 | Region | FRA1 (Frankfurt) | Closest DO region to Greece; EU (GDPR) |
 | OS | Ubuntu LTS | |
-| App runtime | Docker, one container (Docker Compose) | Data and media folders are bind mounts on the host |
-| Reverse proxy | nginx on the host (not in Docker) | |
+| App runtime | k3s, single node; one app pod at launch (Deployment, `replicas: 1`, readiness/liveness probes) | k3s's bundled Traefik is **disabled**. The app's Service is a NodePort. Docker is used only on the developer's PC to build the image |
+| Database | PostgreSQL, one pod (StatefulSet, 1 replica) inside the cluster | Data on the droplet disk under `/var/saronida/pgdata`; never exposed outside the cluster. Version pinned when the manifests are written (local dev and tests use `postgres:18.6-alpine`) |
+| Reverse proxy | nginx on the host (not in the cluster) | Proxies to the app Service's NodePort. NodePorts are blocked by the firewall |
 | TLS | Let's Encrypt via `certbot --nginx` on the host | certbot package handles auto-renewal |
 | DNS / CDN | Cloudflare Free | Nameservers point to Cloudflare; domain stays at its registrar. SSL mode **Full (strict)**. Free-plan request body limit 100 MB |
 | Analytics | Cloudflare Web Analytics | Enabled from the Cloudflare dashboard; cookieless |
+| Backups | `pg_dump` CronJob on the droplet + pull script on the developer's PC | No DigitalOcean backups. See Backups |
 
 ## Host Layout
 
+Agreed design (Phase 8); the media, logs and keys folders are mounted into every app pod (single node, so host folders are shared).
+
 | Path | Purpose |
 |---|---|
-| `/opt/saronida/docker-compose.yml` | Compose file (from `deploy/docker-compose.yml`) |
-| `/var/saronida/data/saronida.db` | Content database (bind mount → container) |
-| `/var/saronida/data/hangfire.db` | Hangfire job storage |
-| `/var/saronida/data/backup/` | Nightly `VACUUM INTO` copy of the content database |
-| `/var/saronida/media/` | Generated images (bind mount → container; served directly by nginx) |
+| `/var/saronida/pgdata/` | PostgreSQL data (mounted into the PostgreSQL pod only) |
+| `/var/saronida/backup/` | Nightly `pg_dump` files (last 7 kept on the droplet) |
+| `/var/saronida/media/` | Generated images (mounted into the pods; served directly by nginx) |
 | `/var/saronida/data/originals/` | Original uploads (private, never served; used to regenerate sizes) |
-| `/var/saronida/data/keys/` | ASP.NET Core Data Protection keys (keep admins logged in across deploys) |
-| `/var/saronida/logs/` | NLog files, 90-day retention |
-| `/usr/local/bin/saronida-admin` | Wrapper for the admin CLI commands |
+| `/var/saronida/data/keys/` | ASP.NET Core Data Protection keys (keep admins logged in across deploys and valid on every pod) |
+| `/var/saronida/logs/` | NLog files shared by all pods (`app-*`, `audit-*` 90 days, `metrics-*` 30 days) and `k8s-events-*` written by the event recorder |
+| `/var/saronida/maintenance.on` | Marker file: while it exists, nginx answers 503 |
+| `deploy/k8s/` (in the repo) | Kubernetes manifests: namespace, app Deployment and NodePort Service, PostgreSQL StatefulSet, `migrate` Job, `pg_dump` CronJob, Secrets |
+| `/usr/local/bin/saronida-admin` | Wrapper for the admin CLI commands (`kubectl exec` into an app pod) |
 | `/etc/nginx/sites-available/saronida` | Site config (from `deploy/nginx/`) |
 
-The .NET container images run as the non-root `app` user (UID 1654) and listen on port 8080. The bind-mounted folders (`/var/saronida/data`, including `data/keys`, `/var/saronida/media` and `/var/saronida/logs`) **must be owned by or writable for UID 1654** (e.g. `chown -R 1654:1654`): the app writes the Data Protection keys to `data/keys` and the NLog files to `logs`. The container port is published on loopback only: `127.0.0.1:5000:8080`.
+The .NET container images run as the non-root `app` user (UID 1654) and listen on port 8080. The host folders the app writes (`/var/saronida/data/keys`, `/var/saronida/media`, `/var/saronida/logs`) **must be writable for UID 1654** (e.g. `chown -R 1654:1654`): the app writes the Data Protection keys to `data/keys` and the NLog files to `logs`.
 
 ## Dockerfile
 
-Implemented (`Dockerfile`, `.dockerignore` at the repo root); the compose file is still planned.
+Implemented (`Dockerfile`, `.dockerignore` at the repo root).
 
 | Fact | Detail |
 |---|---|
@@ -59,28 +69,34 @@ Implemented (`Dockerfile`, `.dockerignore` at the repo root); the compose file i
 | Restore layer | Root build files and the three `.csproj` files are copied first and restored, so source changes do not re-download packages. `nuget.config` is copied too, so Docker restores from nuget.org only |
 | Publish | `dotnet publish src/SaronidaSailing.Web -c Release --no-restore`; `tests/`, `docs/`, `deploy/`, the dev data folder `src/SaronidaSailing.Web/data`, `*.db*` and `*.md` are excluded by `.dockerignore` |
 | User / port | `USER $APP_UID` (1654), `EXPOSE 8080`; entrypoint `dotnet SaronidaSailing.Web.dll` |
-| No `HEALTHCHECK` | Health is checked by `deploy.ps1` against `/health` |
-| No `/var/saronida` folders in the image | They are bind mounts created and owned on the host |
+| No `HEALTHCHECK` | Health is checked by the pod probes and by `deploy.ps1` against `/health` |
+| No `/var/saronida` folders in the image | They are host folders mounted into the pods |
+
+The same image runs the web app and the one-off commands: `dotnet SaronidaSailing.Web.dll migrate` (the migrate Job) and `dotnet SaronidaSailing.Web.dll admin <command>`.
 
 ## Configuration
 
-Production values are in `src/SaronidaSailing.Web/appsettings.json`; environment variables (compose) override them.
+Defaults are in `src/SaronidaSailing.Web/appsettings.json`; environment variables (set in the pod spec) override them.
 
 | Key | Production value | Notes |
 |---|---|---|
-| `ConnectionStrings:Content` | `Data Source=/var/saronida/data/saronida.db` | SQLite connection string; the folder is created at startup if missing |
-| `ConnectionStrings:Hangfire` | `/var/saronida/data/hangfire.db` | Plain file path (not a connection string) |
+| `ConnectionStrings:Content` | `Host=postgres;Port=5432;Database=saronida;Username=saronida` | Npgsql connection string, **without a password**: the deployment supplies the password from the Kubernetes Secret (Phase 8). `postgres` is the in-cluster host name the file assumes. One string serves EF Core, Hangfire storage (schema `hangfire`) and the cache-eviction bus/listener. `ConnectionStrings:Hangfire` no longer exists |
+| `Database:MigrateAtStartup` | `false` | `true` only in `appsettings.Development.json`. With `false` a pod never migrates: startup fails when migrations are pending and names the `migrate` command. The `migrate` command applies the EF migrations and installs the Hangfire schema |
 | `Media:RootPath` | `/var/saronida/media` | Must exist and be writable; outside Development it is **not** created by the app, and `/health` fails if it is missing |
 | `Health:HomePageUrl` | `http://127.0.0.1:8080/` | URL the `home-page` health check requests from inside the container |
-| `Logs:Path` | `/var/saronida/logs` | NLog folder (`audit-*.log`, `app-*.log`); must be writable for UID 1654; startup fails if the key is missing |
+| `Logs:Path` | `/var/saronida/logs` | NLog folder (`audit-*`, `app-*`, `metrics-*`); must be writable for UID 1654; startup fails if the key is missing |
+| `Logs:Instance` | not set | Name written as the 2nd field of every log line. Defaults to the machine name, which in Kubernetes is the pod name. An empty value or one containing `\|` or control characters fails startup. As an environment variable: `Logs__Instance` |
+| `Diagnostics:*` | not set (defaults in code) | Thresholds and intervals of the runtime diagnostics; values must be greater than 0. Keys and defaults: `docs/architecture.md` → Logging → Diagnostics |
 | `DataProtection:KeysPath` | `/var/saronida/data/keys` | Data Protection keys (unencrypted at rest); created if missing, must be writable for UID 1654; startup fails if the key is missing |
-| `ForwardedHeaders:KnownNetworks` | `["172.30.0.0/24"]` | CIDR networks allowed to set `X-Forwarded-For` / `X-Forwarded-Proto`; an invalid value fails startup. As an environment variable: `ForwardedHeaders__KnownNetworks__0` |
+| `ForwardedHeaders:KnownNetworks` | `["172.30.0.0/24"]` in `appsettings.json` | CIDR networks allowed to set `X-Forwarded-For` / `X-Forwarded-Proto`; an invalid value fails startup. As an environment variable: `ForwardedHeaders__KnownNetworks__0`. The value in the file is the old Docker Compose subnet; Phase 8 sets it to the k3s network (see below) |
 
-A missing `ConnectionStrings:Content`, `ConnectionStrings:Hangfire`, `Media:RootPath`, `Logs:Path` or `DataProtection:KeysPath` fails startup.
+A missing `ConnectionStrings:Content`, `Media:RootPath`, `Logs:Path` or `DataProtection:KeysPath` fails startup.
 
-**Compose network.** The compose file (Phase 8) must pin the network subnet to `172.30.0.0/24`. Host nginx reaches the container through the published port `127.0.0.1:5000:8080`, so the app sees requests coming from the compose network gateway, not from `127.0.0.1`; `ForwardedHeaders:KnownNetworks` trusts exactly that subnet. If the subnet changes, change the key with it, or the app ignores the client IP and every login rate-limit bucket becomes the gateway address.
+**Cluster network.** Host nginx reaches the app through the Service NodePort, so the app sees requests coming from the cluster network, not from `127.0.0.1`. `ForwardedHeaders:KnownNetworks` must name exactly the network those requests arrive from; Phase 8 finds it and sets it. If it is wrong, the app ignores the client IP and every login rate-limit bucket becomes one address.
 
-**Admin CLI.** `saronida-admin` (Phase 8) wraps `docker compose exec web dotnet SaronidaSailing.Web.dll admin <command>`. The commands read the password from a hidden prompt and need a TTY: `docker compose exec` allocates one by default, so do not pass `-T`. Without a TTY the command fails with a message and exit code 1.
+**Admin CLI.** `saronida-admin` (Phase 8) wraps `kubectl exec` into an app pod running `dotnet SaronidaSailing.Web.dll admin <command>`. The commands read the password from a hidden prompt and need a TTY, so `kubectl exec` must allocate one. Without a TTY the command fails with a message and exit code 1.
+
+**Migrations.** The deploy script runs a `migrate` Job (same image, `dotnet SaronidaSailing.Web.dll migrate`) before each rollout; the first deploy creates the schema this way. After the very first deploy, create the first admin with `saronida-admin add <email>`.
 
 ## nginx
 
@@ -96,17 +112,18 @@ A missing `ConnectionStrings:Content`, `ConnectionStrings:Hangfire`, `Media:Root
 - Cloudflare: DNS records for both `saronidasailing.gr` and `www` proxied; "Always Use HTTPS" on. nginx enforces the same rules, so they hold even if Cloudflare settings change.
 
 - `location /media/` → `alias /var/saronida/media/;` with `Cache-Control: public, max-age=31536000, immutable`.
-- Everything else → `proxy_pass http://127.0.0.1:5000;` with `X-Forwarded-For` / `X-Forwarded-Proto`.
+- Everything else → `proxy_pass` to the app Service's NodePort on the host, with `X-Forwarded-For` / `X-Forwarded-Proto`.
 - Real client IP: `real_ip_header CF-Connecting-IP;` plus `set_real_ip_from` for each Cloudflare IP range (published at cloudflare.com/ips; update when they change).
 - `client_max_body_size` set for image uploads.
-- `location /health` → `deny all;` from the internet (only reachable on the droplet via `127.0.0.1:5000`).
+- `location /health` → `deny all;` from the internet (only reachable on the droplet itself).
+- nginx access and error logs are kept **30 days** (logrotate).
 
 ### Maintenance Mode
 
 - While `/var/saronida/maintenance.on` exists, nginx answers **every public request** with **503** and a static "Back soon" page (Greek + English, no external assets), plus `Retry-After: 3600`.
 - Page source: `deploy/nginx/maintenance.html`, installed to `/var/www/saronida/maintenance.html`.
 - 503 tells search engines the outage is temporary, so rankings are not affected.
-- Independent of `/health` and the app: you can deploy and test on `127.0.0.1:5000` while maintenance mode is on.
+- Independent of `/health` and the app: you can deploy and test against the NodePort on the droplet while maintenance mode is on.
 
 ## Security Headers (nginx)
 
@@ -117,33 +134,51 @@ A missing `ConnectionStrings:Content`, `ConnectionStrings:Hangfire`, `Media:Root
 ## Server Hardening
 
 - SSH key login only; password login and root login disabled.
-- A dedicated `deploy` user in the `docker` group. Membership in `docker` is effectively root — protect that SSH key accordingly.
-- Firewall: only 22, 80, 443 open.
-- Automatic security updates (`unattended-upgrades`), with an automatic reboot at night when an update requires one. The container uses `restart: unless-stopped`, so the site comes back on its own.
+- A dedicated `deploy` user for deploys (image import and `kubectl`); how it is granted those rights is decided in Phase 8 — the SSH key is effectively a root key, protect it accordingly.
+- A separate read-only backup user for the PC backup script (see Backups).
+- Firewall: only 22, 80, 443 open; **NodePorts closed**, PostgreSQL never exposed outside the cluster.
+- Automatic security updates (`unattended-upgrades`), with an automatic reboot at night when an update requires one. k3s and the pods must come back on boot on their own.
 - Base images pinned to exact versions in the `Dockerfile`.
 
 ## Deploy Script — `deploy/deploy.ps1`
 
-PowerShell 7 (Windows, macOS, Linux). Run from the developer's PC. The droplet never builds and never has access to the repo.
+Agreed design (Phase 8). PowerShell 7 (Windows, macOS, Linux). Run from the developer's PC. The droplet never builds and never has access to the repo.
 
 1. `git clone` `main` into a temp folder (so local uncommitted work is never deployed).
 2. `docker build --platform linux/amd64 -t saronida-web:<commit-sha> .`
-3. `docker save saronida-web:<commit-sha> | ssh deploy@<host> docker load`
-4. Over SSH: point the compose file at the new tag, `docker compose up -d`.
-5. Poll `/health` on the droplet (`127.0.0.1:5000`); on non-200, switch back to the previous tag.
-6. `docker image prune` on the droplet, keeping the current and previous tags; delete the temp folder locally.
+3. `docker save saronida-web:<commit-sha> | ssh deploy@<host>` into `ctr images import` (k3s's containerd): no registry.
+4. Run the `migrate` Job with the new image and wait for it; a failed migration stops the deploy before any pod is replaced.
+5. Roll out the new image to the app Deployment and wait for it.
+6. Check `/health` on the droplet. What happens on a failed check (the earlier design switched back to the previous tag) is decided when the script is written.
+7. Clean up old images on the droplet, keeping the current and previous tags; delete the temp folder locally.
 
-EF Core migrations are applied at app startup. After the very first deploy, create the first admin with `saronida-admin add <email>`.
+## Crash and Resource Diagnostics
 
-The compose file caps Docker's container console log (json-file `max-size` / `max-file`).
+The app logs what it can see itself (lifecycle, crashes, per-minute metrics, slow requests, health changes; `docs/architecture.md` → Logging → Diagnostics). A process killed by the out-of-memory killer or `SIGKILL` cannot log its own death, so the droplet records it from outside (all agreed design, Phase 8):
+
+| Piece | What it records |
+|---|---|
+| Kubernetes event recorder | A small service on the droplet writes cluster events (`OOMKilled`, failed liveness checks, restarts, evictions) to `/var/saronida/logs/k8s-events-YYYY-MM-DD.log`; Kubernetes forgets events after about an hour |
+| Memory requests and limits | Set on the app pod and on PostgreSQL, so .NET's GC works within the limit (the app logs the container limit and the GC heap limit) and a kill is recorded as `OOMKilled` |
+| nginx logs | Access and error logs kept 30 days (logrotate) |
+| Persistent systemd journal | Size-capped, so the kernel's out-of-memory messages for the whole droplet survive a reboot |
 
 ## Monitoring
 
 - **UptimeRobot** (free) checks `https://www.saronidasailing.gr/` every few minutes and emails the developer if it goes down.
 
+## Scaling to two pods
+
+Agreed design (Phase 8). The app is already correct with two pods; the steps are operational:
+
+1. Resize the droplet to 2 vCPU / 4 GiB (about $24/mo).
+2. Set the app Deployment to `replicas: 2`.
+
+What the app does with two pods: each pod keeps its own output cache and evicts the other's through PostgreSQL `LISTEN/NOTIFY`; every pod runs a Hangfire server and Hangfire's locks keep recurring jobs single; Data Protection keys, media and originals are shared host folders, so an admin session works on both; both pods write the same daily log files; the login rate limiter is per pod (accepted). Phase 8 includes a two-pod rehearsal on the preview (cache eviction across pods, jobs run once, admin login, both pods in the shared logs, a forced pod kill visible in `k8s-events`, then back to one pod) and a written scale-up runbook.
+
 ## Preview (owner demo)
 
-After local development and testing, the site is shown to the owner on the DigitalOcean droplet at **`https://saronida.visualpivot.net`** (A record on the developer's domain `visualpivot.net` → droplet IP). **This droplet later becomes production**: content the owner enters during the preview carries over. Same Docker image and setup as production, with these differences:
+After local development and testing, the site is shown to the owner on the DigitalOcean droplet at **`https://saronida.visualpivot.net`** (A record on the developer's domain `visualpivot.net` → droplet IP). **This droplet later becomes production**: content the owner enters during the preview carries over. Same image and setup as production, with these differences:
 
 | Concern | Preview |
 |---|---|
@@ -154,7 +189,7 @@ After local development and testing, the site is shown to the owner on the Digit
 | Redirects | No canonical `www.saronidasailing.gr` redirect and no old-site redirects |
 | Instagram | The Meta app needs the preview URL as an allowed OAuth redirect URI too |
 | Monitoring | Not needed |
-| DO backups | Off during preview; enabled at go-live (developer's decision). Until then a lost droplet means re-entering the owner's content |
+| Backups | The PC backup script runs from the start of the preview (no DO backups at all), so the owner's content is protected from day one |
 | Output cache | Effectively off: Basic Auth adds an `Authorization` header to every request, and the default cache policy skips such requests. Fine for a demo; caching is exercised locally and in production |
 
 
@@ -169,9 +204,12 @@ After local development and testing, the site is shown to the owner on the Digit
 
 ## Backups
 
+Agreed design (Phase 8). There are **no DigitalOcean backups**; the copies live on the developer's PC.
+
 | Layer | What |
 |---|---|
-| DigitalOcean droplet backups | Paid add-on, **weekly** (kept 4 weeks; +20% of droplet price). Daily backups are listed only for some regions, not FRA1 — check the control panel for a usage-based plan there |
-| Nightly Hangfire job | `VACUUM INTO /var/saronida/data/backup/saronida.db` — guarantees each DO backup contains a consistent copy of the database |
+| Nightly `pg_dump` CronJob | Writes to `/var/saronida/backup/`; the last 7 dumps are kept on the droplet |
+| PC pull script (`deploy/backup.ps1`) | Run by Windows Task Scheduler (also when a run was missed). Over SSH, with a dedicated read-only backup user, it pulls the dumps, new files in `/var/saronida/data/originals/` and the Data Protection keys into the Proton Drive sync folder. Keeps 30 daily and 12 monthly copies. Warns when the newest backup is more than 3 days old |
+| Restore runbook | Written, and a restore tested once |
 
-DO backups are stored in the same datacenter as the droplet. Worst case data loss with weekly backups: up to 7 days of admin edits.
+Not backed up because they can be regenerated: the generated images under `/var/saronida/media/` (rebuilt from the originals). Worst case data loss is the edits since the last successful pull (the droplet keeps the last 7 dumps, but they are on the same disk as the database).
