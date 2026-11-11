@@ -7,6 +7,20 @@
       "runtimeArgs": ["run", "--project", "src/SaronidaSailing.Web", "--launch-profile", "http"],
       "port": 5001,
       "url": "https://localhost:5001"
+    },
+    {
+      "name": "web-a",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "src/SaronidaSailing.Web", "--no-launch-profile", "--", "--environment", "Development", "--urls", "http://localhost:5010;https://localhost:5011", "--Logs:Instance", "a", "--Health:HomePageUrl", "http://localhost:5010/"],
+      "port": 5011,
+      "url": "https://localhost:5011"
+    },
+    {
+      "name": "web-b",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "src/SaronidaSailing.Web", "--no-launch-profile", "--no-build", "--", "--environment", "Development", "--urls", "http://localhost:5020;https://localhost:5021", "--Logs:Instance", "b", "--Health:HomePageUrl", "http://localhost:5020/"],
+      "port": 5021,
+      "url": "https://localhost:5021"
     }
   ]
 }
