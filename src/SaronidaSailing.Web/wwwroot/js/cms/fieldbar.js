@@ -41,11 +41,12 @@ export const createFieldBar = ({ editMode, windows }) => {
         const offscreen = rect.bottom < 0 || rect.top > window.innerHeight;
         bar.style.visibility = offscreen ? 'hidden' : 'visible';
 
+        const toolbarBottom = document.querySelector('.cms-toolbar').getBoundingClientRect().bottom;
         let top = rect.bottom + gap;
-        if (top + height > window.innerHeight - margin && rect.top - gap - height >= margin) {
+        if (top + height > window.innerHeight - margin && rect.top - gap - height >= toolbarBottom + margin) {
             top = rect.top - gap - height;
         }
-        top = Math.max(margin, Math.min(top, window.innerHeight - height - margin));
+        top = Math.max(toolbarBottom + margin, Math.min(top, window.innerHeight - height - margin));
         const left = Math.max(margin, Math.min(rect.left, window.innerWidth - width - margin));
         bar.style.top = `${top}px`;
         bar.style.left = `${left}px`;

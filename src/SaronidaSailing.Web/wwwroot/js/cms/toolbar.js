@@ -127,6 +127,46 @@ export const createToolbar = ({ config, pending, editMode }) => {
         location.reload();
     };
 
+    const toolbar = document.querySelector('.cms-toolbar');
+    const moreButton = document.querySelector('[data-cms-action="more"]');
+    const morePanel = document.getElementById('cms-toolbar-more');
+
+    const setOpen = (open) => {
+        toolbar.classList.toggle('cms-toolbar-open', open);
+        moreButton.setAttribute('aria-expanded', String(open));
+    };
+
+    const inDialog = (node) => node instanceof Element && node.closest('dialog.cms-dialog') !== null;
+
+    moreButton.addEventListener('click', () => setOpen(moreButton.getAttribute('aria-expanded') !== 'true'));
+
+    morePanel.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && moreButton.getAttribute('aria-expanded') === 'true') {
+            event.preventDefault();
+            setOpen(false);
+            moreButton.focus();
+        }
+    });
+
+    document.addEventListener('pointerdown', (event) => {
+        if (event.target instanceof Node && !toolbar.contains(event.target) && !inDialog(event.target)) {
+            setOpen(false);
+        }
+    });
+
+    toolbar.addEventListener('focusout', (event) => {
+        const to = event.relatedTarget;
+        if (to instanceof Node && !toolbar.contains(to) && !inDialog(to)) {
+            setOpen(false);
+        }
+    });
+
+    const syncHeight = () => {
+        document.documentElement.style.setProperty('--cms-toolbar-height', `${toolbar.offsetHeight}px`);
+    };
+    new ResizeObserver(syncHeight).observe(toolbar);
+    syncHeight();
+
     saveButton.addEventListener('click', save);
     discardButton.addEventListener('click', discard);
     pending.subscribe(render);
