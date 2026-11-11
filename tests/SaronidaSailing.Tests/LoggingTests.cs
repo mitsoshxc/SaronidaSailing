@@ -29,6 +29,31 @@ public class LoggingTests(TempDatabaseWebApplicationFactory factory) : IClassFix
     }
 
     [Fact]
+    public void NLogTimeSource_IsAccurateUtc() =>
+        Assert.IsType<NLog.Time.AccurateUtcTimeSource>(NLog.Time.TimeSource.Current);
+
+    [Fact]
+    public void AuditRecords_InTightLoop_HaveMonotonicTimestamps()
+    {
+        var audit = factory.Services.GetRequiredService<IAuditLog>();
+
+        for (var i = 0; i < 20; i++)
+        {
+            audit.Record("tight-loop-test", null, null, i.ToString());
+        }
+
+        LogManager.Flush();
+
+        var stamps = ReadLines(factory.LogsPath, $"audit-{Today}.log")
+            .Where(l => l.Contains("|tight-loop-test|"))
+            .Select(l => DateTime.Parse(l.Split('|')[0], null, System.Globalization.DateTimeStyles.RoundtripKind))
+            .ToList();
+        Assert.Equal(20, stamps.Count);
+        Assert.Equal(stamps.OrderBy(t => t), stamps);
+        Assert.True(stamps.Distinct().Count() > 1);
+    }
+
+    [Fact]
     public void AuditRecord_SanitizesFieldsAgainstLogInjection()
     {
         var audit = factory.Services.GetRequiredService<IAuditLog>();

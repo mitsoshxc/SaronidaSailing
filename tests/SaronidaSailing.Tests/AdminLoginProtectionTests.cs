@@ -110,7 +110,12 @@ public class AdminLoginProtectionTests(TempDatabaseWebApplicationFactory factory
 
         Assert.Equal(HttpStatusCode.TooManyRequests, limited.StatusCode);
         Assert.Equal("60", limited.Headers.GetValues("Retry-After").Single());
-        Assert.Equal("Too many attempts. Try again in a minute.", await limited.Content.ReadAsStringAsync());
+        Assert.Equal("text/html; charset=utf-8", limited.Content.Headers.ContentType!.ToString());
+        var body = await limited.Content.ReadAsStringAsync();
+        Assert.Contains("<title>Too many attempts — Saronida Sailing admin</title>", body);
+        Assert.Contains("<h1>Too many attempts</h1>", body);
+        Assert.Contains(AdminLoginRateLimit.RejectionMessage, body);
+        Assert.Contains("href=\"/admin/login\"", body);
         Assert.Contains(ReadLogLines(factory.LogsPath, "audit"), l => l.Contains($"|login-rate-limited|user=-|ip={ip}|/admin/login"));
 
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/admin/login")).StatusCode);

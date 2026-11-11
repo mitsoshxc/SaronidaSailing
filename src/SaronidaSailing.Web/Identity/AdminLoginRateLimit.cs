@@ -13,6 +13,29 @@ public static class AdminLoginRateLimit
     public const string RejectionMessage = "Too many attempts. Try again in a minute.";
     public const string AuditEvent = "login-rate-limited";
 
+    public static readonly string RejectionPage = $"""
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+            <meta name="robots" content="noindex, nofollow" />
+            <title>Too many attempts — Saronida Sailing admin</title>
+            <link rel="stylesheet" href="/css/site.css" />
+        </head>
+        <body class="admin">
+            <main class="admin-main">
+                <div class="admin-card">
+                    <p class="admin-brand">Saronida Sailing admin</p>
+                    <h1>Too many attempts</h1>
+                    <p class="admin-error" role="alert">{RejectionMessage}</p>
+                    <p><a href="/admin/login">Back to log in</a></p>
+                </div>
+            </main>
+        </body>
+        </html>
+        """;
+
     private const string UnknownIp = "unknown";
 
     private static readonly string[] LimitedPaths =
@@ -61,10 +84,10 @@ public static class AdminLoginRateLimit
             var context = rejected.HttpContext;
             context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
             context.Response.Headers.RetryAfter = RetryAfterSeconds;
-            context.Response.ContentType = "text/plain; charset=utf-8";
+            context.Response.ContentType = "text/html; charset=utf-8";
             context.RequestServices.GetRequiredService<IAuditLog>()
                 .Record(AuditEvent, null, context.Connection.RemoteIpAddress?.ToString(), context.Request.Path.Value);
-            await context.Response.WriteAsync(RejectionMessage, cancellationToken);
+            await context.Response.WriteAsync(RejectionPage, cancellationToken);
         };
     }
 }
