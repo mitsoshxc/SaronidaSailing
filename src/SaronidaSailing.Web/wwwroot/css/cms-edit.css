@@ -679,12 +679,25 @@ html:not(.cms-view) [data-cms-type="image"]:focus-visible {
     margin-block-end: 0.5rem;
 }
 
+.cms-sectionbar {
+    flex-wrap: wrap;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
 .cms-sectionbar-state:empty {
     display: none;
 }
 
+.cms-sectionbar-name,
 .cms-sectionbar-state {
-    padding-inline: 0.5rem;
+    padding-inline-start: 0.5rem;
+}
+
+.cms-sectionbar-name::after,
+.cms-sectionbar-state:not(:empty)::after {
+    content: " \00b7";
+    padding-inline-start: 0.5rem;
 }
 
 html:not(.cms-view) [data-cms-item]:hover > .cms-itembar,

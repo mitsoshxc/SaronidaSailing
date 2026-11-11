@@ -1,4 +1,5 @@
 import { el, openDialog } from './dialog.js';
+import { normalize, shorten } from './values.js';
 
 const sortableUrl = '/lib/sortablejs/sortable.core.esm.js';
 const itemSelector = '[data-cms-item]';
@@ -13,6 +14,11 @@ const sameIds = (a, b) => a.length === b.length && a.every((id, index) => id ===
 const focusItem = (item) => {
     const target = item.querySelector('[data-cms-key]') ?? item.querySelector('.cms-itembar button');
     target?.focus();
+};
+
+const itemName = (item, index) => {
+    const text = normalize(item.querySelector('[data-cms-type="text"]')?.textContent ?? '');
+    return text === '' ? `item ${index + 1}` : shorten(text, 40);
 };
 
 const makeButton = (text, label) => {
@@ -43,6 +49,14 @@ export const createLists = ({ pending, inline, fieldBar, toolbar, editMode, conf
             const bar = item.querySelector(':scope > .cms-itembar');
             if (!bar) {
                 return;
+            }
+            const name = itemName(item, index);
+            for (const button of bar.querySelectorAll('[data-cms-itemaction]')) {
+                const base = button.dataset.cmsBaseLabel === 'hide'
+                    ? (isActive(item) ? 'Hide item' : 'Show item')
+                    : button.dataset.cmsBaseLabel;
+                button.setAttribute('aria-label', `${base}: ${name}`);
+                button.title = button.getAttribute('aria-label');
             }
             const setDisabled = (name, disabled) => {
                 const button = bar.querySelector(`[data-cms-itemaction="${name}"]`);
@@ -94,7 +108,6 @@ export const createLists = ({ pending, inline, fieldBar, toolbar, editMode, conf
             item.setAttribute('data-cms-active', 'false');
         }
         button.textContent = active ? 'Hide' : 'Show';
-        button.setAttribute('aria-label', active ? 'Hide item' : 'Show item');
         sync(list);
         toolbar.setStatus(active ? 'Item shown to visitors.' : 'Item hidden from visitors (both languages).');
     };
@@ -133,10 +146,11 @@ export const createLists = ({ pending, inline, fieldBar, toolbar, editMode, conf
 
     const confirmDelete = (list, item, trigger, hideButton) => {
         const saved = list.original.ids.includes(item.dataset.cmsItem);
+        const name = itemName(item, itemsOf(list.key).indexOf(item));
         const bar = item.querySelector(':scope > .cms-itembar');
         bar.classList.add('cms-itembar-held');
         const win = openDialog({
-            title: saved ? 'Delete item?' : 'Remove new item?',
+            title: saved ? `Delete item '${name}'?` : `Remove new item '${name}'?`,
             returnFocus: () => {
                 trigger.focus();
                 bar.classList.remove('cms-itembar-held');
@@ -183,9 +197,13 @@ export const createLists = ({ pending, inline, fieldBar, toolbar, editMode, conf
         const remove = el('button', 'cms-itembar-button', 'Delete');
         remove.type = 'button';
         up.dataset.cmsItemaction = 'up';
+        up.dataset.cmsBaseLabel = 'Move up';
         down.dataset.cmsItemaction = 'down';
+        down.dataset.cmsBaseLabel = 'Move down';
         hide.dataset.cmsItemaction = 'hide';
+        hide.dataset.cmsBaseLabel = 'hide';
         remove.dataset.cmsItemaction = 'delete';
+        remove.dataset.cmsBaseLabel = 'Delete';
 
         up.addEventListener('click', () => move(list, item, -1, up));
         down.addEventListener('click', () => move(list, item, 1, down));
@@ -267,6 +285,13 @@ export const createLists = ({ pending, inline, fieldBar, toolbar, editMode, conf
         }
         refreshBars(list);
     }
+
+    document.addEventListener('cms:fieldchange', (event) => {
+        const item = event.detail.element.closest(itemSelector);
+        if (item && lists.has(item.dataset.cmsList)) {
+            refreshBars(lists.get(item.dataset.cmsList));
+        }
+    });
 
     if (lists.size > 0) {
         import(sortableUrl)

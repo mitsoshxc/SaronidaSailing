@@ -1,6 +1,6 @@
 import { el, openDialog } from './dialog.js';
 import { cleanHtml } from './rich-html.js';
-import { isAllowedUrl } from './values.js';
+import { fieldName, isAllowedUrl } from './values.js';
 
 const toolbarLabels = [
     ['.ql-header', 'Heading'],
@@ -58,7 +58,11 @@ const configure = (Quill, host, html) => {
 };
 
 export const openRichWindow = ({ element, fields, loadQuill, returnFocus }) => {
-    const win = openDialog({ title: 'Edit text', returnFocus });
+    const win = openDialog({
+        title: 'Edit text',
+        subtitle: `${fieldName(element)} · ${fields.fieldOf(element).key}`,
+        returnFocus
+    });
     const error = el('p', 'cms-error');
     error.setAttribute('role', 'alert');
     error.hidden = true;

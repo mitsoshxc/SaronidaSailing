@@ -254,9 +254,24 @@ public sealed class CmsEditorTagHelperTests
     {
         var attributes = new TagHelperAttributeList { { "id", "ig" } };
         var output = NewOutput("section", attributes);
-        await new CmsSectionTagHelper(new FakePageContentAccessor(content), edit) { Key = "home.instagram" }
+        await new CmsSectionTagHelper(new FakePageContentAccessor(content), edit) { Key = "home.instagram", Label = "Instagram" }
             .ProcessAsync(NewContext("section", attributes), output);
         return Render(output);
+    }
+
+    [Fact]
+    public async Task Section_Editor_BlankLabel_Throws()
+    {
+        var attributes = new TagHelperAttributeList();
+        var output = NewOutput("section", attributes);
+        var helper = new CmsSectionTagHelper(new FakePageContentAccessor(Content()), Editor)
+        {
+            Key = "home.instagram",
+            Label = " ",
+        };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => helper.ProcessAsync(NewContext("section", attributes), output));
     }
 
     [Fact]
@@ -265,10 +280,10 @@ public sealed class CmsEditorTagHelperTests
         var inactive = Content(sections: new() { ["home.instagram"] = false });
 
         Assert.Equal(
-            "<section id=\"ig\" data-cms-section=\"home.instagram\" data-cms-active=\"false\"></section>",
+            "<section id=\"ig\" data-cms-section=\"home.instagram\" data-cms-section-label=\"Instagram\" data-cms-active=\"false\"></section>",
             await RenderSection(inactive, Editor));
         Assert.Equal(
-            "<section id=\"ig\" data-cms-section=\"home.instagram\"></section>",
+            "<section id=\"ig\" data-cms-section=\"home.instagram\" data-cms-section-label=\"Instagram\"></section>",
             await RenderSection(Content(), Editor));
     }
 }

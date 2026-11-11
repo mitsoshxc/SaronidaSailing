@@ -1,5 +1,5 @@
 import { confirmDialog, el, openDialog } from './dialog.js';
-import { parseLink } from './values.js';
+import { fieldName, parseLink } from './values.js';
 
 let counter = 0;
 
@@ -93,7 +93,11 @@ const addField = (parent, labelText, input) => {
 };
 
 export const openLinkWindow = ({ element, fields, returnFocus }) => {
-    const win = openDialog({ title: 'Edit link', returnFocus });
+    const win = openDialog({
+        title: 'Edit link',
+        subtitle: `${fieldName(element)} · ${fields.fieldOf(element).key}`,
+        returnFocus
+    });
     const current = fields.valueOf(element);
     const initial = readLinkForm(current);
 

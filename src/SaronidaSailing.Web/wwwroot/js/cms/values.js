@@ -20,4 +20,14 @@ export const parseLink = (value) => {
     return null;
 };
 
+export const fieldName = (element) => {
+    if (element.dataset.cmsName) {
+        return element.dataset.cmsName;
+    }
+    if (element.dataset.cmsType === 'image' && element.dataset.cmsLabel) {
+        return element.dataset.cmsLabel;
+    }
+    return (element.dataset.cmsKey ?? '').split('.').at(-1).replaceAll('-', ' ');
+};
+
 export const shorten = (text, length) => (text.length > length ? `${text.slice(0, length).trimEnd()}…` : text);

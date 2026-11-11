@@ -57,7 +57,7 @@ const elementSubject = (element, fields, config) => {
     fields.track(element);
     const values = fields.imageValues(element);
     return {
-        title: 'Edit image',
+        title: `Edit image: ${element.dataset.cmsLabel}`,
         subtitle: `${element.dataset.cmsKey} · ${config.locale === 'en' ? 'English' : 'Greek'}`,
         current: {
             id: values.id,

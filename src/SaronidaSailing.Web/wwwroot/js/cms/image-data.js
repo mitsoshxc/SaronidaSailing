@@ -62,8 +62,8 @@ export const recordImage = ({ pending, config, imageKey, altKey, listItemId, ori
 export const layoutClassOf = (element) =>
     [...element.classList].filter((name) => name !== 'cms-image-placeholder').join(' ');
 
-export const createPlaceholder = (layoutClass) => {
-    const button = el('button', layoutClass === '' ? 'cms-image-placeholder' : `${layoutClass} cms-image-placeholder`, 'Add image');
+export const createPlaceholder = (layoutClass, label) => {
+    const button = el('button', layoutClass === '' ? 'cms-image-placeholder' : `${layoutClass} cms-image-placeholder`, `Add image: ${label}`);
     button.type = 'button';
     return button;
 };

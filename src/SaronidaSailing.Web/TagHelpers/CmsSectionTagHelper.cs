@@ -11,9 +11,13 @@ public sealed class CmsSectionTagHelper(IPageContentAccessor accessor, ICmsEditC
     [HtmlAttributeName("cms-section")]
     public string? Key { get; set; }
 
+    [HtmlAttributeName("cms-section-label")]
+    public string? Label { get; set; }
+
     public override async Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
     {
         var key = CmsFieldResolver.RequireSectionKey(Key, "cms-section");
+        var label = CmsFieldResolver.RequireLabel(Label, $"Section '{key}'", "cms-section-label");
         var active = (await accessor.GetAsync()).IsSectionActive(key);
 
         if (!await editContext.IsEditorAsync())
@@ -27,6 +31,7 @@ public sealed class CmsSectionTagHelper(IPageContentAccessor accessor, ICmsEditC
         }
 
         output.Attributes.SetAttribute("data-cms-section", key);
+        output.Attributes.SetAttribute("data-cms-section-label", label);
         if (!active)
         {
             output.Attributes.SetAttribute("data-cms-active", "false");

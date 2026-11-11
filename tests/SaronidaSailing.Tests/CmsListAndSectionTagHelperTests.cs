@@ -158,12 +158,13 @@ public sealed class CmsListAndSectionTagHelperTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => RenderList(ListContent(), key));
     }
 
-    private static async Task<string> RenderSection(PageContent content, string key = "home.instagram")
+    private static async Task<string> RenderSection(
+        PageContent content, string key = "home.instagram", string? label = "Instagram")
     {
         var attributes = new TagHelperAttributeList { { "id", "ig" } };
         var output = NewOutput("section", attributes);
 
-        await new CmsSectionTagHelper(new FakePageContentAccessor(content), Visitor) { Key = key }
+        await new CmsSectionTagHelper(new FakePageContentAccessor(content), Visitor) { Key = key, Label = label }
             .ProcessAsync(NewContext("section", attributes), output);
 
         return Render(output);
@@ -194,6 +195,15 @@ public sealed class CmsListAndSectionTagHelperTests
     public async Task Section_InvalidKey_Throws(string key)
     {
         await Assert.ThrowsAsync<InvalidOperationException>(() => RenderSection(Content(), key));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("  ")]
+    public async Task Section_MissingOrBlankLabel_Throws(string? label)
+    {
+        await Assert.ThrowsAsync<InvalidOperationException>(() => RenderSection(Content(), "home.instagram", label));
     }
 
     private static async Task<string> RenderSectionLink(

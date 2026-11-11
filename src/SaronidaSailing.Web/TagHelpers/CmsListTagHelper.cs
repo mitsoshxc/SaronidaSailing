@@ -17,7 +17,7 @@ public sealed class CmsListTagHelper(IPageContentAccessor accessor, ICmsEditCont
     public override async Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
     {
         var key = CmsFieldResolver.RequireListKey(Key, "cms-list");
-        var addLabel = CmsFieldResolver.RequireAddLabel(AddLabel, key, "cms-add-label");
+        var addLabel = CmsFieldResolver.RequireLabel(AddLabel, $"List '{key}'", "cms-add-label");
         if (CmsFieldResolver.IsInsideList(context))
         {
             throw new InvalidOperationException($"'cms-list' cannot be nested (list '{key}').");

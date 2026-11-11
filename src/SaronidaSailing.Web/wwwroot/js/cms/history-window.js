@@ -1,7 +1,7 @@
 import { el, openDialog } from './dialog.js';
 import { imagePreview, loadAsset } from './image-data.js';
 import { htmlToText } from './rich-html.js';
-import { parseLink, shorten } from './values.js';
+import { fieldName, parseLink, shorten } from './values.js';
 
 const dateFormat = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
 
@@ -53,7 +53,7 @@ export const openHistoryWindow = ({ element, fields, pending, config, setStatus,
     const present = fields.valueOf(element);
     const win = openDialog({
         title: 'History',
-        subtitle: `${shorten(describeValue(field.type, present), 60)} (${language})`,
+        subtitle: `${fieldName(element)} · ${field.key} · ${shorten(describeValue(field.type, present), 60)} (${language})`,
         returnFocus: () => returnFocus(current)
     });
 

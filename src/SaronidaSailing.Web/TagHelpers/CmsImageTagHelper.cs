@@ -24,6 +24,9 @@ public sealed partial class CmsImageTagHelper(
     [HtmlAttributeName("field")]
     public string? ItemField { get; set; }
 
+    [HtmlAttributeName("label")]
+    public string? Label { get; set; }
+
     [HtmlAttributeName("sizes")]
     public string? Sizes { get; set; }
 
@@ -45,6 +48,7 @@ public sealed partial class CmsImageTagHelper(
             throw new InvalidOperationException($"'loading' must be 'lazy' or 'eager', not '{Loading}'.");
         }
 
+        var label = CmsFieldResolver.RequireLabel(Label, "'cms-image'", "label");
         var field = await CmsFieldResolver.ReadAsync(context, accessor, Key, ItemField, "key", "field");
         var alt = await CmsFieldResolver.ReadAsync(
             context,
@@ -97,7 +101,7 @@ public sealed partial class CmsImageTagHelper(
             attributes.SetAttribute("type", "button");
             attributes.SetAttribute(
                 "class", string.IsNullOrWhiteSpace(layoutClass) ? PlaceholderClass : $"{layoutClass} {PlaceholderClass}");
-            output.Content.SetContent("Add image");
+            output.Content.SetContent($"Add image: {label}");
         }
         else
         {
@@ -121,6 +125,7 @@ public sealed partial class CmsImageTagHelper(
 
         attributes.SetAttribute("data-cms-key", field.Key);
         attributes.SetAttribute("data-cms-type", "image");
+        attributes.SetAttribute("data-cms-label", label);
         attributes.SetAttribute("data-cms-value", image is null ? string.Empty : image.Id.ToString());
         attributes.SetAttribute("data-cms-alt-key", alt.Key);
         attributes.SetAttribute("data-cms-alt", inLocale);

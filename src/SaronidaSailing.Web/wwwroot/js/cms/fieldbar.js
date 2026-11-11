@@ -1,4 +1,5 @@
 import { isDialogOpen } from './dialog.js';
+import { fieldName } from './values.js';
 
 const fieldSelector = '[data-cms-key]';
 const windowTypes = ['richText', 'link', 'image'];
@@ -104,6 +105,7 @@ export const createFieldBar = ({ editMode, windows }) => {
             button.className = 'cms-fieldbar-button';
             button.dataset.cmsFieldaction = name;
             button.textContent = actions[name].label;
+            button.setAttribute('aria-label', `${actions[name].label}: ${fieldName(element)}`);
             button.addEventListener('click', () => openAction(name, element, button));
             bar.append(button);
         }

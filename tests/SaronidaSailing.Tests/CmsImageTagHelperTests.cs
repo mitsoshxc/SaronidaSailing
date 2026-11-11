@@ -53,6 +53,7 @@ public sealed class CmsImageTagHelperTests
             new FakePageContentAccessor(content), edit, logger ?? new ListLogger<CmsImageTagHelper>())
         {
             Key = "home.hero.image",
+            Label = "Hero photo",
             Sizes = "100vw",
         };
         configure?.Invoke(helper);
@@ -204,7 +205,7 @@ public sealed class CmsImageTagHelperTests
         Assert.Equal(
             $"<img class=\"hero\" src=\"/media/photo-960.webp\" srcset=\"{Srcset}\" sizes=\"100vw\""
             + " width=\"3000\" height=\"2000\" alt=\"A boat\" loading=\"lazy\" decoding=\"async\""
-            + " data-cms-key=\"home.hero.image\" data-cms-type=\"image\""
+            + " data-cms-key=\"home.hero.image\" data-cms-type=\"image\" data-cms-label=\"Hero photo\""
             + $" data-cms-value=\"{Id}\" data-cms-alt-key=\"home.hero.image-alt\" data-cms-alt=\"A boat\""
             + " data-cms-alt-el=\"A boat\" data-cms-sizes=\"100vw\" data-cms-loading=\"lazy\" data-cms-alt-proposal=\"Sail with us\">",
             html);
@@ -308,9 +309,28 @@ public sealed class CmsImageTagHelperTests
 
         Assert.Equal(
             "<button type=\"button\" class=\"hero cms-image-placeholder\" data-cms-key=\"home.hero.image\""
-            + " data-cms-type=\"image\" data-cms-value=\"\" data-cms-alt-key=\"home.hero.image-alt\""
-            + " data-cms-alt=\"\" data-cms-alt-el=\"\" data-cms-sizes=\"100vw\" data-cms-loading=\"lazy\" data-cms-alt-proposal=\"T\" data-cms-empty>Add image</button>",
+            + " data-cms-type=\"image\" data-cms-label=\"Hero photo\" data-cms-value=\"\" data-cms-alt-key=\"home.hero.image-alt\""
+            + " data-cms-alt=\"\" data-cms-alt-el=\"\" data-cms-sizes=\"100vw\" data-cms-loading=\"lazy\" data-cms-alt-proposal=\"T\" data-cms-empty>Add image: Hero photo</button>",
             html);
+    }
+
+    [Fact]
+    public async Task Visitor_NeverEmitsLabel()
+    {
+        var html = await Run(Standalone(), Visitor);
+
+        Assert.DoesNotContain("label", html);
+        Assert.DoesNotContain("Hero photo", html);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task MissingOrBlankLabel_Throws_ForVisitorAndEditor(string? label)
+    {
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Run(Standalone(), Visitor, h => h.Label = label));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Run(Content(), Editor, h => h.Label = label));
     }
 
     [Fact]
@@ -321,6 +341,7 @@ public sealed class CmsImageTagHelperTests
             new FakePageContentAccessor(Content()), Editor, new ListLogger<CmsImageTagHelper>())
         {
             Key = "home.hero.image",
+            Label = "Hero photo",
             Sizes = "100vw",
         };
         var output = NewOutput("cms-image", attributes);
@@ -371,6 +392,7 @@ public sealed class CmsImageTagHelperTests
             var helper = new CmsImageTagHelper(accessor, edit, new ListLogger<CmsImageTagHelper>())
             {
                 ItemField = "image",
+                Label = "Card photo",
                 Sizes = "33vw",
                 AltSource = "title",
             };
@@ -540,7 +562,7 @@ public sealed class CmsImageWebHostTests(TempDatabaseWebApplicationFactory facto
 
         var html = await admin.GetStringAsync("/en/dev/cms-sandbox");
 
-        Assert.Contains($"data-cms-key=\"shared.sandbox.image\" data-cms-type=\"image\" data-cms-value=\"{asset}\"", html);
+        Assert.Contains($"data-cms-key=\"shared.sandbox.image\" data-cms-type=\"image\" data-cms-label=\"Sandbox photo\" data-cms-value=\"{asset}\"", html);
         Assert.Contains("data-cms-alt-key=\"shared.sandbox.image-alt\" data-cms-alt=\"\" data-cms-alt-el=\"Alt EL\" data-cms-sizes=\"(min-width: 960px) 50vw, 100vw\" data-cms-loading=\"lazy\" data-cms-fallback", html);
         Assert.Contains("data-cms-alt-proposal=\"Τίτλος\"", html);
         Assert.Contains("class=\"cms-image-placeholder\" data-cms-key=\"shared.sandbox-items.image\"", html);

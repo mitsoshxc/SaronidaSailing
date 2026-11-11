@@ -155,7 +155,7 @@ export const createFields = ({ pending, config }) => {
             if (id === (element.dataset.cmsValue ?? '')) {
                 target = element;
             } else if (id === '') {
-                target = createPlaceholder(layoutClassOf(element));
+                target = createPlaceholder(layoutClassOf(element), element.dataset.cmsLabel ?? '');
             } else {
                 target = createImageElement({
                     layoutClass: layoutClassOf(element),

@@ -238,8 +238,8 @@ public class CmsAdminRenderingTests(TempDatabaseWebApplicationFactory factory)
 
         var html = await admin.GetStringAsync("/dev/cms-sandbox");
 
-        Assert.Contains("data-cms-section=\"shared.sandbox\"", html);
-        Assert.Contains("data-cms-section=\"shared.sandbox-list\" data-cms-active=\"false\"", html);
+        Assert.Contains("data-cms-section=\"shared.sandbox\" data-cms-section-label=\"Intro\"", html);
+        Assert.Contains("data-cms-section=\"shared.sandbox-list\" data-cms-section-label=\"Lists\" data-cms-active=\"false\"", html);
         Assert.Contains("data-cms-key=\"shared.sandbox.body\" data-cms-type=\"richText\" data-cms-empty", html);
         Assert.Contains("data-cms-key=\"shared.sandbox.cta\" data-cms-type=\"link\" data-cms-empty", html);
         Assert.Contains($"data-cms-item=\"{item}\" data-cms-active=\"false\"", html);
