@@ -16,6 +16,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="SaronidaSailing.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\SaronidaSailing.Core\SaronidaSailing.Core.csproj" />
   </ItemGroup>
 

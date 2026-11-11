@@ -422,6 +422,44 @@ public sealed class MediaServiceTests(ITestOutputHelper output) : IAsyncLifetime
     private AppDbContext NewContext() =>
         new(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(_connectionString).Options, TimeProvider.System);
 
+    [Fact]
+    public async Task WriteAtomic_FinalFileAlreadyExists_SkipsWriteAndLeavesItUntouched()
+    {
+        var finalPath = Path.Combine(Root, "a.webp");
+        await File.WriteAllBytesAsync(finalPath, [1, 2, 3]);
+
+        await MediaService.WriteAtomicAsync(Root, "a.webp", new byte[] { 9, 9 }, CancellationToken.None);
+
+        Assert.Equal(new byte[] { 1, 2, 3 }, await File.ReadAllBytesAsync(finalPath));
+        AssertNoTempFiles();
+        Assert.Single(Directory.GetFiles(Root));
+    }
+
+    [Fact]
+    public async Task WriteAtomic_LosingMove_TreatsAnotherWritersFileAsSuccess()
+    {
+        var finalPath = Path.Combine(Root, "b.webp");
+
+        await MediaService.WriteAtomicAsync(Root, "b.webp", new byte[] { 9, 9 }, CancellationToken.None, (_, final) =>
+        {
+            File.WriteAllBytes(final, [1, 2, 3]);
+            throw new UnauthorizedAccessException();
+        });
+
+        Assert.Equal(new byte[] { 1, 2, 3 }, await File.ReadAllBytesAsync(finalPath));
+        AssertNoTempFiles();
+    }
+
+    [Fact]
+    public async Task WriteAtomic_MoveFailsWithoutFinalFile_Rethrows_AndLeavesNoTemp()
+    {
+        await Assert.ThrowsAsync<IOException>(() => MediaService.WriteAtomicAsync(
+            Root, "c.webp", new byte[] { 9 }, CancellationToken.None, (_, _) => throw new IOException()));
+
+        AssertNoTempFiles();
+        Assert.Empty(Directory.GetFiles(Root));
+    }
+
     private async Task<int> CountRowsAsync()
     {
         await using var context = NewContext();

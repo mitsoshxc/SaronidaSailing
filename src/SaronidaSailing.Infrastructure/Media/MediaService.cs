@@ -92,14 +92,24 @@ public sealed class MediaService(
         await WriteAtomicAsync(options.Value.OriginalsPath, MediaFileNames.OriginalFileName(hash, image.OriginalExtension), original, ct);
     }
 
-    private static async Task WriteAtomicAsync(string folder, string fileName, ReadOnlyMemory<byte> bytes, CancellationToken ct)
+    internal static async Task WriteAtomicAsync(
+        string folder, string fileName, ReadOnlyMemory<byte> bytes, CancellationToken ct, Action<string, string>? move = null)
     {
         var finalPath = Path.Combine(folder, fileName);
+        if (File.Exists(finalPath))
+        {
+            return;
+        }
+
         var tempPath = Path.Combine(folder, $"{fileName}.{Guid.NewGuid():N}.tmp");
         try
         {
             await File.WriteAllBytesAsync(tempPath, bytes, ct);
-            File.Move(tempPath, finalPath, overwrite: true);
+            (move ?? MoveReplacing)(tempPath, finalPath);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException && File.Exists(finalPath))
+        {
+            File.Delete(tempPath);
         }
         catch
         {
@@ -107,6 +117,8 @@ public sealed class MediaService(
             throw;
         }
     }
+
+    private static void MoveReplacing(string tempPath, string finalPath) => File.Move(tempPath, finalPath, overwrite: true);
 
     private static async Task<ReadOnlyMemory<byte>?> ReadLimitedAsync(Stream content, CancellationToken ct)
     {
