@@ -48,7 +48,7 @@ Agreed design (Phase 8); the media, logs and keys folders are mounted into every
 | `/var/saronida/pgdata/` | PostgreSQL data (mounted into the PostgreSQL pod only) |
 | `/var/saronida/backup/` | Nightly `pg_dump` files (last 7 kept on the droplet) |
 | `/var/saronida/media/` | Generated images (mounted into the pods; served directly by nginx) |
-| `/var/saronida/data/originals/` | Original uploads (private, never served; used to regenerate sizes) |
+| `/var/saronida/data/originals/` | Original uploads (private, never served; used to regenerate sizes; mounted into the pods, writable for UID 1654, and **not** inside `/var/saronida/media`) |
 | `/var/saronida/data/keys/` | ASP.NET Core Data Protection keys (keep admins logged in across deploys and valid on every pod) |
 | `/var/saronida/logs/` | NLog files shared by all pods (`app-*`, `audit-*` 90 days, `metrics-*` 30 days) and `k8s-events-*` written by the event recorder |
 | `/var/saronida/maintenance.on` | Marker file: while it exists, nginx answers 503 |
@@ -56,7 +56,7 @@ Agreed design (Phase 8); the media, logs and keys folders are mounted into every
 | `/usr/local/bin/saronida-admin` | Wrapper for the admin CLI commands (`kubectl exec` into an app pod) |
 | `/etc/nginx/sites-available/saronida` | Site config (from `deploy/nginx/`) |
 
-The .NET container images run as the non-root `app` user (UID 1654) and listen on port 8080. The host folders the app writes (`/var/saronida/data/keys`, `/var/saronida/media`, `/var/saronida/logs`) **must be writable for UID 1654** (e.g. `chown -R 1654:1654`): the app writes the Data Protection keys to `data/keys` and the NLog files to `logs`.
+The .NET container images run as the non-root `app` user (UID 1654) and listen on port 8080. The host folders the app writes (`/var/saronida/data/keys`, `/var/saronida/data/originals`, `/var/saronida/media`, `/var/saronida/logs`) **must be writable for UID 1654** (e.g. `chown -R 1654:1654`): the app writes the Data Protection keys to `data/keys`, the NLog files to `logs`, and uploaded images to `media` (generated WebP files) and `data/originals` (the uploaded file). The originals folder must stay outside the media folder, because nginx serves everything under `/var/saronida/media/`; the app refuses to start if `Media:OriginalsPath` is inside `Media:RootPath`.
 
 ## Dockerfile
 
@@ -74,6 +74,8 @@ Implemented (`Dockerfile`, `.dockerignore` at the repo root).
 
 The same image runs the web app and the one-off commands: `dotnet SaronidaSailing.Web.dll migrate` (the migrate Job) and `dotnet SaronidaSailing.Web.dll admin <command>`.
 
+**SkiaSharp on Linux.** Image processing uses SkiaSharp with the `SkiaSharp.NativeAssets.Linux.NoDependencies` package, so nothing is installed in the image. `dotnet publish` is not RID-specific; the native library is in the output under `runtimes/linux-x64/native/` and is found at run time. It has only run on Windows so far (tests, development): **the first Linux run is the Phase 8 preview**, where a first upload (plus the real-iPhone HEIC test) must be checked. `/health` does not exercise SkiaSharp, so only an upload proves it works.
+
 ## Configuration
 
 Defaults are in `src/SaronidaSailing.Web/appsettings.json`; environment variables (set in the pod spec) override them.
@@ -82,7 +84,9 @@ Defaults are in `src/SaronidaSailing.Web/appsettings.json`; environment variable
 |---|---|---|
 | `ConnectionStrings:Content` | `Host=postgres;Port=5432;Database=saronida;Username=saronida` | Npgsql connection string, **without a password**: the deployment supplies the password from the Kubernetes Secret (Phase 8). `postgres` is the in-cluster host name the file assumes. One string serves EF Core, Hangfire storage (schema `hangfire`) and the cache-eviction bus/listener. `ConnectionStrings:Hangfire` no longer exists |
 | `Database:MigrateAtStartup` | `false` | `true` only in `appsettings.Development.json`. With `false` a pod never migrates: startup fails when migrations are pending and names the `migrate` command. The `migrate` command applies the EF migrations and installs the Hangfire schema |
-| `Media:RootPath` | `/var/saronida/media` | Must exist and be writable; outside Development it is **not** created by the app, and `/health` fails if it is missing |
+| `Media:RootPath` | `/var/saronida/media` | Generated images. Must exist and be writable; outside Development it is **not** created by the app, and `/health` fails if it is missing |
+| `Media:OriginalsPath` | `/var/saronida/data/originals` | Private originals of uploads, never served. Same rules as `Media:RootPath` (must exist and be writable for UID 1654, not created outside Development, `/health` fails when missing or unwritable), and it must **not** be inside `Media:RootPath` (startup fails) |
+| `Media:ProcessingWaitSeconds` | not set (default 30) | How long an upload waits for the pod's one processing slot before the admin gets "busy" (503). Must not be negative |
 | `Health:HomePageUrl` | `http://127.0.0.1:8080/` | URL the `home-page` health check requests from inside the container |
 | `Logs:Path` | `/var/saronida/logs` | NLog folder (`audit-*`, `app-*`, `metrics-*`); must be writable for UID 1654; startup fails if the key is missing |
 | `Logs:Instance` | not set | Name written as the 2nd field of every log line. Defaults to the machine name, which in Kubernetes is the pod name. An empty value or one containing `\|` or control characters fails startup. As an environment variable: `Logs__Instance` |
@@ -90,7 +94,7 @@ Defaults are in `src/SaronidaSailing.Web/appsettings.json`; environment variable
 | `DataProtection:KeysPath` | `/var/saronida/data/keys` | Data Protection keys (unencrypted at rest); created if missing, must be writable for UID 1654; startup fails if the key is missing |
 | `ForwardedHeaders:KnownNetworks` | `["172.30.0.0/24"]` in `appsettings.json` | CIDR networks allowed to set `X-Forwarded-For` / `X-Forwarded-Proto`; an invalid value fails startup. As an environment variable: `ForwardedHeaders__KnownNetworks__0`. The value in the file is the old Docker Compose subnet; Phase 8 sets it to the k3s network (see below) |
 
-A missing `ConnectionStrings:Content`, `Media:RootPath`, `Logs:Path` or `DataProtection:KeysPath` fails startup.
+A missing `ConnectionStrings:Content`, `Media:RootPath`, `Media:OriginalsPath`, `Logs:Path` or `DataProtection:KeysPath` fails startup.
 
 **Cluster network.** Host nginx reaches the app through the Service NodePort, so the app sees requests coming from the cluster network, not from `127.0.0.1`. `ForwardedHeaders:KnownNetworks` must name exactly the network those requests arrive from; Phase 8 finds it and sets it. If it is wrong, the app ignores the client IP and every login rate-limit bucket becomes one address.
 
@@ -114,7 +118,7 @@ A missing `ConnectionStrings:Content`, `Media:RootPath`, `Logs:Path` or `DataPro
 - `location /media/` → `alias /var/saronida/media/;` with `Cache-Control: public, max-age=31536000, immutable`.
 - Everything else → `proxy_pass` to the app Service's NodePort on the host, with `X-Forwarded-For` / `X-Forwarded-Proto`.
 - Real client IP: `real_ip_header CF-Connecting-IP;` plus `set_real_ip_from` for each Cloudflare IP range (published at cloudflare.com/ips; update when they change).
-- `client_max_body_size` set for image uploads.
+- `client_max_body_size` set for image uploads: the admin upload `POST /admin/api/media` takes files up to 25 MB, and the app counts the whole multipart body (limit 25 MB + 64 KB), so nginx must allow at least **26 MB** on that path (nginx's default of 1 MB would turn every photo into a 413 before the app sees it). Cloudflare Free allows 100 MB, so it is not the limit. The rest of the site can keep a small limit (the content save API caps its body at 256 KB itself).
 - `location /health` → `deny all;` from the internet (only reachable on the droplet itself).
 - nginx access and error logs are kept **30 days** (logrotate).
 

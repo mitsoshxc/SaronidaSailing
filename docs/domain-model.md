@@ -1,8 +1,8 @@
 # Domain Model
 
-Status: **`BaseEntity`, `ApplicationUser` and the four content entities (`ContentItem`, `ContentListItem`, `ContentSection`, `ContentHistory`) are implemented on PostgreSQL, all in the single migration `InitialCreate`. `MediaAsset`, `InstagramPost` and `IntegrationSetting` are planned, not yet implemented.**
+Status: **`BaseEntity`, `ApplicationUser`, the four content entities (`ContentItem`, `ContentListItem`, `ContentSection`, `ContentHistory`) and `MediaAsset` are implemented on PostgreSQL: the first five in the migration `InitialCreate`, `MediaAsset` in `AddMediaAssets`. `InstagramPost` and `IntegrationSetting` are planned, not yet implemented.**
 
-Storage: PostgreSQL through the Npgsql EF Core provider. `Guid` columns are `uuid`; every `DateTime` (`CreatedAt`, `UpdatedAt`) is `timestamp with time zone` and read back as UTC (`docs/conventions.md` → EF Core and PostgreSQL). Table names are the ones below (`ContentItems`, `ContentListItems`, `ContentSections`, `ContentHistory`, plus the Identity `AspNet*` tables) in the default `public` schema. Hangfire's tables are not EF entities: they live in the separate schema `hangfire` of the same database, created by the `migrate` command (`docs/architecture.md` → Background Jobs).
+Storage: PostgreSQL through the Npgsql EF Core provider. `Guid` columns are `uuid`; every `DateTime` (`CreatedAt`, `UpdatedAt`) is `timestamp with time zone` and read back as UTC (`docs/conventions.md` → EF Core and PostgreSQL). Table names are the ones below (`ContentItems`, `ContentListItems`, `ContentSections`, `ContentHistory`, `MediaAssets`, plus the Identity `AspNet*` tables) in the default `public` schema. Hangfire's tables are not EF entities: they live in the separate schema `hangfire` of the same database, created by the `migrate` command (`docs/architecture.md` → Background Jobs).
 
 ## Content Keys
 
@@ -11,10 +11,11 @@ Every editable spot has a key: `{page}.{section}.{field}` — lowercase, kebab-c
 | Example | Meaning |
 |---|---|
 | `home.hero.title` | Home page, hero section, title text |
-| `home.hero.image` | Home page, hero section, image |
+| `home.hero.image` | Home page, hero section, image (value: a `MediaAsset` id, Greek only) |
+| `home.hero.image-alt` | The image's alt text (`Text`, localized; the Greek one is required while an image is set) |
 | `shared.footer.phone-1` | Footer (on every page), first phone |
 | `home.highlights` | A list (no field segment) |
-| `home.seo.title` / `home.seo.description` / `home.seo.image` | Page SEO fields (section key `seo` is reserved) |
+| `home.seo.title` / `home.seo.description` / `home.seo.image` / `home.seo.image-alt` | Page SEO fields (section key `seo` is reserved); the image and its alt text feed the Open Graph tags |
 
 Page key `shared` is reserved for content on every page (header, footer). Writing to it evicts the cache of all pages.
 
@@ -36,7 +37,7 @@ Implemented (`Core/Entities/ContentItem.cs`, table `ContentItems`). The current 
 | `Locale` | string (max 5) | `el`, `en` |
 | `ListItemId` | Guid? | FK → `ContentListItem`; null for standalone fields |
 | `Type` | `ContentType` enum | `Text`, `RichText`, `Link`, `Image` (`Core/Entities/ContentType.cs`); stored as a string (max 20) |
-| `Value` | string | Plain text, sanitized HTML, link JSON (`url`, `label`), or `MediaAsset.Id` |
+| `Value` | string | Plain text, sanitized HTML, link JSON (`url`, `label`), or `MediaAsset.Id` (as text; `Image` values exist for locale `el` only, see MediaAsset) |
 | `UpdatedBy` | string (max 256) | The editing admin's **email**, plain text, no FK to `ApplicationUser` — history survives `admin remove` and continues if the same email is re-added |
 
 PostgreSQL treats NULLs as distinct in unique indexes, so uniqueness is two filtered (partial) unique indexes (`Infrastructure/Data/Configurations/ContentItemConfiguration.cs`):
@@ -49,7 +50,7 @@ PostgreSQL treats NULLs as distinct in unique indexes, so uniqueness is two filt
 
 A list item's fields carry the list's `PageKey` and its `ListKey` as `SectionKey`. `ContentPersistenceTests` proves both indexes on PostgreSQL.
 
-`Value` is sanitized and validated by `ContentService.ApplyChangesAsync` before it is stored: `RichText` goes through `IRichTextSanitizer`, `Link` JSON must pass `ContentLink.TryParse` (see `docs/architecture.md` → CMS Editing Flow). Link JSON is read and checked by `Core/Services/ContentLink.cs` (`https:`, `tel:`, `mailto:` only).
+`Value` is sanitized and validated by `ContentService.ApplyChangesAsync` before it is stored: `RichText` goes through `IRichTextSanitizer`, `Link` JSON must pass `ContentLink.TryParse` (see `docs/architecture.md` → CMS Editing Flow). Link JSON is read and checked by `Core/Services/ContentLink.cs` (`https:`, `tel:`, `mailto:` only). `Image` values are checked in `ContentBatch` (Greek only, an existing media id, a Greek alt text present).
 
 ### ContentListItem
 
@@ -93,18 +94,28 @@ A field gets **one history row per field per save**: a batch with two `SetField`
 
 ### MediaAsset
 
-Planned. One uploaded image and its generated files.
+Implemented (`Core/Entities/MediaAsset.cs`, table `MediaAssets`, migration `AddMediaAssets`). One uploaded image and the set of files generated from it. Created with `MediaAsset.Create(...)` by `MediaService` (`docs/architecture.md` → Media Pipeline); every property is `init`.
 
 | Field | Type | Notes |
 |---|---|---|
-| `OriginalFileName` | string | |
-| `ContentHash` | string | Part of the generated file names |
-| `Slug` | string | Part of the generated file names |
-| `Widths` | string | Generated widths, e.g. `480,960,1600` |
-| `Width` / `Height` | int | Dimensions after orientation fix |
-| `OriginalPath` | string | Private original under `/var/saronida/data/originals/` |
+| `OriginalFileName` | string (max 255) | The uploaded file's name as given (cut to 255); display only, never part of a path |
+| `ContentHash` | string (max 64) | SHA-256 of the uploaded bytes, lowercase hex. The first 16 characters are part of the public file names; the whole hash names the private original. **Unique** |
+| `Slug` | string (max 50) | From the original file name (`Slugs.FromFileName`); part of the public file names |
+| `Widths` | string (max 50) | Generated widths, ascending, comma-separated, e.g. `480,960,1600` (`GetWidths()` parses it). Never wider than the image; an image narrower than 480 has one entry, its own width |
+| `Width` / `Height` | int | Dimensions after the orientation fix |
+| `OriginalFileExtension` | string (max 10) | `.jpg`, `.png` or `.webp`, chosen from the decoded format. Together with `ContentHash` it names the private original (`MediaFileNames.OriginalFileName`); the table stores **no path**, the folder comes from `Media:OriginalsPath` |
 
-Alt text is a separate `Text` content field (e.g. `home.hero.image-alt`), so it is localized.
+| Index | Columns |
+|---|---|
+| `UX_MediaAssets_ContentHash` (unique) | `ContentHash`. Makes an upload of the same bytes reuse the row; the loser of a concurrent insert gets PostgreSQL error `23505` for this constraint and returns the winner's row |
+
+Files on disk (names built by `Core/Services/MediaFileNames.cs`): `{Slug}-{ContentHash[..16]}-{width}.webp` under `Media:RootPath` for each width, and `{ContentHash}{OriginalFileExtension}` under `Media:OriginalsPath`. A `MediaAsset` is never deleted at launch, so a content value or history row never points at a missing row.
+
+**How content refers to an asset.** An `Image` content value (`ContentItem.Value`, type `Image`) is the `MediaAsset.Id` as text. It exists **in Greek only** (`el`); English shows the Greek value (the save is rejected for `en`). There is no foreign key (content values are strings); the save checks that the id exists (`docs/architecture.md` → Media Pipeline → Image values and save checks), and a template or page read that meets a missing id logs a warning and renders no image.
+
+**Alt text** is a separate localized `Text` content field whose key is the image's key plus `-alt` (`home.hero.image` → `home.hero.image-alt`; a list item field `image` → `image-alt`; `home.seo.image` → `home.seo.image-alt`). The Greek alt is required whenever an image is set; the English alt is optional and falls back to Greek like any other field. History keeps image values and alt texts like every other field.
+
+**`PageImage`** (`Core/Interfaces/PageImage.cs`) is the read model: id, width, height and the file list `[{Width, Url}]` (`PageImageSource`), built from a `MediaAsset` by `ContentService.LoadImagesAsync` for the images a page's content refers to; `HeightAt(width)` gives a file's height. `ContentValue.DefaultLocaleValue` (`Core/Interfaces/PageContent.cs`) carries the Greek value next to the value shown in English, so the admin can see the Greek alt text on an English page.
 
 ### InstagramPost
 

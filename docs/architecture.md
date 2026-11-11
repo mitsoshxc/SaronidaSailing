@@ -1,6 +1,6 @@
 # Architecture
 
-Status: **Phases 0-4.5 are implemented (decisions, foundation, admin authentication, CMS core, inline editing, PostgreSQL and two-pod readiness: cross-pod cache eviction, shared logs, runtime diagnostics); everything else (media, Instagram, jobs, public pages, k3s deploy) is agreed design, not yet built.** Update as phases land.
+Status: **Phases 0-5 are implemented (decisions, foundation, admin authentication, CMS core, inline editing, PostgreSQL and two-pod readiness: cross-pod cache eviction, shared logs, runtime diagnostics; media: upload pipeline, library, `<cms-image>`, image window), except the real-iPhone HEIC upload test, which stays open until the Phase 8 preview (it needs HTTPS). Everything else (Instagram, jobs, public pages, k3s deploy) is agreed design, not yet built.** Update as phases land.
 
 ## Tech Stack
 
@@ -13,7 +13,7 @@ Status: **Phases 0-4.5 are implemented (decisions, foundation, admin authenticat
 | Logging | NLog to files (`NLog.Targets.AtomicFile`), 90-day retention | Audit log (logins, admin actions), app log and metrics log, shared by all pods, the pod name on every line |
 | Caching | ASP.NET Core Output Caching (in-memory, per app process); evictions broadcast between pods with Postgres `LISTEN/NOTIFY` | Visitors are served rendered pages from memory; DB is hit only after a cache miss |
 | Background jobs | Hangfire with `Hangfire.PostgreSql` storage, schema `hangfire` in the content database | Recurring jobs: Instagram fetch, token refresh. Every pod runs a server; Hangfire's distributed locks keep recurring jobs single |
-| Image processing | SkiaSharp (MIT) | Resize, fix orientation, strip metadata, encode WebP |
+| Image processing | SkiaSharp 4.155.0 (MIT) | Resize, fix orientation, strip metadata, encode WebP. Linux native library from `SkiaSharp.NativeAssets.Linux.NoDependencies` |
 | Media | Files on the droplet disk, served by nginx, cached by Cloudflare | Zero extra cost |
 | Analytics | Cloudflare Web Analytics | Free, cookieless — needs no consent category |
 | Hosting | DigitalOcean Basic droplet (FRA1), k3s single node (agreed design, Phase 8) | One app pod at launch, built to run two. See `docs/deployment.md` |
@@ -49,9 +49,9 @@ SaronidaSailing.slnx
 global.json, Directory.Build.props, Directory.Packages.props, nuget.config
 .config/dotnet-tools.json          dotnet-ef local tool
 src/
-  SaronidaSailing.Core/            Entities/ (BaseEntity, ApplicationUser, Content*), Interfaces/ (repositories, IContentService, IRichTextSanitizer, IUnitOfWork, IPageCacheInvalidator, ICacheTagEvictor, ICacheEvictionBus, PageContent), Services/ (ContentService, ContentBatch, ContentKeys, ContentLocales, ContentLink); no EF, no ASP.NET
-  SaronidaSailing.Infrastructure/  Data/ (AppDbContext, DatabaseInitializer, DatabaseSettings, UnitOfWork, Configurations/, Migrations), Caching/ (PostgresCacheEvictionBus, PostgresCacheEvictionListener, CacheEvictionChannel), Repositories/, Content/ (RichTextSanitizer), Health/, Logging/ (AuditLog), Media/, DependencyInjection.cs
-  SaronidaSailing.Web/             Program.cs, SiteOptions.cs, LogInstance.cs, Caching/ (CacheTags, OutputCachePageInvalidator, OutputCacheTagEvictor), Diagnostics/ (lifecycle, crash, metrics, request and health logging), Content/ (PageContentAccessor, CmsEditContext, CmsEditorConfig), Endpoints/ (ContentEndpoints, ContentApiModels), TagHelpers/, Cli/ (admin and migrate commands), Identity/, Localization/, Health/, Pages/ (Pages/Admin/, Pages/Dev/), wwwroot (css/, js/cms/, lib/quill/, lib/sortablejs/), appsettings*.json
+  SaronidaSailing.Core/            Entities/ (BaseEntity, ApplicationUser, Content*, MediaAsset), Interfaces/ (repositories, IContentService, IMediaService, MediaImportResult, IRichTextSanitizer, IUnitOfWork, IPageCacheInvalidator, ICacheTagEvictor, ICacheEvictionBus, PageContent, PageImage), Services/ (ContentService, ContentBatch, ContentKeys, ContentLocales, ContentLink, MediaFileNames, MediaLimits, MediaDimensions, Slugs); no EF, no ASP.NET
+  SaronidaSailing.Infrastructure/  Data/ (AppDbContext, DatabaseInitializer, DatabaseSettings, UnitOfWork, Configurations/, Migrations), Caching/ (PostgresCacheEvictionBus, PostgresCacheEvictionListener, CacheEvictionChannel), Repositories/, Content/ (RichTextSanitizer), Health/, Logging/ (AuditLog), Media/ (MediaService, ImageProcessor, MediaProcessingGate, MediaOptions, MediaFolder), DependencyInjection.cs
+  SaronidaSailing.Web/             Program.cs, SiteOptions.cs, LogInstance.cs, DevelopmentMediaFiles.cs, Caching/ (CacheTags, OutputCachePageInvalidator, OutputCacheTagEvictor), Diagnostics/ (lifecycle, crash, metrics, request and health logging), Content/ (PageContentAccessor, CmsEditContext, CmsEditorConfig), Endpoints/ (ContentEndpoints, ContentApiModels, MediaEndpoints, MediaApiModels), TagHelpers/, Cli/ (admin and migrate commands), Identity/, Localization/, Health/, Pages/ (Pages/Admin/, Pages/Dev/), wwwroot (css/, js/cms/, lib/quill/, lib/sortablejs/), appsettings*.json
 tests/
   SaronidaSailing.Tests/           xUnit; one PostgreSQL Testcontainer, one database per test class (see docs/conventions.md -> Tests)
 Dockerfile, .dockerignore
@@ -76,7 +76,7 @@ Root build files:
 Data layer (`Infrastructure/Data/`):
 
 - `AppDbContext` stamps `CreatedAt` / `UpdatedAt` on every `SaveChanges*` from the injected `TimeProvider` (see `docs/domain-model.md` -> Entities). A convention converter (`UtcDateTimeConverter`) marks every `DateTime` read back as `DateTimeKind.Utc`; the columns are `timestamp with time zone`.
-- **Migrations:** one `InitialCreate` (`20261111081638_InitialCreate`) holds the Identity tables and the four content tables (see `docs/domain-model.md`). The earlier SQLite migrations were deleted when the provider changed.
+- **Migrations:** `InitialCreate` (`20261111081638_InitialCreate`) holds the Identity tables and the four content tables; `AddMediaAssets` (`20261111133422_AddMediaAssets`) adds `MediaAssets` (see `docs/domain-model.md`). The earlier SQLite migrations were deleted when the provider changed.
 - **Who applies migrations** (`Infrastructure/Data/DatabaseInitializer.cs`, flag `Database:MigrateAtStartup`, `DatabaseSettings`): `InitializeDatabaseAsync` runs in `Web/Program.cs` before the app accepts requests. With the flag `true` (set only in `appsettings.Development.json`) it calls `MigrateAsync`: applies pending EF migrations **and** installs or upgrades the Hangfire schema (`PostgreSqlObjectsInstaller.Install`, schema `hangfire`). With the flag `false` (the default in `appsettings.json`, so preview and production) it calls `EnsureUpToDateAsync`, which throws "The database is behind: N pending migration(s): ... Run the 'migrate' command first." Pods never migrate or install the Hangfire schema themselves (Hangfire's `PrepareSchemaIfNecessary` follows the flag). In production the `migrate` command runs as a Kubernetes Job before each rollout (agreed design, Phase 8).
 - Entity configurations are in `Infrastructure/Data/Configurations/` (one per content entity). Repositories (`Infrastructure/Repositories/`: `ContentItemRepository`, `ContentListItemRepository`, `ContentSectionRepository`, `ContentHistoryRepository`) only **stage** changes; `IUnitOfWork` (`Infrastructure/Data/UnitOfWork.cs`) has `SaveChangesAsync` (one commit, one transaction) and `DiscardChanges`. All are scoped (`AddInfrastructure`).
 - Connection string `ConnectionStrings:Content` is an Npgsql string; a missing value fails startup. The same string serves EF Core, Hangfire storage and the cache-eviction bus and listener. `appsettings.json` has no password (`Host=postgres;Port=5432;Database=saronida;Username=saronida`); `appsettings.Development.json` points at the local container (`Host=localhost`).
@@ -116,7 +116,7 @@ The cookie-consent banner and the footer "Cookie settings" link from the design 
 
 ## SEO
 
-- **Implemented (Phase 3):** `<cms-seo fallback-title="...">` (`Web/TagHelpers/CmsSeoTagHelper.cs`) in the `<head>` of `Pages/Shared/_Layout.cshtml`. On a site page (one in `SitePages`) it emits `<title>` (`{page}.seo.title`, else the fallback title), `<meta name="description">` (`{page}.seo.description`, omitted when empty), `og:title`, `og:description`, `og:type` (`website`), `og:site_name`, `og:url`, `og:locale` and `og:locale:alternate` (`el_GR` / `en_GB`). On other pages (admin, errors) it emits only `<title>`. Values are read as `Text` fields in the visitor's language (English falls back to Greek). `og:image` from `{page}.seo.image` is deferred to Phase 5 (media).
+- **Implemented (Phase 3):** `<cms-seo fallback-title="...">` (`Web/TagHelpers/CmsSeoTagHelper.cs`) in the `<head>` of `Pages/Shared/_Layout.cshtml`. On a site page (one in `SitePages`) it emits `<title>` (`{page}.seo.title`, else the fallback title), `<meta name="description">` (`{page}.seo.description`, omitted when empty), `og:title`, `og:description`, `og:type` (`website`), `og:site_name`, `og:url`, `og:locale` and `og:locale:alternate` (`el_GR` / `en_GB`). On other pages (admin, errors) it emits only `<title>`. Values are read as `Text` fields in the visitor's language (English falls back to Greek). `og:image` (Phase 5): when `{page}.seo.image` holds an existing image, the tag helper also emits `og:image` (absolute URL: `Site:BaseUrl` + the largest generated width of 1600 or less, else the smallest), `og:image:width`, `og:image:height` and, when `{page}.seo.image-alt` has text in the visitor's language (English falls back to Greek), `og:image:alt`. A stored value of the wrong type, or an id with no `MediaAsset`, logs a warning and emits no image tags.
 - **Planned:** canonical URL and `hreflang` alternates on every page, `sitemap.xml`, `robots.txt`, JSON-LD.
 - **`Site:BaseUrl`** (`Web/SiteOptions.cs`) is a required option: an absolute http(s) URL with no path, query or fragment (a trailing `/` is trimmed). It is validated on start, so a missing or invalid value fails startup. `appsettings.json` has no value; Development sets `https://localhost:5001`; preview and production must set `Site__BaseUrl` (Phase 8). It prefixes `og:url` today and all absolute URLs (canonical, sitemap, `hreflang`) later.
 - **Greek is not escaped in HTML output:** `WebEncoderOptions` in `Program.cs` allows `BasicLatin`, `Latin1Supplement`, `GreekandCoptic` and `GeneralPunctuation`, so Greek text is emitted as characters, not `&#x...;` entities.
@@ -219,13 +219,14 @@ Razor templates mark editable spots with tag helper **attributes on real element
 | `<li cms-list="home.highlights">` | Repeats the element once per **active** entry (the admin also sees inactive ones), in `SortOrder`. Inside it, `cms-field="title"` (with optional `cms-rich`) and `cms-link-field="link"` read that entry's fields. Lists cannot be nested; no active entries omits the element for visitors |
 | `<section cms-section="home.instagram">` | Omits the whole element when the section is inactive (a section with no row is active) |
 | `<a cms-section-link="home.instagram">` | A menu link to a section (`CmsSectionLinkTagHelper`): omitted for visitors when that section is inactive. Accepts only a section of the current page or of `shared`; any other page key throws at render time |
+| `<cms-image key="home.hero.image" sizes="..." />` | An element, not an attribute (`CmsImageTagHelper`, no end tag). Renders an `<img>` for an `Image` field (see Media Pipeline → `<cms-image>`) |
 | `<cms-seo fallback-title="...">` | Page `<title>`, description and Open Graph tags (see SEO) |
 
-A field with no value in either language omits its element for visitors; the admin gets an empty element flagged `data-cms-empty` to click into. An invalid key, or `cms-field` outside a `cms-list`, throws. `Web/TagHelpers/CmsFieldResolver.cs` holds the shared key checks. **`<cms-image>` (with `srcset`, `alt-source`) is planned, Phase 5.**
+A field with no value in either language omits its element for visitors; the admin gets an empty element flagged `data-cms-empty` to click into. An invalid key, or `cms-field` outside a `cms-list`, throws. `Web/TagHelpers/CmsFieldResolver.cs` holds the shared key checks.
 
 ### Content snapshot
 
-Tag helpers read a per-request snapshot, `IPageContentAccessor` (`Web/Content/PageContentAccessor.cs`, scoped): the first call asks `IContentService.GetPageContentAsync(page, locale)` for the current page (from `ILocalizedUrlService`; `shared` when the route is not a site page) and the UI-culture locale, and every later call reuses it. The snapshot (`Core/Interfaces/PageContent.cs`) holds the page's content plus `shared` content, loaded in one pass (three queries: items, list items, sections). English values that are missing or blank fall back to the Greek value, flagged `IsFallback`. For visitors, inactive list items and sections are not rendered.
+Tag helpers read a per-request snapshot, `IPageContentAccessor` (`Web/Content/PageContentAccessor.cs`, scoped): the first call asks `IContentService.GetPageContentAsync(page, locale)` for the current page (from `ILocalizedUrlService`; `shared` when the route is not a site page) and the UI-culture locale, and every later call reuses it. The snapshot (`Core/Interfaces/PageContent.cs`) holds the page's content plus `shared` content, loaded in one pass (items, list items, sections, then one query for every image the items refer to: `ContentService.LoadImagesAsync` builds a `PageImage` per `MediaAsset`, `PageContent.GetImage(id)`). English values that are missing or blank fall back to the Greek value, flagged `IsFallback`; `ContentValue.DefaultLocaleValue` also carries the Greek value (set on every value read in English, and on Greek values), so the admin can see the Greek alt text on an English page. For visitors, inactive list items and sections are not rendered.
 
 ### Admin rendering
 
@@ -233,14 +234,15 @@ Tag helpers read a per-request snapshot, `IPageContentAccessor` (`Web/Content/Pa
 
 | Emitted | Where |
 |---|---|
-| `data-cms-key`, `data-cms-type` (`text`, `richText`, `link`) | Every field element |
-| `data-cms-value` | Rich-text and link fields: the stored HTML / link JSON, so the editors start from the saved value |
+| `data-cms-key`, `data-cms-type` (`text`, `richText`, `link`, `image`) | Every field element |
+| `data-cms-value` | Rich-text and link fields: the stored HTML / link JSON, so the editors start from the saved value. Image: the media id (empty when none) |
+| `data-cms-alt-key`, `data-cms-alt`, `data-cms-alt-el`, `data-cms-alt-proposal`, `data-cms-sizes`, `data-cms-loading` | `<cms-image>` only: see Media Pipeline → `<cms-image>` |
 | `data-cms-fallback`, `data-cms-empty`, `data-cms-invalid` | Flags: English shows the Greek fallback, no value, invalid link |
 | `data-cms-list`, `data-cms-item` | Every list item copy (`data-cms-item` is the item's Id) |
 | `<template data-cms-list-template="{listKey}">` | After each list: one empty copy of the item markup, cloned by "Add item" |
 | `data-cms-section`, `data-cms-section-link` | Sections and their menu links |
 | `data-cms-active="false"` | Inactive list items, sections and section links; shown dimmed |
-| `<script type="application/json" id="cms-config">` | `CmsEditorConfig` (`Web/Content/CmsEditorConfig.cs`): `pageKey`, `locale`, `saveUrl`, `historyUrl`, `savesUrl`, `antiforgeryToken`, `opensInNewTab` and `seo` (the page's SEO title and description, each with its Greek value when English falls back; null on non-site pages) |
+| `<script type="application/json" id="cms-config">` | `CmsEditorConfig` (`Web/Content/CmsEditorConfig.cs`): `pageKey`, `locale`, `saveUrl`, `historyUrl`, `savesUrl`, `antiforgeryToken`, `opensInNewTab` and `seo` (the page's SEO title and description, each with its Greek value when English falls back; the link-preview `image` (`{value, previewUrl}`, the 960 px file or the largest) and `imageAlt` (`{value, greek}`); null on non-site pages) |
 | `_AdminToolbar` partial, `~/css/cms-edit.css`, `~/js/cms-edit.js` (module) | Layout |
 
 ### Save API
@@ -249,7 +251,7 @@ Tag helpers read a per-request snapshot, `IPageContentAccessor` (`Web/Content/Pa
 
 | Endpoint | Behaviour |
 |---|---|
-| `POST /admin/api/content` | Body `{ "changes": [ ... ] }`, each change a polymorphic record with an `op` discriminator: `setField`, `addListItem`, `deleteListItem`, `reorderList`, `setListItemActive`, `setSectionActive` (see Write service). Field `type` is a camel-case string (`text`, `richText`, `link`). The antiforgery token must be sent in the `RequestVerificationToken` header (`HeaderName` set in `Program.cs`). Success: `200 {"saveId": "..."}` (`saveId` is null when the batch changed nothing). Invalid changes: `400 {"errors": [...]}`, nothing written |
+| `POST /admin/api/content` | Body `{ "changes": [ ... ] }`, each change a polymorphic record with an `op` discriminator: `setField`, `addListItem`, `deleteListItem`, `reorderList`, `setListItemActive`, `setSectionActive` (see Write service). Field `type` is a camel-case string (`text`, `richText`, `link`, `image`). The antiforgery token must be sent in the `RequestVerificationToken` header (`HeaderName` set in `Program.cs`). Success: `200 {"saveId": "..."}` (`saveId` is null when the batch changed nothing). Invalid changes: `400 {"errors": [...]}`, nothing written |
 | `GET /admin/api/content/history?key=&locale=&listItemId=` | The saved versions of one field, newest first: `[{saveId, value, changedBy, createdAt}]`. `400` for an invalid key, locale or `listItemId` |
 | `GET /admin/api/content/saves/{saveId}` | One save: `{saveId, changedBy, createdAt, fields: [{key, locale, type, listItemId, value, previousValue, currentValue}]}`; `404` when the save has no history rows. `previousValue` is the field's value in the version before that save (empty for the first version), `currentValue` is its value now |
 
@@ -288,6 +290,7 @@ Both run inside `ContentService.ApplyChangesAsync` (`ContentBatch.SetFieldAsync`
 | `RichText` | Passed through `IRichTextSanitizer` (`Core/Interfaces/`), implemented by `RichTextSanitizer` (`Infrastructure/Content/`, HtmlSanitizer 11.0.16, registered as a singleton). Allowed tags: `p`, `br`, `strong`, `em`, `a`, `ul`, `ol`, `li`, `h3`. The only allowed attribute is `href`; no classes, CSS or `data-` attributes. Allowed URL schemes: `https`, `mailto`, `tel`, and only on `a`. Disallowed tags are unwrapped (children kept), except `script`, `style`, `iframe`, `frame`, `frameset`, `object`, `embed`, `applet`, `noscript`, `template`, `textarea`, `title`, `svg` and `math`, which are dropped with their content. A result that is only empty paragraphs becomes `""` |
 | `Link` | An empty value clears the link. Otherwise the JSON must parse with `ContentLink.TryParse`: `https:`, `mailto:` or `tel:` URL and a non-blank label; if not, the save is rejected with an error naming the field |
 | `Text` | Stored as sent |
+| `Image` | Checked in `ContentBatch` (`SetFieldAsync`, then `ValidateImagesAsync` once all changes are applied): see Media Pipeline → Save checks |
 
 ### History
 
@@ -324,12 +327,13 @@ A status line and an error list (`role="alert"`) sit below the controls.
 | `inline.js` | Inline editing of `text` fields (`contenteditable="plaintext-only"`). Enter finishes, Escape reverts. Clicks on editable links are blocked in edit mode |
 | `toolbar.js` | Save (one `fetch` POST with the `RequestVerificationToken` header; on an antiforgery 400 it reloads the page HTML once for a fresh token and retries), Discard, counter, More panel, `beforeunload` warning, the `--cms-toolbar-height` CSS variable, the "Saved" message after the reload, messages for 400 / 401 / 403 / 413 |
 | `edit-mode.js` | Edit mode on/off. Starts **on**; remembered per tab in `sessionStorage` (`cms-edit-mode`). Off adds the class `cms-view` to `<html>` |
-| `fieldbar.js` | The small bar next to a focused or clicked field: "History" for every field, plus "Edit text" / "Edit link". Clicking a rich-text block or a link opens its window directly |
-| `windows.js`, `dialog.js` | `dialog.js` builds the native `<dialog>` windows (focus return, Escape asks before discarding changes); `windows.js` opens the four window types |
+| `fieldbar.js` | The small bar next to a focused or clicked field: "History" for every field, plus "Edit text" / "Edit link" / "Edit image". Clicking a rich-text block, a link or an image opens its window directly |
+| `windows.js`, `dialog.js` | `dialog.js` builds the native `<dialog>` windows (focus return, Escape asks before discarding changes); `windows.js` opens the window types (rich text, link, image, history, page settings) |
 | `rich-window.js`, `quill-loader.js`, `rich-html.js` | Rich-text window: Quill 2 limited to heading (h3), bold, italic, numbered and bulleted lists, link and clear formatting. `quill-loader.js` loads Quill lazily. `rich-html.js` is a client-side mirror of the sanitizer's allowed tags, for preview only; the server's sanitizer is the authority. Links not starting with `https://`, `mailto:` or `tel:` are refused |
 | `link-window.js`, `values.js` | Link window: type picker (Web page / Email / Phone, which adds `https://`, `mailto:` or `tel:`), label, "Remove link". `values.js` holds shared helpers (text normalize, link parse, allowed schemes) |
-| `history-window.js` | Loads `historyUrl`; "Restore this version" sets the field as a pending change; "Undo this whole save" loads `savesUrl{saveId}`, lists the fields that differ from before the save, flags those changed again by a later save (undo overwrites them), and sets them back as pending changes |
-| `settings-window.js` | Page settings: `{page}.seo.title` and `{page}.seo.description` in the current language, with the Greek value shown as guidance when English is empty. The image field comes in Phase 5 |
+| `history-window.js` | Loads `historyUrl`; image versions show thumbnails (`imagePreview`) and restore as an image change, and an image that no longer exists cannot be restored; "Restore this version" sets the field as a pending change; "Undo this whole save" loads `savesUrl{saveId}`, lists the fields that differ from before the save, flags those changed again by a later save (undo overwrites them), and sets them back as pending changes |
+| `image-window.js`, `image-data.js` | Image window and its shared helpers (see Media Pipeline → Image window). `image-data.js` holds the media API client (`loadAsset` with a per-id cache), `imagePreview`, `recordImage` (puts the image id and the alt texts into `pending`), and builders for the placeholder button and the `<img>` element, so the page shows the new image before Save |
+| `settings-window.js` | Page settings: `{page}.seo.title` and `{page}.seo.description` in the current language, with the Greek value shown as guidance when English is empty, plus a "Link preview image" row (`{page}.seo.image` and its alt `{page}.seo.image-alt`) that opens the image window |
 | `missing.js` | Counts elements flagged `data-cms-fallback` and jumps to the next one |
 | `lists.js` | List editing (below) |
 | `sections.js` | Section bar (below) |
@@ -338,7 +342,7 @@ A status line and an error list (`role="alert"`) sit below the controls.
 
 **Sections** (`sections.js`): every `data-cms-section` gets an always-visible **section bar** with Hide section / Show section. The toggle also dims or restores the section's menu links (`data-cms-section-link`) and sets the slot `section:{sectionKey}` with a `setSectionActive` op (empty when the state returns to the original). The same visibility applies to both languages.
 
-**Phone layout** (under 720 px; `wwwroot/css/cms-edit.css` is mobile-first with a single `min-width: 720px` breakpoint): the toolbar stays in one line (Save page, counter, More) and More opens a panel below; windows are full-screen (`100vw` x `100dvh`) and become centred dialogs from 720 px; the item drag handle is hidden, so items move with the up/down buttons; buttons in the item and section bars and the toolbar are 44 px (2.75rem) touch targets, shrinking from 720 px; `scroll-padding-top` follows `--cms-toolbar-height` so focused fields are not hidden under the toolbar.
+**Phone layout** (under 720 px; `wwwroot/css/cms-edit.css` is mobile-first with `min-width: 720px` and `min-width: 960px` breakpoints; the media library grid has 2 columns on phones, 3 from 720 px and 4 from 960 px): the toolbar stays in one line (Save page, counter, More) and More opens a panel below; windows are full-screen (`100vw` x `100dvh`) and become centred dialogs from 720 px; the item drag handle is hidden, so items move with the up/down buttons; buttons in the item and section bars and the toolbar are 44 px (2.75rem) touch targets, shrinking from 720 px; `scroll-padding-top` follows `--cms-toolbar-height` so focused fields are not hidden under the toolbar.
 
 ### Vendored libraries
 
@@ -358,24 +362,127 @@ The CSP is own-origin only (`docs/deployment.md`), so admin JS never adds `style
 ### Other rules
 
 - **One save per page:** every change (fields, list operations, section toggles) is kept in the browser as pending until the admin clicks **Save page**. Save sends all pending changes in **one request**, written in **one database transaction**, followed by **one** cache eviction. The page warns before navigating away with unsaved changes. Save publishes immediately (no draft/publish workflow). Only changed fields are sent, so two admins editing different fields of a page don't overwrite each other; the same field: last save wins.
-- Image files are uploaded and processed when chosen (the file must be processed anyway); assigning the image to the field is a pending change like any other. **Planned, Phase 5.**
-- **Page settings window:** per page and language, the SEO fields `{page}.seo.title` (browser tab / search result title) and `{page}.seo.description` (search result snippet). `{page}.seo.image` (link-preview image for Facebook, WhatsApp, etc. via Open Graph tags) is planned, Phase 5.
+- Image files are uploaded and processed when chosen (the file must be processed anyway, `POST /admin/api/media`); assigning the image to the field is a pending change like any other, saved with Save page. A file uploaded but never assigned stays in the library (no cleanup at launch).
+- **Page settings window:** per page and language, the SEO fields `{page}.seo.title` (browser tab / search result title) and `{page}.seo.description` (search result snippet), and "Link preview image" `{page}.seo.image` (shown by Facebook, WhatsApp, etc. through the `og:image` tag) with its alt text `{page}.seo.image-alt`.
 
 ## Media Pipeline (SkiaSharp)
 
-1. Admin uploads an image from the image modal ("Upload new"), or picks a past upload ("Choose existing" — media library grid).
-2. Validation: accepted formats **JPEG, PNG, WebP**; max **25 MB** and **50 megapixels**; the file is decoded to confirm it is an image (not by extension). Rejections show a clear error. (HEIC from iPhones: expected to arrive as JPEG via the browser — to be tested on a real iPhone.)
-3. Apply the EXIF orientation (SkiaSharp does not do this automatically), then re-encode — which drops all metadata, including GPS location.
-4. Generate widths **480 / 960 / 1600 / 2400** (never upscaled) as **WebP, quality ~80**. Whatever the upload format, the public files are always WebP.
-5. Public files: `{slug}-{contentHash}-{width}.webp` under `Media:RootPath` (production `/var/saronida/media`).
-6. **The original upload is kept privately** in `/var/saronida/data/originals/` (never served by nginx — it still has GPS metadata), so all sizes can be regenerated if the design changes. Included in backups.
-7. A `MediaAsset` row records the file set; image content references it.
-8. **Alt text is required**: an image can't be saved without Greek alt text (English falls back to Greek). The modal pre-fills a **proposed alt text from the nearest title** — the template names it, e.g. `<cms-image key="home.trips.image" alt-source="title" />` uses the list item's title. The admin should refine it to describe the photo (an alt text identical to the visible title adds little for screen-reader users).
-9. nginx serves `/media/` with `Cache-Control: public, max-age=31536000, immutable`. In development the app serves the folder via static files.
+Implemented in Phase 5 (`Core/Interfaces/IMediaService.cs`, `Infrastructure/Media/`, `Web/Endpoints/MediaEndpoints.cs`, `Web/TagHelpers/CmsImageTagHelper.cs`). Not yet verified on a real iPhone (HEIC) and not yet run on Linux (SkiaSharp native library); both happen on the Phase 8 preview.
 
-Linux native assets: `SkiaSharp.NativeAssets.Linux.NoDependencies` (nothing to install in the container).
+```
+POST /admin/api/media (multipart "file")
+   | antiforgery, body cap 25 MB + 64 KB
+   v
+MediaService.ImportAsync
+   read up to 25 MB -> SHA-256 -> hash already in MediaAssets? -- yes --> return that asset (existed=true)
+                                          | no
+                                 per-pod gate (1 at a time, waits up to 30 s, else Busy)
+                                          v
+        ImageProcessor: decode -> sRGB, apply EXIF orientation -> resize -> WebP q80
+                                          v
+        write public files + original (temp name, then rename) -> insert MediaAsset
+                                          | unique violation on the hash (another pod won)? -> return the winner's row
+                                          v
+                       200 { id, width, height, previewUrl, thumbUrl, sources, ... }
+```
+
+### Import (`MediaService`, `ImageProcessor`)
+
+| Step | Rule |
+|---|---|
+| Size | `MediaLimits.MaxUploadBytes` = 25 MB. The stream is read into memory with the limit enforced while reading; over it = `TooLarge` |
+| Duplicates | The SHA-256 of the bytes (lowercase hex) is the `ContentHash`. An existing `MediaAsset` with that hash is returned as is: no second row, no new files (`MediaImportResult.AlreadyExisted`). Two uploads of the same file at once (two pods): the second insert hits the unique index `UX_MediaAssets_ContentHash`; `MediaService` catches the PostgreSQL error `23505` for that constraint only, discards its staged row and returns the winner's row |
+| Concurrency | `MediaProcessingGate` (singleton, one slot) allows **one upload at a time per pod**. A waiter gives up after `Media:ProcessingWaitSeconds` (default 30) with `Busy` |
+| Format check | The file is decoded with `SKCodec` (never trusted by extension). JPEG, PNG and WebP are accepted. HEIC/HEIF (the Heif codec, or a file that does not decode but has a HEIC `ftyp` brand) = `Heic`; another decodable format = `UnsupportedFormat`; not decodable = `NotAnImage`; over `MediaLimits.MaxPixels` (50 million) = `TooManyPixels` |
+| Colour and orientation | Decoded into an sRGB RGBA bitmap, then drawn through the matrix of the EXIF orientation (all 8 origins), so portrait photos come out upright. Re-encoding drops all metadata, including GPS |
+| Widths | `MediaLimits.Widths` = 480, 960, 1600, 2400, **only those not wider than the oriented image** (never upscaled). An image narrower than 480 gets **one** file at its own width. Height = `MediaDimensions.ScaledHeight` (rounded, at least 1) |
+| Encoding | Lossy WebP, quality `MediaLimits.WebpQuality` = 80, whatever the upload format |
+| Files | Public: `{slug}-{first 16 hex chars of the hash}-{width}.webp` under `Media:RootPath` (`MediaFileNames.PublicFileName`, URL prefix `/media/`). Private original: `{full hash}{original extension}` (`.jpg`, `.png`, `.webp`) under `Media:OriginalsPath`, never served (it keeps its metadata, so every size can be regenerated). Every file is written to `{name}.{guid}.tmp` and renamed, so a half-written file is never visible; a failed write deletes the temp file |
+| Slug | `Slugs.FromFileName`: the file name without extension, lowercased, accents removed, Greek transliterated (`ου` = `ou`, `θ` = `th`, `χ` = `ch`, `ψ` = `ps`, ...), everything else outside `a-z0-9` becomes `-` (no doubles, none at the ends), at most 50 characters; `image` when nothing is left |
+| Row | `MediaAsset` (`docs/domain-model.md`); the stored original file name is cut to 255 characters |
+
+Errors are results (`MediaImportError`: `TooLarge`, `NotAnImage`, `UnsupportedFormat`, `Heic`, `TooManyPixels`, `Busy`), not exceptions. The two folders must exist when a file is written: the app creates them only in Development (see Health Check).
+
+### Admin media API (`Web/Endpoints/MediaEndpoints.cs`)
+
+Group `/admin/api/media`: `Admin` policy, `Cache-Control: no-store`. Records are in `MediaApiModels.cs`. Every error body is `{ "code": "...", "errors": ["message"] }`.
+
+| Endpoint | Behaviour |
+|---|---|
+| `POST /admin/api/media` | Multipart form with exactly one file in the field `file`; antiforgery token in the `RequestVerificationToken` header. The request body cap is raised to 25 MB + 64 KB (`MaxBodyBytes`) and counted while reading. Success: `200` with the asset (below) plus `alreadyExisted` |
+| `GET /admin/api/media?page=N` | The library: 48 per page (`PageSize`), newest first (`CreatedAt`, then `Id`, descending), `{ items, hasMore }`. `page` defaults to 1; anything other than a whole number from 1 up is `400 invalidPage` |
+| `GET /admin/api/media/{id}` | One asset, or `404 notFound` |
+
+Asset response: `id`, `width`, `height`, `originalFileName`, `createdAt`, `previewUrl` (the 960 file, or the widest), `thumbUrl` (the narrowest file), `sources` (`[{width, url}]`).
+
+| Status and `code` | Cause |
+|---|---|
+| 400 `invalidAntiforgery` | Missing or wrong token |
+| 400 `noFile` | Not multipart, malformed multipart, no file, more than one file, an empty file, or the file in another field |
+| 413 `tooLarge` | Declared or actual body over the cap, or a file over 25 MB |
+| 400 `notAnImage`, `unsupportedFormat`, `heic`, `tooManyPixels` | `MediaImportError` of the same name; the `heic` message tells the admin to pick JPEG ("Most Compatible" on iPhone) |
+| 503 `busy` + `Retry-After: 5` | The pod's one processing slot stayed taken for the whole wait |
+| 401 / 403 | Not signed in / signed in without `amr=mfa` (`AdminApiCookieEvents`) |
+
+Audit events: `media-uploaded` (details `id= existed= size=WxH`) and `media-rejected` (details `code=`); the file name is never logged.
+
+### Image values and save checks
+
+- An `Image` field (`ContentType.Image`) stores the **`MediaAsset.Id`** as its value, **in Greek only** (`el`); English visitors get the Greek value. The photo can be changed from either language's page.
+- The alt text is the localized `Text` field with the same key plus `-alt` (`home.hero.image-alt`; for a list item field `image`, the item field `image-alt`; for the page image, `{page}.seo.image-alt`).
+- Checks in `ContentBatch` (`SetFieldAsync` per change, then `ValidateImagesAsync` once all changes are applied), so every writer is covered. A violation rejects the whole save (nothing written, `content-save-rejected`):
+
+| Rule | Error |
+|---|---|
+| An `Image` value for locale `en` | "Images are stored in Greek only" |
+| A non-empty value that is not a GUID | "image value must be a media id" |
+| A media id with no `MediaAsset` (one `IMediaAssetRepository.ExistAsync` query for all ids in the batch) | "Image '...' does not exist." |
+| An image set (in the batch or already saved) while the Greek `{field}-alt` is empty, including when the batch clears the alt of a saved image | "Greek alt text is required." |
+
+Images of a list item deleted in the same batch are skipped. Clearing an image (empty value) is allowed; its alt text may stay.
+
+### `<cms-image>`
+
+`<cms-image key="home.hero.image" sizes="(min-width: 960px) 50vw, 100vw" alt-source="title" loading="lazy|eager" class="..." />`, or `field="image"` instead of `key` inside a `cms-list` (`CmsImageTagHelper`; the alt text is read from `{key}-alt` / `{field}-alt`).
+
+| Attribute | Rule |
+|---|---|
+| `key` / `field` | One of them, resolved as for the other tag helpers (`CmsFieldResolver`) |
+| `sizes` | Required: the `sizes` attribute of the `<img>`; a missing value throws |
+| `loading` | `lazy` (default) or `eager` (above-the-fold images); anything else throws |
+| `alt-source` | Admin only: the field whose text proposes the alt text. With `key`, a full content key (`shared.sandbox.title`); inside a list, a field of the same item (`title`). Rich text is turned into plain text. Written to `data-cms-alt-proposal` |
+| other attributes (`class`, ...) | Kept on the `<img>` |
+
+- **Visitors:** an `<img>` with `src` (the 960 px file, else the widest), `srcset` of every generated width (`url 480w, ...`), `sizes`, `width` and `height` (the source dimensions, so the layout does not jump), `alt`, `loading`, `decoding="async"`. Nothing is rendered when the field is empty, holds a value of another type (warning logged) or refers to a missing asset (warning logged).
+- **Admin:** the same `<img>` plus `data-cms-key`, `data-cms-type="image"`, `data-cms-value` (media id), `data-cms-alt-key`, `data-cms-alt` (alt in the current language, empty when English falls back), `data-cms-alt-el` (the Greek alt), `data-cms-sizes`, `data-cms-loading`, `data-cms-alt-proposal` (when `alt-source` is set) and the flags `data-cms-fallback` (English alt falls back to Greek) and `data-cms-empty`. With no image the element is `<button type="button" class="... cms-image-placeholder">Add image</button>`; the layout `class` is kept.
+- One query per page loads every image the page refers to (see CMS Editing Flow → Content snapshot).
+- **`og:image`** for the page image: see SEO.
+
+### Image window (client)
+
+`wwwroot/js/cms/image-window.js` (`openImageWindow`) opens from a click on an image or "Add image", from the field bar's "Edit image", and from Page settings. Helpers shared with Page settings and History are in `image-data.js`.
+
+- **Upload new:** a file input with `accept="image/jpeg,image/png,image/webp"` (so iOS converts a HEIC photo to JPEG when it is picked). The upload is an `XMLHttpRequest` (for the "Uploading..." then "Processing..." status) with the antiforgery header. Each error code has its own message; `busy` and network errors show "Try again". The uploaded photo is selected at once.
+- **Choose existing:** the library grid (2, 3 or 4 columns by width), "Load more" 48 at a time, from `GET /admin/api/media`.
+- **Remove image:** clears the choice.
+- **Alt text:** Greek is required whenever an image is set (the window refuses to apply and focuses the field). It is pre-filled from `data-cms-alt-proposal` when empty and marked "Suggested from the title - please refine" until edited. On an English page the window shows an optional English alt (visitors see Greek when it is empty) and the Greek alt, and says the photo is shared by both languages. The preview's alt follows what is typed.
+- **Apply:** `fields.writeImage` updates the element in place (a new `<img>` with `srcset`, or the placeholder again) and `recordImage` puts up to three pending changes into `pending`: the image id (locale `el`), the alt in the page language and, on an English page, the Greek alt. Nothing is written until Save page; the server checks above are the authority.
+- **History** (`history-window.js`) shows thumbnails for image versions and restores them; **Page settings** (`settings-window.js`) has the "Link preview image" row.
+
+### Serving and configuration
+
+- **Production:** nginx serves `/media/` from `Media:RootPath` with `Cache-Control: public, max-age=31536000, immutable` (see `docs/deployment.md`). File names contain the content hash, so a file never changes.
+- **Development:** the app serves `Media:RootPath` itself at `/media` (`Web/DevelopmentMediaFiles.cs`, registered only in Development, before the other middleware): `.webp` files only (`ServeUnknownFileTypes` off), immutable cache header. Originals are never served.
+- `Media:RootPath` (`/var/saronida/media`; Development `data/media`) and `Media:OriginalsPath` (`/var/saronida/data/originals`; Development `data/originals`) are both required and resolved against the content root. Startup fails when either is missing, or when `OriginalsPath` is inside `RootPath` (originals must never end up under the served folder). `Media:ProcessingWaitSeconds` (default 30, not in `appsettings.json`) must not be negative.
+- Health: the `media` check covers both folders (see Health Check).
+
+Linux native assets: `SkiaSharp.NativeAssets.Linux.NoDependencies` (nothing to install in the container). Publish is not RID-specific; the native library lands under `runtimes/linux-x64/native/` in the output. The first real run on Linux is the Phase 8 preview.
 
 **Video: not at launch.** The hero uses a photo. Self-hosted video would need pre-compressed uploads (no ffmpeg on the small droplet) and a check of Cloudflare's CDN terms on serving video. Revisit with the owner later.
+
+**Not built:** deleting media (the library has no delete at launch) and the cleanup job for files nothing refers to (see Background Jobs).
+
+**Open: real-iPhone HEIC test.** The browser should hand a JPEG to the file input; a HEIC file that reaches the server is rejected with the `heic` error. Whether an iPhone really does this can only be tested over HTTPS, so it is done on the Phase 8 preview (the PLAN.md task stays open until then).
 
 ## Instagram Feed
 
@@ -413,7 +520,7 @@ Returns **200 "Healthy"** only if every check passes, otherwise **503 "Unhealthy
 |---|---|---|
 | `database` | `Infrastructure/Health/DatabaseHealthCheck.cs` | `CanConnectAsync` on the content database |
 | `hangfire` | `Infrastructure/Health/HangfireStorageHealthCheck.cs` | `GetMonitoringApi().GetStatistics()` against the Hangfire storage (schema `hangfire`) |
-| `media` | `Infrastructure/Health/MediaFolderHealthCheck.cs` | Write and delete a temp file under `Media:RootPath` |
+| `media` | `Infrastructure/Health/MediaFolderHealthCheck.cs` | Write and delete a temp file under `Media:RootPath`, then under `Media:OriginalsPath`; unhealthy ("Media folder is not writable." / "Originals folder is not writable.") when either fails |
 | `home-page` | `Web/Health/HomePageHealthCheck.cs` | GET of `Health:HomePageUrl` through a named `HttpClient` (5 s timeout, redirects not followed); must return exactly 200 |
 
 **Planned, Phase 7:** a fifth check, "at least one Greek `ContentItem` for page `home` exists (e.g. `home.hero.title`)". It needs the seed data, so it is deferred (recorded in `PLAN.md`).
@@ -424,8 +531,9 @@ Configuration keys:
 |---|---|---|
 | `Health:HomePageUrl` | `http://127.0.0.1:8080/` (the container's own port) | `http://localhost:5000/` |
 | `Media:RootPath` | `/var/saronida/media` | `data/media` |
+| `Media:OriginalsPath` | `/var/saronida/data/originals` | `data/originals` |
 
-The media folder is created at startup **only in Development** (`MediaFolder.EnsureExists` in `Web/Program.cs`). Elsewhere it is a bind mount, and a missing or unwritable folder must fail `/health` rather than be silently created inside the container.
+The media and originals folders are created at startup **only in Development** (`MediaFolder.EnsureExists` in `Web/Program.cs`). Elsewhere they are bind mounts, and a missing or unwritable folder must fail `/health` rather than be silently created inside the container.
 
 **Not checked:** Instagram (an outage there must not fail health and roll back a good deploy) and maintenance mode (handled by nginx, see `docs/deployment.md`).
 
@@ -617,7 +725,7 @@ Code in `Web/Diagnostics/`. Goal: find out afterwards what went wrong. A pod kil
 | Admin pages in caches | Pages rendered for an admin carry `Cache-Control: no-store` and are never stored by the output cache |
 | XSS | Razor encoding by default; rich text sanitized with HtmlSanitizer on save, inside `ContentService` (see CMS Editing Flow); link URLs restricted to `https:`, `tel:`, `mailto:` and validated on save |
 | Transport | Cloudflare SSL mode **Full (strict)**; Let's Encrypt cert on the origin |
-| Uploads | Admin-only; validated by decoding; size limits |
+| Uploads | `POST /admin/api/media` is admin-only with antiforgery; the file is validated by decoding (not by extension or content type), limited to 25 MB and 50 megapixels, one at a time per pod; re-encoding strips all metadata; originals are kept outside the served folder, and startup fails if they would be inside it. Only `.webp` is served from the media folder in Development; file names are generated from a slug and the content hash, never from the raw upload name |
 
 ## Cookies & Privacy
 
