@@ -209,6 +209,7 @@ try
     app.MapStaticAssets();
     app.MapContentEndpoints();
     app.MapMediaEndpoints();
+    app.MapAdminEndpoints();
     app.MapRazorPages()
        .WithStaticAssets();
 
