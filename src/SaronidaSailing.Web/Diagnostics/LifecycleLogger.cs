@@ -20,7 +20,7 @@ public sealed class LifecycleLogger(Logger logger, TimeProvider time, ShutdownSi
         var lifecycle = new LifecycleLogger(LogManager.GetLogger(LoggerName), time, new ShutdownSignalRecorder());
         lifetime.ApplicationStarted.Register(() => lifecycle.LogStarted(
             ResolveVersion(assembly), environment.EnvironmentName, RuntimeInformation.FrameworkDescription,
-            Environment.ProcessorCount, GC.GetGCMemoryInfo().TotalAvailableMemoryBytes, Environment.ProcessId));
+            Environment.ProcessorCount, ContainerMemoryLimit.Bytes, GC.GetGCMemoryInfo().TotalAvailableMemoryBytes, Environment.ProcessId));
         lifetime.ApplicationStopping.Register(lifecycle.LogStopping);
         lifetime.ApplicationStopped.Register(lifecycle.LogStopped);
         return lifecycle;
@@ -37,14 +37,14 @@ public sealed class LifecycleLogger(Logger logger, TimeProvider time, ShutdownSi
         return string.Create(CultureInfo.InvariantCulture, $"{(long)value.TotalHours:00}:{value.Minutes:00}:{value.Seconds:00}");
     }
 
-    public static string StartedMessage(string version, string environment, string dotnet, int cpus, long memoryLimitBytes, int pid) =>
+    public static string StartedMessage(string version, string environment, string dotnet, int cpus, long memoryLimitBytes, long gcHeapLimitBytes, int pid) =>
         string.Create(CultureInfo.InvariantCulture,
-            $"Started version={version} environment={environment} dotnet={dotnet} cpus={cpus} memoryLimit={memoryLimitBytes / 1024 / 1024}MiB pid={pid}");
+            $"Started version={version} environment={environment} dotnet={dotnet} cpus={cpus} memoryLimit={memoryLimitBytes / 1024 / 1024}MiB gcHeapLimit={gcHeapLimitBytes / 1024 / 1024}MiB pid={pid}");
 
-    public void LogStarted(string version, string environment, string dotnet, int cpus, long memoryLimitBytes, int pid)
+    public void LogStarted(string version, string environment, string dotnet, int cpus, long memoryLimitBytes, long gcHeapLimitBytes, int pid)
     {
         Volatile.Write(ref _startedAtTicks, time.GetUtcNow().UtcTicks);
-        logger.Info(StartedMessage(version, environment, dotnet, cpus, memoryLimitBytes, pid));
+        logger.Info(StartedMessage(version, environment, dotnet, cpus, memoryLimitBytes, gcHeapLimitBytes, pid));
     }
 
     public void LogStopping() =>

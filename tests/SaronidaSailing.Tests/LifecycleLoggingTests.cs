@@ -26,7 +26,7 @@ public class LifecycleLoggingTests(TempDatabaseWebApplicationFactory factory) : 
         Assert.Contains(" environment=Development ", started);
         Assert.Matches(@" dotnet=\.NET \S+ ", started);
         Assert.Matches(@" cpus=\d+ ", started);
-        Assert.Matches(@" memoryLimit=\d+MiB ", started);
+        Assert.Matches(@" memoryLimit=\d+MiB gcHeapLimit=\d+MiB ", started);
         Assert.Matches(@" pid=\d+$", started);
     }
 
@@ -194,7 +194,7 @@ public class LifecycleLoggerUnitTests
         var lifecycle = new LifecycleLogger(log.Logger, time, signals);
 
         Assert.False(lifecycle.HasStarted);
-        lifecycle.LogStarted("1.2.3", "Production", ".NET 10.0.0", 2, 512L * 1024 * 1024, 42);
+        lifecycle.LogStarted("1.2.3", "Production", ".NET 10.0.0", 2, 512L * 1024 * 1024, 384L * 1024 * 1024, 42);
         time.Advance(TimeSpan.FromHours(25) + TimeSpan.FromMinutes(2) + TimeSpan.FromSeconds(3));
         signals.Record(PosixSignal.SIGTERM);
         lifecycle.LogStopping();
@@ -203,7 +203,7 @@ public class LifecycleLoggerUnitTests
         Assert.True(lifecycle.HasStarted);
         Assert.Equal(
             [
-                "INFO|Lifecycle|Started version=1.2.3 environment=Production dotnet=.NET 10.0.0 cpus=2 memoryLimit=512MiB pid=42",
+                "INFO|Lifecycle|Started version=1.2.3 environment=Production dotnet=.NET 10.0.0 cpus=2 memoryLimit=512MiB gcHeapLimit=384MiB pid=42",
                 "INFO|Lifecycle|Stopping reason=SIGTERM uptime=25:02:03",
                 "INFO|Lifecycle|Stopped uptime=25:02:03",
             ],

@@ -63,6 +63,7 @@ try
         options.TextEncoderSettings = new TextEncoderSettings(
             UnicodeRanges.BasicLatin, UnicodeRanges.Latin1Supplement, UnicodeRanges.GreekandCoptic, UnicodeRanges.GeneralPunctuation));
     builder.Services.AddSiteOptions(builder.Configuration);
+    builder.Services.AddRuntimeDiagnostics(builder.Configuration);
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddScoped<ILocalizedUrlService, LocalizedUrlService>();
     builder.Services.AddScoped<IPageContentAccessor, PageContentAccessor>();
@@ -166,6 +167,7 @@ try
     }
 
     app.UseForwardedHeaders();
+    app.UseRequestDiagnostics();
 
     if (!app.Environment.IsDevelopment())
     {
