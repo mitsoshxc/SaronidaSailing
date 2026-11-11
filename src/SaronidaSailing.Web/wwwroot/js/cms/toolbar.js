@@ -1,3 +1,5 @@
+import { confirmDialog } from './dialog.js';
+
 const savedKey = 'cms-saved';
 const antiforgeryError = 'Invalid antiforgery token.';
 const networkError = 'Could not reach the server. Your changes are still here — try again.';
@@ -118,9 +120,19 @@ export const createToolbar = ({ config, pending, editMode }) => {
         }
     };
 
-    const discard = () => {
+    const discard = async () => {
         const count = pending.count();
-        if (count === 0 || !confirm(`Discard ${unsaved(count)}?`)) {
+        if (count === 0) {
+            return;
+        }
+        const confirmed = await confirmDialog({
+            title: 'Discard changes?',
+            message: `Discard ${unsaved(count)}? The page reloads with the saved content.`,
+            confirmLabel: 'Discard',
+            cancelLabel: 'Keep editing',
+            returnFocus: () => discardButton.focus()
+        });
+        if (!confirmed) {
             return;
         }
         pending.clear();

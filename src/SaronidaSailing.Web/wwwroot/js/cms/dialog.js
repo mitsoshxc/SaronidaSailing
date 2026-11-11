@@ -3,7 +3,7 @@ let counter = 0;
 const focusable = 'input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), select:not([disabled]), '
     + '[contenteditable="true"], button:not([disabled])';
 
-export const isDialogOpen = () => document.querySelector('dialog.cms-dialog') !== null;
+export const isDialogOpen = () => document.querySelector('dialog.cms-dialog[open]') !== null;
 
 export const el = (tag, className, text) => {
     const element = document.createElement(tag);
@@ -62,9 +62,10 @@ export const openDialog = ({ title, subtitle = '', returnFocus = null }) => {
         },
 
         close(options) {
-            if (!dialog.isConnected) {
+            if (finished) {
                 return;
             }
+            finished = true;
             dialog.close();
             dialog.remove();
             if (options?.restoreFocus !== false) {
@@ -72,20 +73,86 @@ export const openDialog = ({ title, subtitle = '', returnFocus = null }) => {
             }
         },
 
-        requestCancel() {
-            if (!win.isDirty() || confirm('Discard the changes in this window?')) {
+        async requestCancel() {
+            if (!win.isDirty()) {
+                win.close();
+                return;
+            }
+            if (confirming) {
+                return;
+            }
+            confirming = true;
+            pendingConfirm = confirmDialog({
+                title: 'Discard changes?',
+                message: 'Discard the changes in this window?',
+                confirmLabel: 'Discard',
+                cancelLabel: 'Keep editing',
+                returnFocus: () => win.focusFirst()
+            });
+            const discard = await pendingConfirm;
+            pendingConfirm = null;
+            confirming = false;
+            if (discard) {
                 win.close();
             }
         }
     };
 
+    let confirming = false;
+    let finished = false;
+    let pendingConfirm = null;
+
     dialog.addEventListener('cancel', (event) => {
+        if (!event.cancelable) {
+            return;
+        }
         event.preventDefault();
         win.requestCancel();
+    });
+
+    dialog.addEventListener('close', () => {
+        if (finished) {
+            return;
+        }
+        pendingConfirm?.dismiss();
+        pendingConfirm = null;
+        confirming = false;
+        win.close();
     });
 
     document.body.append(dialog);
     dialog.showModal();
 
     return win;
+};
+
+export const confirmDialog = ({ title, message, confirmLabel, cancelLabel = 'Cancel', returnFocus = null }) => {
+    let dismiss;
+    const result = new Promise((resolve) => {
+        let settled = false;
+        const win = openDialog({ title, returnFocus });
+        win.dialog.querySelector('.cms-dialog-note').hidden = true;
+        win.body.append(el('p', '', message));
+
+        const settle = (value, options) => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            win.close(options);
+            resolve(value);
+        };
+
+        dismiss = () => settle(false, { restoreFocus: false });
+
+        win.requestCancel = () => settle(false);
+        win.dialog.addEventListener('close', () => settle(false));
+        win.setActions([
+            { label: cancelLabel, onClick: () => settle(false) },
+            { label: confirmLabel, primary: true, onClick: () => settle(true) }
+        ]);
+        win.actions.querySelector('button')?.focus();
+    });
+    result.dismiss = dismiss;
+    return result;
 };

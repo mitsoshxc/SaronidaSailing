@@ -1,4 +1,4 @@
-import { el, openDialog } from './dialog.js';
+import { confirmDialog, el, openDialog } from './dialog.js';
 import { parseLink } from './values.js';
 
 let counter = 0;
@@ -177,8 +177,14 @@ export const openLinkWindow = ({ element, fields, returnFocus }) => {
         win.close();
     };
 
-    const remove = () => {
-        if (confirm('Remove this link?')) {
+    const remove = async () => {
+        const confirmed = await confirmDialog({
+            title: 'Remove link?',
+            message: 'The link is removed from this field. Save page to apply.',
+            confirmLabel: 'Remove link',
+            returnFocus: () => win.focusFirst()
+        });
+        if (confirmed) {
             fields.write(element, '');
             win.close();
         }
