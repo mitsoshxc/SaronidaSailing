@@ -1,6 +1,6 @@
 # Architecture
 
-Status: **Phases 0-3 are implemented (decisions, foundation, admin authentication, CMS core: content entities and service, visitor tag helpers, SEO tags, output cache); everything else (inline editing UI, media, Instagram, jobs, deploy) is agreed design, not yet built.** Update as phases land.
+Status: **Phases 0-4 are implemented (decisions, foundation, admin authentication, CMS core, inline editing: save API, sanitizing, history, admin rendering and the editing UI); everything else (media, Instagram, jobs, public pages, deploy) is agreed design, not yet built.** Update as phases land.
 
 ## Tech Stack
 
@@ -46,9 +46,9 @@ SaronidaSailing.slnx
 global.json, Directory.Build.props, Directory.Packages.props, nuget.config
 .config/dotnet-tools.json          dotnet-ef local tool
 src/
-  SaronidaSailing.Core/            Entities/ (BaseEntity, ApplicationUser, Content*), Interfaces/ (repositories, IContentService, IUnitOfWork, IPageCacheInvalidator, PageContent), Services/ (ContentService, ContentKeys, ContentLocales, ContentLink); no EF, no ASP.NET
-  SaronidaSailing.Infrastructure/  Data/ (AppDbContext, DatabaseInitializer, UnitOfWork, Configurations/, Migrations), Repositories/, Health/, Logging/ (AuditLog), Media/, DependencyInjection.cs
-  SaronidaSailing.Web/             Program.cs, SiteOptions.cs, Caching/ (CacheTags, OutputCachePageInvalidator), Content/ (PageContentAccessor), TagHelpers/, Cli/, Identity/, Localization/, Health/, Pages/ (Pages/Admin/), wwwroot, appsettings*.json
+  SaronidaSailing.Core/            Entities/ (BaseEntity, ApplicationUser, Content*), Interfaces/ (repositories, IContentService, IRichTextSanitizer, IUnitOfWork, IPageCacheInvalidator, PageContent), Services/ (ContentService, ContentBatch, ContentKeys, ContentLocales, ContentLink); no EF, no ASP.NET
+  SaronidaSailing.Infrastructure/  Data/ (AppDbContext, DatabaseInitializer, UnitOfWork, Configurations/, Migrations), Repositories/, Content/ (RichTextSanitizer), Health/, Logging/ (AuditLog), Media/, DependencyInjection.cs
+  SaronidaSailing.Web/             Program.cs, SiteOptions.cs, Caching/ (CacheTags, OutputCachePageInvalidator), Content/ (PageContentAccessor, CmsEditContext, CmsEditorConfig), Endpoints/ (ContentEndpoints, ContentApiModels), TagHelpers/, Cli/, Identity/, Localization/, Health/, Pages/ (Pages/Admin/, Pages/Dev/), wwwroot (css/, js/cms/, lib/quill/, lib/sortablejs/), appsettings*.json
 tests/
   SaronidaSailing.Tests/           xUnit; temp-file databases (see docs/conventions.md -> Tests)
 Dockerfile, .dockerignore
@@ -72,7 +72,7 @@ Root build files:
 Data layer (`Infrastructure/Data/`):
 
 - `AppDbContext` stamps `CreatedAt` / `UpdatedAt` on every `SaveChanges*` from the injected `TimeProvider` (see `docs/domain-model.md` -> Entities). A convention converter makes every `DateTime` come back from SQLite as UTC.
-- `DatabaseInitializer.InitializeDatabaseAsync` runs in `Web/Program.cs` before the app accepts requests: creates the database folder, applies migrations, then sets `PRAGMA journal_mode=WAL`. Migrations so far: an empty `InitialCreate`, `AddIdentity` (the Identity tables) and `AddContent` (`ContentItems`, `ContentListItems`, `ContentSections`, `ContentHistory`; see `docs/domain-model.md`).
+- `DatabaseInitializer.InitializeDatabaseAsync` runs in `Web/Program.cs` before the app accepts requests: creates the database folder, applies migrations, then sets `PRAGMA journal_mode=WAL`. Migrations so far: an empty `InitialCreate`, `AddIdentity` (the Identity tables) and `AddContent` (`ContentItems`, `ContentListItems`, `ContentSections`, `ContentHistory`; see `docs/domain-model.md`) and `AddContentHistorySaveId` (adds `ContentHistory.SaveId`, backfills `SaveId = Id` for existing rows, adds an index).
 - Entity configurations are in `Infrastructure/Data/Configurations/` (one per content entity). Repositories (`Infrastructure/Repositories/`: `ContentItemRepository`, `ContentListItemRepository`, `ContentSectionRepository`, `ContentHistoryRepository`) only **stage** changes; `IUnitOfWork` (`Infrastructure/Data/UnitOfWork.cs`) has `SaveChangesAsync` (one commit, one transaction) and `DiscardChanges`. All are scoped (`AddInfrastructure`).
 - Connection string `ConnectionStrings:Content`; a missing value fails startup.
 
@@ -157,43 +157,176 @@ Implemented in Phase 3 (`Web/Program.cs`, `Web/Caching/`).
 - Each page declares the policy and its own tag on its page model: `[OutputCache(PolicyName = CacheTags.PolicyName, Tags = [CacheTags.HomePage])]` (tag `page:{pageKey}`, e.g. `page:home`). Only `IndexModel` is cached so far; a guard test (`OutputCacheTests`) requires every built site page to carry the policy and its page tag, so a new page without it fails the tests.
 - `IContentService.ApplyChangesAsync` calls `IPageCacheInvalidator` once per save with the touched page keys. `OutputCachePageInvalidator` (singleton, `IOutputCacheStore.EvictByTagAsync`) evicts `page:X` for each touched page; if `shared` is touched it evicts `pages:all` only.
 - A successful Instagram fetch evicts `page:home` (planned, Phase 6).
-- Authenticated requests (the admin) are neither served from nor stored in the cache — built-in default policy behaviour. `app.UseOutputCache()` is placed **after** `UseAuthentication()`/`UseAuthorization()`.
+- Authenticated requests (the admin) are neither served from nor stored in the cache — built-in default policy behaviour (and admin-rendered pages are sent with `Cache-Control: no-store`). `app.UseOutputCache()` is placed **after** `UseAuthentication()`/`UseAuthorization()`.
 - Cache is lost on restart/redeploy; pages rebuild on first request.
 
 ## CMS Editing Flow
 
-1. **Implemented (Phase 3, visitor rendering).** Razor templates mark editable spots with tag helper **attributes on real elements** (`Web/TagHelpers/`), not wrapper elements:
+```
+Template (Razor, tag helper attributes)
+   |  admin signed in? -- no --> visitor HTML (cached)
+   v yes
+Admin HTML: data-cms-* attributes + #cms-config JSON + cms-edit.css + cms-edit.js (Cache-Control: no-store)
+   |  admin edits in place; every change stays in the browser as pending
+   v
+Save page --> POST /admin/api/content (one request)
+   |            ContentService.ApplyChangesAsync: validate + sanitize -> one transaction -> one cache eviction -> one audit line
+   v
+200 {saveId} --> page reloads ("Saved")      400 {errors} --> nothing written, errors shown in the toolbar
+```
+
+### Template markup
+
+Razor templates mark editable spots with tag helper **attributes on real elements** (`Web/TagHelpers/`), not wrapper elements:
 
 | Markup | Does |
 |---|---|
-| `<h1 cms="home.hero.title">` | Fills the element with a `Text` value (encoded) or a `RichText` value (emitted as HTML). Any other type logs a warning and omits the element |
-| `<a cms-link="home.hero.cta">` | Link field: sets `href` and the label. An `https:` link also gets `target="_blank"`, `rel="noopener"` and a visually hidden "(opens in a new tab)" notice in the page language (`Localization/UiText.cs`). Invalid link JSON or a disallowed scheme logs a warning and omits the element |
-| `<li cms-list="home.highlights">` | Repeats the element once per **active** entry, in `SortOrder`. Inside it, `cms-field="title"` and `cms-link-field="link"` read that entry's fields. Lists cannot be nested; no active entries omits the element |
+| `<h1 cms="home.hero.title">` | Fills the element with a `Text` value (encoded). Add `cms-rich` (`<div cms="about.story.body" cms-rich>`) to declare a `RichText` field, emitted as HTML. If the stored type differs from what the template declares, a warning is logged and the element is omitted |
+| `<a cms-link="home.hero.cta">` | Link field: sets `href` and the label. An `https:` link also gets `target="_blank"`, `rel="noopener"` and a visually hidden "(opens in a new tab)" notice in the page language (`Localization/UiText.cs`). Invalid link JSON or a disallowed scheme logs a warning and omits the element for visitors; the admin sees it flagged `data-cms-invalid` |
+| `<li cms-list="home.highlights">` | Repeats the element once per **active** entry (the admin also sees inactive ones), in `SortOrder`. Inside it, `cms-field="title"` (with optional `cms-rich`) and `cms-link-field="link"` read that entry's fields. Lists cannot be nested; no active entries omits the element for visitors |
 | `<section cms-section="home.instagram">` | Omits the whole element when the section is inactive (a section with no row is active) |
+| `<a cms-section-link="home.instagram">` | A menu link to a section (`CmsSectionLinkTagHelper`): omitted for visitors when that section is inactive. Accepts only a section of the current page or of `shared`; any other page key throws at render time |
 | `<cms-seo fallback-title="...">` | Page `<title>`, description and Open Graph tags (see SEO) |
 
-   A field with no value in either language omits its element for visitors (Phase 4 gives the admin a placeholder). An invalid key, or `cms-field` outside a `cms-list`, throws. `Web/TagHelpers/CmsFieldResolver.cs` holds the shared key checks. **`<cms-image>` (with `srcset`, `alt-source`) is planned, Phase 5.**
-2. Tag helpers read a per-request snapshot, `IPageContentAccessor` (`Web/Content/PageContentAccessor.cs`, scoped): the first call asks `IContentService.GetPageContentAsync(page, locale)` for the current page (from `ILocalizedUrlService`; `shared` when the route is not a site page) and the UI-culture locale, and every later call reuses it. The snapshot (`Core/Interfaces/PageContent.cs`) holds the page's content plus `shared` content, loaded in one pass (three queries: items, list items, sections). English values that are missing or blank fall back to the Greek value, flagged `IsFallback`. For visitors, inactive list items and sections are not rendered.
-3. **Planned (Phase 4).** When the admin is signed in, tag helpers also render `data-cms-*` attributes, inactive list items are shown dimmed, and the layout loads `wwwroot/js/cms-edit.js`.
-4. **Admin toolbar** (top of the page): Edit mode on/off (off = see the page exactly as a visitor), **Save page**, Discard, unsaved-changes counter, Page settings, language switch, jobs dashboard link, logout.
-5. `cms-edit.js` provides: inline text editing; **modals** (native `<dialog>`) for rich text, links, images, history and Page settings; for lists: add, delete (with confirmation), drag-to-reorder (SortableJS, self-hosted) **plus up/down buttons** (keyboard and phone), active/inactive toggle; an active/inactive toggle per section. Menu links to an inactive section are hidden too.
-6. **One save per page:** every change (fields, list operations, section toggles) is kept in the browser as pending until the admin clicks **Save page**. Save sends all pending changes in **one request**, written in **one database transaction**, followed by **one** cache eviction. The page warns before navigating away with unsaved changes. Save publishes immediately (no draft/publish workflow) — history makes every change undoable. Only changed fields are sent, so two admins editing different fields of a page don't overwrite each other; the same field: last save wins.
-7. Image files are uploaded and processed when chosen (the file must be processed anyway); assigning the image to the field is a pending change like any other.
-8. **Implemented (Phase 3, service side; the HTTP endpoint and UI are Phase 4).** Save → write content + append history → evict the page's output-cache tag (`pages:all` if shared content changed). The write API is one method, `IContentService.ApplyChangesAsync(changes, ContentEditor)` (`Core/Services/ContentService.cs`, `ContentBatch.cs`), taking an ordered list of change records (`Core/Interfaces/ContentChanges.cs`):
+A field with no value in either language omits its element for visitors; the admin gets an empty element flagged `data-cms-empty` to click into. An invalid key, or `cms-field` outside a `cms-list`, throws. `Web/TagHelpers/CmsFieldResolver.cs` holds the shared key checks. **`<cms-image>` (with `srcset`, `alt-source`) is planned, Phase 5.**
+
+### Content snapshot
+
+Tag helpers read a per-request snapshot, `IPageContentAccessor` (`Web/Content/PageContentAccessor.cs`, scoped): the first call asks `IContentService.GetPageContentAsync(page, locale)` for the current page (from `ILocalizedUrlService`; `shared` when the route is not a site page) and the UI-culture locale, and every later call reuses it. The snapshot (`Core/Interfaces/PageContent.cs`) holds the page's content plus `shared` content, loaded in one pass (three queries: items, list items, sections). English values that are missing or blank fall back to the Greek value, flagged `IsFallback`. For visitors, inactive list items and sections are not rendered.
+
+### Admin rendering
+
+`ICmsEditContext.IsEditorAsync()` (`Web/Content/CmsEditContext.cs`, scoped) evaluates the `Admin` policy once per request. For an admin it also sets `Cache-Control: no-store` on the response (in `OnStarting`, after antiforgery's own header). Only then do the tag helpers and `Pages/Shared/_Layout.cshtml` emit admin markup:
+
+| Emitted | Where |
+|---|---|
+| `data-cms-key`, `data-cms-type` (`text`, `richText`, `link`) | Every field element |
+| `data-cms-value` | Rich-text and link fields: the stored HTML / link JSON, so the editors start from the saved value |
+| `data-cms-fallback`, `data-cms-empty`, `data-cms-invalid` | Flags: English shows the Greek fallback, no value, invalid link |
+| `data-cms-list`, `data-cms-item` | Every list item copy (`data-cms-item` is the item's Id) |
+| `<template data-cms-list-template="{listKey}">` | After each list: one empty copy of the item markup, cloned by "Add item" |
+| `data-cms-section`, `data-cms-section-link` | Sections and their menu links |
+| `data-cms-active="false"` | Inactive list items, sections and section links; shown dimmed |
+| `<script type="application/json" id="cms-config">` | `CmsEditorConfig` (`Web/Content/CmsEditorConfig.cs`): `pageKey`, `locale`, `saveUrl`, `historyUrl`, `savesUrl`, `antiforgeryToken`, `opensInNewTab` and `seo` (the page's SEO title and description, each with its Greek value when English falls back; null on non-site pages) |
+| `_AdminToolbar` partial, `~/css/cms-edit.css`, `~/js/cms-edit.js` (module) | Layout |
+
+### Save API
+
+`Web/Endpoints/ContentEndpoints.cs` (`MapContentEndpoints`, called in `Program.cs`) maps the group `/admin/api/content`, which requires the `Admin` policy and sets `Cache-Control: no-store` through an endpoint filter. Request and response records are in `Web/Endpoints/ContentApiModels.cs`; endpoints only translate and delegate to `IContentService`.
+
+| Endpoint | Behaviour |
+|---|---|
+| `POST /admin/api/content` | Body `{ "changes": [ ... ] }`, each change a polymorphic record with an `op` discriminator: `setField`, `addListItem`, `deleteListItem`, `reorderList`, `setListItemActive`, `setSectionActive` (see Write service). Field `type` is a camel-case string (`text`, `richText`, `link`). The antiforgery token must be sent in the `RequestVerificationToken` header (`HeaderName` set in `Program.cs`). Success: `200 {"saveId": "..."}` (`saveId` is null when the batch changed nothing). Invalid changes: `400 {"errors": [...]}`, nothing written |
+| `GET /admin/api/content/history?key=&locale=&listItemId=` | The saved versions of one field, newest first: `[{saveId, value, changedBy, createdAt}]`. `400` for an invalid key, locale or `listItemId` |
+| `GET /admin/api/content/saves/{saveId}` | One save: `{saveId, changedBy, createdAt, fields: [{key, locale, type, listItemId, value, previousValue, currentValue}]}`; `404` when the save has no history rows. `previousValue` is the field's value in the version before that save (empty for the first version), `currentValue` is its value now |
+
+Other status codes of `POST`:
+
+| Status | Cause |
+|---|---|
+| 400 `{errors: ["Invalid antiforgery token."]}` | Missing or wrong token |
+| 400 `{errors: ["Malformed request body..."]}` | Not valid JSON for the request shape (the JSON path is named), unknown `op`, a `null` entry in `changes` |
+| 413 | Body over **256 KB** (`MaxBodyBytes`): checked on `Content-Length` and while reading the body |
+| 401 / 403 | Not signed in / signed in without `amr=mfa` |
+
+**401/403 instead of a login redirect:** `Web/Identity/AdminApiCookieEvents.cs` replaces the cookie `OnRedirectToLogin` / `OnRedirectToAccessDenied` events. For any path under `/admin/api` they set status 401 / 403; for every other path they redirect as before.
+
+### Write service
+
+The write API is one method, `IContentService.ApplyChangesAsync(changes, ContentEditor)` (`Core/Services/ContentService.cs`, `ContentBatch.cs`), taking an ordered list of change records (`Core/Interfaces/ContentChanges.cs`):
 
 | Change | Effect |
 |---|---|
-| `SetField(key, locale, type, value, listItemId?)` | Creates or updates a field; every changed value appends a `ContentHistory` row (the first save included). A different `Type` than the stored one is rejected. Setting the same value is a no-op (no history row) |
-| `AddListItem(listKey, id)` | Appends a list item at the end. The `Id` is generated by the client so later changes in the same save can refer to it; empty or already-used Ids are rejected |
+| `SetField(key, locale, type, value, listItemId?)` | Creates or updates a field; every changed value appends a `ContentHistory` row (the first save included). A different `Type` than the stored one is rejected. Setting the same value is a no-op (no history row). Two `SetField` for the same key, locale and list item in one batch keep the last value (one history row) |
+| `AddListItem(listKey, id)` | Appends a list item at the end. The `Id` is generated by the client (`crypto.randomUUID()`) so later changes in the same save can refer to it; empty or already-used Ids are rejected |
 | `DeleteListItem(listKey, id)` | Deletes the item (its fields and their history cascade) |
 | `ReorderList(listKey, orderedIds)` | Must list each current item exactly once |
 | `SetListItemActive(listKey, id, isActive)` | Shows or hides a list item |
 | `SetSectionActive(sectionKey, isActive)` | Shows or hides a section |
 
-   Changes are validated and applied in order (keys, locale, type, value present, list item belongs to the list); then **one** `IUnitOfWork.SaveChangesAsync` commit, **one** `IPageCacheInvalidator.EvictPagesAsync` call with the touched pages, and **one** `content-saved` audit line. Any invalid change means nothing is written: the pending staging is discarded, errors are returned in `ContentSaveResult`, and `content-save-rejected` is audited. Changes that alter nothing do not count as touching a page. The editor is identified by email (`ContentEditor(Email, IpAddress)`). No sanitizing yet: HtmlSanitizer and link validation on save come with the Save-page endpoint in Phase 4.
-9. Rich-text HTML is sanitized server-side (HtmlSanitizer library) before storage. Allowed formatting: bold, italic, links, bullet and numbered lists, subheadings. Editor library: **Quill 2** (BSD-3), self-hosted, toolbar limited to exactly these formats. (TinyMCE rejected: GPLv2+ since v7.)
-10. **Edit history is kept forever** (every previous value in `ContentHistory`); a field's History modal restores any earlier version (as a pending change, saved with Save page).
-11. **Page settings modal**: per page and language, the SEO fields `{page}.seo.title` (browser tab / search result title), `{page}.seo.description` (search result snippet) and `{page}.seo.image` (link-preview image for Facebook, WhatsApp, etc. via Open Graph tags).
+Changes are validated and applied in order (keys, locale, type, value present, list item belongs to the list, then the sanitizing and link checks below); then **one** `IUnitOfWork.SaveChangesAsync` commit, **one** `IPageCacheInvalidator.EvictPagesAsync` call with the touched pages, and **one** `content-saved` audit line. Any invalid change means nothing is written: the pending staging is discarded, errors are returned in `ContentSaveResult`, and `content-save-rejected` is audited. Changes that alter nothing do not count as touching a page, and a batch that touches no page returns success without a `SaveId`. The editor is identified by email (`ContentEditor(Email, IpAddress)`).
+
+### Sanitizing and validation
+
+Both run inside `ContentService.ApplyChangesAsync` (`ContentBatch.SetFieldAsync`), so every writer is covered (the save endpoint, the Phase 7 seed, jobs), not only the HTTP endpoint.
+
+| Value type | Rule |
+|---|---|
+| `RichText` | Passed through `IRichTextSanitizer` (`Core/Interfaces/`), implemented by `RichTextSanitizer` (`Infrastructure/Content/`, HtmlSanitizer 11.0.16, registered as a singleton). Allowed tags: `p`, `br`, `strong`, `em`, `a`, `ul`, `ol`, `li`, `h3`. The only allowed attribute is `href`; no classes, CSS or `data-` attributes. Allowed URL schemes: `https`, `mailto`, `tel`, and only on `a`. Disallowed tags are unwrapped (children kept), except `script`, `style`, `iframe`, `frame`, `frameset`, `object`, `embed`, `applet`, `noscript`, `template`, `textarea`, `title`, `svg` and `math`, which are dropped with their content. A result that is only empty paragraphs becomes `""` |
+| `Link` | An empty value clears the link. Otherwise the JSON must parse with `ContentLink.TryParse`: `https:`, `mailto:` or `tel:` URL and a non-blank label; if not, the save is rejected with an error naming the field |
+| `Text` | Stored as sent |
+
+### History
+
+- `ContentHistory.SaveId` (`docs/domain-model.md`): one id per `ApplyChangesAsync` call, shared by all history rows of that save; a field gets at most one row per save.
+- `GetFieldHistoryAsync(key, locale, listItemId)` returns a field's versions newest first; `GetSaveAsync(saveId)` returns the fields of a save with their `PreviousValue` and `CurrentValue` (computed in `ContentService` from the field's other history rows).
+- History holds **field values only**. List structure (add, delete, reorder, hide) and section toggles are not in history; a deleted list item takes its history with it.
+- **Edit history is kept forever.** The History window restores a version or undoes a whole save, both as pending changes saved with Save page.
+
+### Admin toolbar
+
+`Pages/Shared/_AdminToolbar.cshtml`, at the top of the page (`role="region"`):
+
+| Control | Notes |
+|---|---|
+| Save page | Disabled until there are pending changes; Ctrl/Cmd+S does the same while edit mode is on |
+| Unsaved counter | "No unsaved changes" / "N unsaved changes" (fields plus list and section operations) |
+| More | Opens the panel with the rest; hidden from 720 px up, where the panel's controls sit inline |
+| Edit mode | Toggle, `aria-pressed`. Off = the page looks exactly as for a visitor |
+| Discard | Asks for confirmation, then reloads the page |
+| Page settings | Only on a site page |
+| "N missing in English" | English pages only; hidden when the count is 0 |
+| Language link, Jobs, Log out | Log out is a POST form with an antiforgery token |
+
+A status line and an error list (`role="alert"`) sit below the controls.
+
+### Editing UI (client)
+
+`wwwroot/js/cms-edit.js` is the entry module: it reads `#cms-config` and wires the modules in `wwwroot/js/cms/`. It is loaded only for the admin. Plain ES modules, no framework.
+
+| Module | Role |
+|---|---|
+| `pending.js` | The pending model. Field changes are keyed by key + locale + list item id and dropped when the value returns to the original; list and section operations live in named **op slots** (`list:{listKey}`, `section:{sectionKey}`) that are replaced as a whole. `toBatch()` puts the ops first, then the `setField` changes |
+| `fields.js` | Reads and writes one field element: original value, preview of the new value, `data-cms-dirty` / `-empty` / `-invalid` / `-fallback` flags, hand-off to `pending` |
+| `inline.js` | Inline editing of `text` fields (`contenteditable="plaintext-only"`). Enter finishes, Escape reverts. Clicks on editable links are blocked in edit mode |
+| `toolbar.js` | Save (one `fetch` POST with the `RequestVerificationToken` header; on an antiforgery 400 it reloads the page HTML once for a fresh token and retries), Discard, counter, More panel, `beforeunload` warning, the `--cms-toolbar-height` CSS variable, the "Saved" message after the reload, messages for 400 / 401 / 403 / 413 |
+| `edit-mode.js` | Edit mode on/off. Starts **on**; remembered per tab in `sessionStorage` (`cms-edit-mode`). Off adds the class `cms-view` to `<html>` |
+| `fieldbar.js` | The small bar next to a focused or clicked field: "History" for every field, plus "Edit text" / "Edit link". Clicking a rich-text block or a link opens its window directly |
+| `windows.js`, `dialog.js` | `dialog.js` builds the native `<dialog>` windows (focus return, Escape asks before discarding changes); `windows.js` opens the four window types |
+| `rich-window.js`, `quill-loader.js`, `rich-html.js` | Rich-text window: Quill 2 limited to heading (h3), bold, italic, numbered and bulleted lists, link and clear formatting. `quill-loader.js` loads Quill lazily. `rich-html.js` is a client-side mirror of the sanitizer's allowed tags, for preview only; the server's sanitizer is the authority. Links not starting with `https://`, `mailto:` or `tel:` are refused |
+| `link-window.js`, `values.js` | Link window: type picker (Web page / Email / Phone, which adds `https://`, `mailto:` or `tel:`), label, "Remove link". `values.js` holds shared helpers (text normalize, link parse, allowed schemes) |
+| `history-window.js` | Loads `historyUrl`; "Restore this version" sets the field as a pending change; "Undo this whole save" loads `savesUrl{saveId}`, lists the fields that differ from before the save, flags those changed again by a later save (undo overwrites them), and sets them back as pending changes |
+| `settings-window.js` | Page settings: `{page}.seo.title` and `{page}.seo.description` in the current language, with the Greek value shown as guidance when English is empty. The image field comes in Phase 5 |
+| `missing.js` | Counts elements flagged `data-cms-fallback` and jumps to the next one |
+| `lists.js` | List editing (below) |
+| `sections.js` | Section bar (below) |
+
+**Lists** (`lists.js`): each list item gets an **item bar** (drag handle, Move up, Move down, Hide/Show, Delete), shown while the pointer or keyboard focus is inside the item. Each list ends with **Add item**: it clones the `data-cms-list-template`, gives the copy a new GUID and focuses its first field. Delete asks first (Delete, "Hide instead", Cancel); a saved item has no history, so its deletion cannot be undone after Save. The list operations are **computed from the DOM** against the state at page load, not recorded as clicks: `addListItem` for new ids, `deleteListItem` for missing ids, `setListItemActive` for changed visibility, and one `reorderList` when the order differs from the expected one. The result goes into the slot `list:{listKey}`. Pending edits of a deleted item's fields are dropped. Drag-and-drop uses SortableJS, loaded lazily only when the page has a list; if it fails to load, the buttons still work.
+
+**Sections** (`sections.js`): every `data-cms-section` gets an always-visible **section bar** with Hide section / Show section. The toggle also dims or restores the section's menu links (`data-cms-section-link`) and sets the slot `section:{sectionKey}` with a `setSectionActive` op (empty when the state returns to the original). The same visibility applies to both languages.
+
+**Phone layout** (under 720 px; `wwwroot/css/cms-edit.css` is mobile-first with a single `min-width: 720px` breakpoint): the toolbar stays in one line (Save page, counter, More) and More opens a panel below; windows are full-screen (`100vw` x `100dvh`) and become centred dialogs from 720 px; the item drag handle is hidden, so items move with the up/down buttons; buttons in the item and section bars and the toolbar are 44 px (2.75rem) touch targets, shrinking from 720 px; `scroll-padding-top` follows `--cms-toolbar-height` so focused fields are not hidden under the toolbar.
+
+### Vendored libraries
+
+Self-hosted in `wwwroot/lib/`, each folder with a `README.md` (version, source, files, date) and the license. Both load lazily and only for the admin.
+
+| Library | Version | Files | Loaded by |
+|---|---|---|---|
+| Quill (BSD-3-Clause) | 2.0.3 | `lib/quill/quill.js` (UMD, sets `window.Quill`), `quill.snow.css` | `quill-loader.js`, the first time a rich-text window opens |
+| SortableJS (MIT) | 1.15.6 | `lib/sortablejs/sortable.core.esm.js` (core ES module, no plugins) | `lists.js`, `import()` when the page has a list. No auto-scroll while dragging; the up/down buttons cover long lists |
+
+The CSP is own-origin only (`docs/deployment.md`), so admin JS never adds `style=""` attributes or `<style>` elements; setting `element.style` through the CSSOM is allowed.
+
+### Dev sandbox
+
+`/dev/cms-sandbox` and `/en/dev/cms-sandbox` (`Pages/Dev/CmsSandbox.cshtml`; the English route is added in `Program.cs` only in Development). `CmsSandboxModel` returns 404 outside Development. It uses keys under `shared.sandbox*` (a text, a rich-text block, a link, a list with text / rich text / link fields, a plain list, two sections and a `cms-section-link`), so the editing UI can be exercised before the real pages exist. In Phase 4 the UI is verified by driving the Claude browser on this page, not with Playwright.
+
+### Other rules
+
+- **One save per page:** every change (fields, list operations, section toggles) is kept in the browser as pending until the admin clicks **Save page**. Save sends all pending changes in **one request**, written in **one database transaction**, followed by **one** cache eviction. The page warns before navigating away with unsaved changes. Save publishes immediately (no draft/publish workflow). Only changed fields are sent, so two admins editing different fields of a page don't overwrite each other; the same field: last save wins.
+- Image files are uploaded and processed when chosen (the file must be processed anyway); assigning the image to the field is a pending change like any other. **Planned, Phase 5.**
+- **Page settings window:** per page and language, the SEO fields `{page}.seo.title` (browser tab / search result title) and `{page}.seo.description` (search result snippet). `{page}.seo.image` (link-preview image for Facebook, WhatsApp, etc. via Open Graph tags) is planned, Phase 5.
 
 ## Media Pipeline (SkiaSharp)
 
@@ -348,7 +481,7 @@ Implemented. Configuration is the `NLog` section of `appsettings.json`, loaded i
 | `login-rate-limited` | Rate limiter rejection (details: path) |
 | `admin-added`, `admin-password-reset`, `admin-removed`, `admin-listed`, `admin-remove-cancelled` | CLI commands (user `cli`) |
 | `admin-add-failed`, `admin-password-reset-failed`, `admin-remove-failed` | CLI command failed (details: email and errors) |
-| `content-saved` | A content batch was committed (details: `pages=` touched page keys and counts of `fields`, `list-added`, `list-deleted`, `reordered`, `list-activated`, `sections`) |
+| `content-saved` | A content batch was committed (details: `pages=` touched page keys, counts of `fields`, `list-added`, `list-deleted`, `reordered`, `list-activated`, `sections`, and `save=` the save id) |
 | `content-save-rejected` | A content batch had an invalid change and nothing was written (details: error count and the first error) |
 
 The user field of the content events is the editor's email.
@@ -361,8 +494,10 @@ The user field of the content events is the editor's email.
 | Real client IP | nginx `realip` module sets the client IP from `CF-Connecting-IP` (Cloudflare ranges only) and forwards it in `X-Forwarded-For`. The app (`UseForwardedHeaders`, `Web/ForwardedHeadersSetup.cs`) reads `X-Forwarded-For` and `X-Forwarded-Proto` with `ForwardLimit = 1`, and trusts them **only** from the networks in `ForwardedHeaders:KnownNetworks` = `172.30.0.0/24`, the docker compose network subnet. It is not `127.0.0.1`: host nginx reaches the container through the published port, so the app sees the request coming from the compose network gateway. The compose file must pin that subnet (see `docs/deployment.md`) |
 | Rate limiting | `UseRateLimiter` with one global partitioned limiter (`Web/Identity/AdminLoginRateLimit.cs`): only **POSTs** to `/admin/login`, `/admin/login/code`, `/admin/login/recovery` and `/admin/two-factor/setup` are limited, 10 per minute per client IP, fixed window, no queue. Rejection: 429, `Retry-After: 60`, plain-text message, audit event `login-rate-limited`. GETs and all other paths are not limited |
 | Lockout | 5 failed attempts → 15 minutes, per account; TOTP and recovery failures count |
-| CSRF | Antiforgery tokens on all admin write endpoints; antiforgery cookie `Secure`, `HttpOnly`, `SameSite=Strict` |
-| XSS | Razor encoding by default; rich text sanitized with HtmlSanitizer before storage; link URLs restricted to `https:`, `tel:`, `mailto:` |
+| CSRF | Antiforgery tokens on all admin write endpoints (the save API reads the `RequestVerificationToken` header, token from `#cms-config`); antiforgery cookie `Secure`, `HttpOnly`, `SameSite=Strict` |
+| Admin API | `/admin/api/*` requires the `Admin` policy, answers 401 / 403 instead of a login redirect, sends `Cache-Control: no-store`, and rejects bodies over 256 KB with 413 |
+| Admin pages in caches | Pages rendered for an admin carry `Cache-Control: no-store` and are never stored by the output cache |
+| XSS | Razor encoding by default; rich text sanitized with HtmlSanitizer on save, inside `ContentService` (see CMS Editing Flow); link URLs restricted to `https:`, `tel:`, `mailto:` and validated on save |
 | Transport | Cloudflare SSL mode **Full (strict)**; Let's Encrypt cert on the origin |
 | Uploads | Admin-only; validated by decoding; size limits |
 
@@ -393,7 +528,7 @@ The Privacy page must cover Cloudflare (hosting/CDN, analytics), Google Maps, an
 
 ## Admin Devices
 
-Edit mode is designed for **laptop/desktop**. On phones it must work for quick text fixes: toolbar collapses, modals go full-screen, up/down buttons instead of dragging.
+Edit mode is designed for **laptop/desktop**. On phones (under 720 px) it works for quick fixes: the toolbar collapses behind a More button, windows go full-screen, and up/down buttons replace dragging (see CMS Editing Flow → Editing UI).
 
 ## Accessibility
 

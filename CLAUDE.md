@@ -6,7 +6,7 @@ Stack: ASP.NET Core 10 Razor Pages · Entity Framework Core 10 · SQLite · ASP.
 
 Languages: Greek (default, no URL prefix) and English (`/en/`). Pages and sections come from the "Saronida Sailing Redesign" design canvas: https://claude.ai/artifact/RcU5iMfQSTJ34rH5gFB7MC (read it with the Artifact tool; desktop artboards `Desktop*.dc.html` hold the full layouts, the canvas notes hold design decisions).
 
-Project status: **Phase 3 (CMS Core) is complete**. Docs mark what is implemented and what is still agreed design; `PLAN.md` tracks the rest of the build.
+Project status: **Phase 4 (Inline Editing) is complete**. Docs mark what is implemented and what is still agreed design; `PLAN.md` tracks the rest of the build.
 
 ## Before You Start (working agreements)
 

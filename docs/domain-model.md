@@ -1,6 +1,6 @@
 # Domain Model
 
-Status: **`BaseEntity`, `ApplicationUser` and the four content entities (`ContentItem`, `ContentListItem`, `ContentSection`, `ContentHistory`; migration `AddContent`) are implemented. `MediaAsset`, `InstagramPost` and `IntegrationSetting` are planned, not yet implemented.**
+Status: **`BaseEntity`, `ApplicationUser` and the four content entities (`ContentItem`, `ContentListItem`, `ContentSection`, `ContentHistory`; migrations `AddContent` and `AddContentHistorySaveId`) are implemented. `MediaAsset`, `InstagramPost` and `IntegrationSetting` are planned, not yet implemented.**
 
 ## Content Keys
 
@@ -47,7 +47,7 @@ SQLite and Postgres treat NULLs as distinct in unique indexes, so uniqueness is 
 
 A list item's fields carry the list's `PageKey` and its `ListKey` as `SectionKey`. `ContentPersistenceTests` proves both indexes on SQLite.
 
-`Value` is not sanitized yet: HtmlSanitizer and link-URL validation on save arrive with the Save-page API (Phase 4). Link JSON is read and checked by `Core/Services/ContentLink.cs` (`https:`, `tel:`, `mailto:` only).
+`Value` is sanitized and validated by `ContentService.ApplyChangesAsync` before it is stored: `RichText` goes through `IRichTextSanitizer`, `Link` JSON must pass `ContentLink.TryParse` (see `docs/architecture.md` → CMS Editing Flow). Link JSON is read and checked by `Core/Services/ContentLink.cs` (`https:`, `tel:`, `mailto:` only).
 
 ### ContentListItem
 
@@ -72,19 +72,22 @@ Implemented (`Core/Entities/ContentSection.cs`, table `ContentSections`). Visibi
 | `SectionKey` | string (max 100) | Unique together with `PageKey` (`UX_ContentSections_PageKey_SectionKey`) |
 | `IsActive` | bool | Default true; a section with no row counts as active. Inactive sections are hidden from visitors (and their menu links), shown dimmed to the admin |
 
-Toggling `home.instagram` will also remove / re-register the Instagram recurring jobs (planned, see `docs/architecture.md` → Instagram Feed).
+The section bar in edit mode toggles it (`SetSectionActive`). Toggling `home.instagram` will also remove / re-register the Instagram recurring jobs (planned, Phase 6, see `docs/architecture.md` → Instagram Feed).
 
 ### ContentHistory
 
-Implemented (`Core/Entities/ContentHistory.cs`, table `ContentHistory`). Append-only: **one row per saved version** of a field, the first save included. Never pruned — all history is kept; used for undo (the History modal is Phase 4).
+Implemented (`Core/Entities/ContentHistory.cs`, table `ContentHistory`). Append-only: **one row per saved version** of a field, the first save included. Never pruned — all history is kept; used for undo (the History window restores one field's version or undoes a whole save).
 
 | Field | Type | Notes |
 |---|---|---|
 | `ContentItemId` | Guid | FK → `ContentItem`, cascade delete; index `IX_ContentHistory_ContentItemId` |
+| `SaveId` | Guid | One id per `ContentService.ApplyChangesAsync` call (`Guid.CreateVersion7()`), shared by every row written by that save; index `IX_ContentHistory_SaveId` |
 | `Value` | string | The value as saved in that version |
 | `ChangedBy` | string (max 256) | The admin's email, plain text, no FK |
 
-The change time is `CreatedAt`. There is no `ChangedAt` and no `PreviousValue`; the current value stays in `ContentItem`.
+The change time is `CreatedAt`. There is no `ChangedAt` and no `PreviousValue`; the current value stays in `ContentItem`, and a version's previous value is the next-older row of the same item.
+
+A field gets **one history row per field per save**: a batch with two `SetField` for the same key, locale and list item keeps only the last. Migration `AddContentHistorySaveId` added the column and backfilled `SaveId = Id` for existing rows (each old row is its own save); it uses one `migrationBuilder.Sql` statement for the backfill. History covers field values only, not list structure or section toggles.
 
 ### MediaAsset
 

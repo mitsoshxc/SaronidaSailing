@@ -36,6 +36,9 @@ These rules apply to every file in the codebase. The Dev agent enforces them on 
 | Output-cache code lives in `Web/Caching/` | `CacheTags` (policy and tag names), `OutputCachePageInvalidator` (implements `IPageCacheInvalidator` from `Core/Interfaces/`) |
 | The per-request content snapshot lives in `Web/Content/` | `IPageContentAccessor`; tag helpers in `Web/TagHelpers/` read content only through it |
 | Strongly typed options live in `Web/` | e.g. `SiteOptions` (`Site:BaseUrl`), validated on start |
+| The HTML sanitizer lives behind `IRichTextSanitizer` | Interface in `Core/Interfaces/`, `RichTextSanitizer` (HtmlSanitizer) in `Infrastructure/Content/`. Sanitizing and link validation run inside `ContentService`, never only in an endpoint |
+| Minimal-API endpoints live in `Web/Endpoints/` | One static `{Feature}Endpoints` class with a `Map{Feature}Endpoints` extension called from `Program.cs`; request/response records in `{Feature}ApiModels.cs`. Admin API routes are under `/admin/api/` |
+| Admin-render context lives in `Web/Content/` | `ICmsEditContext` (is this request an admin; sets `no-store`), `CmsEditorConfig` (the `#cms-config` JSON) |
 
 `Core` must not reference `Infrastructure` or `Web`. `Infrastructure` must not reference `Web`.
 
@@ -54,6 +57,8 @@ These rules apply to every file in the codebase. The Dev agent enforces them on 
 | Hangfire job | `{Purpose}Job` | `InstagramFetchJob` |
 | Content key | `{page}.{section}.{field}`, lowercase kebab-case | `home.hero.title` |
 | Cache tag | `page:{pageKey}`, plus `pages:all` | `page:home` |
+| Admin API request record | `{Op}Request` (derived from `ContentChangeRequest`); responses `{Thing}Response` | `SetFieldRequest`, `SaveContentResponse` |
+| Client JS module | `wwwroot/js/cms/{role}.js`, exports `create{Role}` or `open{Role}Window` | `pending.js` → `createPending` |
 
 ---
 
@@ -72,7 +77,7 @@ The database must stay swappable (Postgres / SQL Server) with only a provider an
 
 | Rule | Reason |
 |---|---|
-| LINQ only — no raw SQL, no SQLite-specific functions. **Single exception:** the startup `PRAGMA journal_mode=WAL` in `Infrastructure/Data/DatabaseInitializer.cs` | Provider portability |
+| LINQ only — no raw SQL, no SQLite-specific functions. **Exceptions:** the startup `PRAGMA journal_mode=WAL` in `Infrastructure/Data/DatabaseInitializer.cs`, and the data backfill in migration `AddContentHistorySaveId` (`UPDATE "ContentHistory" SET "SaveId" = "Id"`, standard SQL; migrations are provider-specific anyway) | Provider portability |
 | Money (if ever needed) as `long` cents, or display-only | SQLite provider can't compare/order `decimal` in queries |
 | Dates as `DateTime`, always UTC — not `DateTimeOffset` | SQLite provider has limited `DateTimeOffset` query support |
 | Migrations are provider-specific | A provider switch means a fresh initial migration |
@@ -109,6 +114,8 @@ The database must stay swappable (Postgres / SQL Server) with only a provider an
 - NLog's `LogManager` is static, so tests that read log files keep their own factory class (the `LogRetentionTests` pattern: `[Collection(WebHostCollection.Name)]` plus `IClassFixture<TempDatabaseWebApplicationFactory>`).
 - Output-cache behaviour is tested against the real host in `OutputCacheTests` (`OutputCacheWebHostTests`, with its own factory class per the rule above); the policy itself is tested without a host (`CmsPageCachePolicyTests`).
 - Tag helpers are unit-tested without a host through `TagHelperTestSupport` (builds a `PageContent` snapshot and a `FakePageContentAccessor`); `PageContentAccessorWebHostTests` uses the web host.
+- The save API is tested against the real host in `ContentApiTests` (antiforgery header, 256 KB limit, 400/401/403/413, history endpoints); `RichTextSanitizerTests`, `ContentServiceTests` and `ContentHistorySaveIdMigrationTests` cover sanitizing, save ids and the migration backfill; `CmsAdminRenderingTests` and `CmsEditorTagHelperTests` cover the `data-cms-*` output.
+- **No Playwright in Phase 4.** The editing UI (JS and CSS) has no automated tests; it is verified by driving the built-in Claude browser against `/dev/cms-sandbox`. Playwright + axe-core stays planned for the public pages.
 - A fake clock (`FakeTimeProvider`) controls `CreatedAt`/`UpdatedAt` only. `BaseEntity.Id` is `Guid.CreateVersion7()` from the real clock, so it does not follow the fake clock. History reads sort by `CreatedAt` descending, then `Id` descending (`ContentHistoryRepository`); a test that needs a deterministic tie-break passes explicit ids built with `Guid.CreateVersion7(timestamp)` (see `ContentPersistenceTests.HistoryReads_AreNewestFirst`).
 - Tests that only need the `DbContext` (e.g. `BaseEntityTimestampTests`) use a plain SQLite in-memory connection and a fake `TimeProvider`.
 
@@ -124,7 +131,9 @@ The database must stay swappable (Postgres / SQL Server) with only a provider an
 
 ## Views and CMS markup
 
-- CMS tag helpers are **attributes on the real element**, not wrapper elements: `<h1 cms="home.hero.title">`, `<a cms-link="home.hero.cta">`, `<li cms-list="home.highlights">` with `cms-field="title"` / `cms-link-field="link"` on its children, `<section cms-section="home.instagram">`. `<cms-image>` (planned, Phase 5) will be an element. See `docs/architecture.md` → CMS Editing Flow.
+- CMS tag helpers are **attributes on the real element**, not wrapper elements: `<h1 cms="home.hero.title">`, `<a cms-link="home.hero.cta">`, `<li cms-list="home.highlights">` with `cms-field="title"` / `cms-link-field="link"` on its children, `<section cms-section="home.instagram">`, `<a cms-section-link="home.instagram">` for menu links to a section. `<cms-image>` (planned, Phase 5) will be an element.
+- A rich-text field must say so in the template: `cms-rich` next to `cms` or `cms-field` (`<div cms="about.story.body" cms-rich>`). No attribute means plain `Text`; a stored type that does not match the template is logged and the element is omitted.
+- `cms-section-link` points only to a section of the current page or of `shared`; any other page key throws at render time. See `docs/architecture.md` → CMS Editing Flow.
 - Every admin-editable value is rendered through these helpers. Never hardcode content the admin is meant to edit.
 - Repeating blocks are always `cms-list`; visitors never see inactive items. `cms-list` cannot be nested; `cms-field` / `cms-link-field` only inside a `cms-list` element.
 - Keys must be valid (`{page}.{section}.{field}` for fields, `{page}.{list}` for lists and sections): an invalid key throws. A missing value omits the element for visitors, so the template must not rely on the element being present.
@@ -133,7 +142,8 @@ The database must stay swappable (Postgres / SQL Server) with only a provider an
 - Third-party content (currently only the Google Map) loads only after consent in its banner category, client-side. Adding any new embed, tracker or cookie is a tech-lead decision (see `docs/architecture.md` → Cookies & Privacy).
 - Never render `RichText` values that did not pass the sanitizer.
 - Link URLs allowed: `https:`, `tel:`, `mailto:` only. Links to external sites (booking platforms) open in a new tab and say so.
-- Admin-only markup (`data-cms-*`, edit script, inactive items) is emitted only for the authenticated admin.
+- Admin-only markup (`data-cms-*`, `#cms-config`, the toolbar, `cms-edit.css`, `cms-edit.js`, inactive items and the list `<template>`) is emitted only for the authenticated admin, through `ICmsEditContext`; such responses are `Cache-Control: no-store`.
+- A page used only for development (`/dev/...`) returns 404 unless the environment is Development, and its content keys live under `shared.sandbox*`.
 - Every page sets `<html lang>`, canonical URL and `hreflang` alternates.
 
 ---
@@ -161,7 +171,11 @@ The database must stay swappable (Postgres / SQL Server) with only a provider an
 
 - `let` / `const` only — never `var`.
 - Plain JS, no framework. Keep scripts small and scoped; no globals.
-- `cms-edit.js` is loaded only for the authenticated admin.
+- `cms-edit.js` (entry module) and the modules in `wwwroot/js/cms/` are loaded only for the authenticated admin. ES modules, one factory or window function per file, wired in `cms-edit.js`; no globals.
+- Build DOM with `createElement` / `textContent`. Rich-text HTML is only parsed into an inert `<template>` and rebuilt through the allowed-tag filter (`rich-html.js`) before it reaches a live element; no `innerHTML` assignment on live elements.
+- **CSP:** no `style=""` attributes and no `<style>` elements, in markup or created from JS (the CSP is own-origin only). Set `element.style` through the CSSOM, or use classes.
+- Third-party libraries are vendored into `wwwroot/lib/{name}/` with a `README.md` (version, source, files copied, date) and the license; never loaded from a CDN, and loaded lazily when only the editor needs them (Quill, SortableJS).
+- Admin editing CSS lives in `wwwroot/css/cms-edit.css` (loaded only for the admin, same mobile-first rule and 720 px / 960 px breakpoints as `site.css`).
 
 ---
 

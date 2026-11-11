@@ -59,6 +59,7 @@ Local development:
 3. `dotnet run --project src/SaronidaSailing.Web` serves http://localhost:5000 (Development environment, from `launchSettings.json`).
 4. Development data (content DB, `hangfire.db`, media) goes to `src/SaronidaSailing.Web/data/`, which is gitignored; delete the folder to start fresh. The media folder is created automatically in Development only.
 5. `dotnet test` runs the xUnit tests (see `docs/conventions.md` -> Tests).
+6. To try the editing UI before real pages exist, sign in at `https://localhost:5001/admin/login` and open `/dev/cms-sandbox` (or `/en/dev/cms-sandbox`), a Development-only page (404 elsewhere). The editing UI is verified through the Claude browser there, not with Playwright (see `docs/architecture.md` -> CMS Editing Flow).
 
 ## Cloud Sessions
 
