@@ -32,6 +32,7 @@ Things we need from the owner before or during the build. Answers go next to eac
 
 18. Switch `@saronidasailing` to a **Business or Creator** account.
 19. Be available once, together with us, to create the free Meta developer app and press "Connect Instagram" in the admin.
+19a. Meta may require a free **business portfolio** (Meta Business Suite) for the business to connect Instagram. Do you already have one for Saronida Sailing? If not, are you OK creating one when we set up the Meta app?
 
 ## Legal
 
