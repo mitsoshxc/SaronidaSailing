@@ -1,0 +1,16 @@
+{
+  "group": "shared.footer",
+  "version": 1,
+  "fields": {
+    "shared.footer.tagline": {
+      "type": "text",
+      "el": "Ιδιωτικές εκδρομές με καταμαράν Lagoon 500 από την Ανάβυσσο.",
+      "en": "Private catamaran trips on a Lagoon 500 from Anavyssos."
+    },
+    "shared.footer.copyright": {
+      "type": "text",
+      "el": "© 2026 Saronida Sailing · Άγιος Νικόλαος, Ανάβυσσος, Αττική",
+      "en": "© 2026 Saronida Sailing · Agios Nikolaos, Anavyssos, Attica"
+    }
+  }
+}

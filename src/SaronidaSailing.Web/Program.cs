@@ -85,6 +85,8 @@ try
         .Tag(CacheTags.AllPages)
         .SetVaryByQuery([])));
     builder.Services.AddScoped<IContentService, ContentService>();
+    builder.Services.AddSingleton<IContentSeedSource, EmbeddedContentSeedSource>();
+    builder.Services.AddScoped<IContentSeeder, ContentSeeder>();
     builder.Services.AddSingleton<ICacheTagEvictor, OutputCacheTagEvictor>();
     builder.Services.AddSingleton<IPageCacheInvalidator, OutputCachePageInvalidator>();
     builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme).AddIdentityCookies();
@@ -166,6 +168,12 @@ try
 
         LogManager.Shutdown();
         return exitCode;
+    }
+
+    if (app.Configuration.GetValue<bool>("Content:SeedAtStartup"))
+    {
+        using var seedScope = app.Services.CreateScope();
+        await seedScope.ServiceProvider.GetRequiredService<IContentSeeder>().SeedAsync();
     }
 
     using (var scope = app.Services.CreateScope())

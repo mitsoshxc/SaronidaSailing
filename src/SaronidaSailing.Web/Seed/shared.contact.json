@@ -1,0 +1,23 @@
+{
+  "group": "shared.contact",
+  "version": 1,
+  "fields": {
+    "shared.contact.phone": {
+      "type": "link",
+      "url": "tel:+306940057799",
+      "el": "+30 694 005 7799",
+      "en": "+30 694 005 7799"
+    },
+    "shared.contact.phone-2": {
+      "type": "link",
+      "url": "tel:+306978856418",
+      "el": "+30 697 885 6418",
+      "en": "+30 697 885 6418"
+    },
+    "shared.contact.address": {
+      "type": "text",
+      "el": "Άγιος Νικόλαος, Ανάβυσσος",
+      "en": "Agios Nikolaos, Anavyssos"
+    }
+  }
+}

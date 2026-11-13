@@ -1,0 +1,18 @@
+{
+  "group": "shared.social",
+  "version": 1,
+  "fields": {
+    "shared.social.instagram": {
+      "type": "link",
+      "url": "https://www.instagram.com/saronidasailing/",
+      "el": "Η Saronida Sailing στο Instagram",
+      "en": "Saronida Sailing on Instagram"
+    },
+    "shared.social.facebook": {
+      "type": "link",
+      "url": "https://www.facebook.com/Saronida-Sailing-108336665074413/",
+      "el": "Η Saronida Sailing στο Facebook",
+      "en": "Saronida Sailing on Facebook"
+    }
+  }
+}

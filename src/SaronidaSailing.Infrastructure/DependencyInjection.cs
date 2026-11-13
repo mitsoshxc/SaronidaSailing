@@ -66,6 +66,7 @@ public static class DependencyInjection
         services.AddSingleton<IInstagramJobScheduler, InstagramJobScheduler>();
         services.AddScoped<InstagramFetchJob>();
         services.AddScoped<InstagramTokenRefreshJob>();
+        services.AddSingleton<IDistributedLock, HangfireDistributedLock>();
         services.AddSingleton<MediaProcessingGate>();
         services.AddScoped<IMediaService, MediaService>();
 

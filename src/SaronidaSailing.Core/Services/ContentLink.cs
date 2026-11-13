@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 
 namespace SaronidaSailing.Core.Services;
@@ -6,6 +7,12 @@ namespace SaronidaSailing.Core.Services;
 public sealed record ContentLink(string Url, string Label)
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
+
+    private static readonly JsonSerializerOptions WriteOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
 
     private static readonly string[] AllowedSchemes = [Uri.UriSchemeHttps, Uri.UriSchemeMailto, "tel"];
 
@@ -38,6 +45,8 @@ public sealed record ContentLink(string Url, string Label)
         link = parsed;
         return true;
     }
+
+    public string ToJson() => JsonSerializer.Serialize(this, WriteOptions);
 
     public static bool IsAllowedUrl(string url) =>
         Uri.TryCreate(url, UriKind.Absolute, out var uri)

@@ -44,6 +44,8 @@ public class TempDatabaseWebApplicationFactory: WebApplicationFactory<Program>
 
     protected virtual string? LogInstanceName => "test-pod";
 
+    protected virtual bool SeedAtStartup => false;
+
     public string ContentConnectionString
     {
         get
@@ -93,6 +95,7 @@ public class TempDatabaseWebApplicationFactory: WebApplicationFactory<Program>
         {
             builder.UseSetting("Database:MigrateAtStartup", migrate ? "true" : "false");
         }
+        builder.UseSetting("Content:SeedAtStartup", SeedAtStartup ? "true" : "false");
         builder.UseSetting("DataProtection:KeysPath", KeysPath);
         builder.UseSetting("Site:BaseUrl", "https://localhost");
         builder.UseSetting("Health:HomePageUrl", "http://localhost/");

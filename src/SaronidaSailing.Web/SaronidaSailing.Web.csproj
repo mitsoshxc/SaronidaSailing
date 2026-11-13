@@ -17,4 +17,9 @@
     <ProjectReference Include="..\SaronidaSailing.Infrastructure\SaronidaSailing.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Remove="Seed\*.json" />
+    <EmbeddedResource Include="Seed\*.json" LogicalName="Seed/%(Filename)%(Extension)" />
+  </ItemGroup>
+
 </Project>
