@@ -17,7 +17,7 @@ Project status: **Phase 5 (Media) is complete except the real-iPhone test (Phase
 - **Never decide on your own** what hasn't been agreed — propose, ask, then record the decision in `docs/` / `PLAN.md`.
 - **Development and testing happen on the developer's PC.** Cloud sessions: the "SaronidaSailing" environment installs the .NET 10 SDK via its setup script; there is no Docker daemon in the cloud, so the `Dockerfile` and k3s manifests are only built and run locally, and the database tests (Testcontainers PostgreSQL) run only on the developer's PC.
 - **Environments:** local → **preview** at `https://saronida.visualpivot.net` (password-protected, never crawlable, for showing the owner) → production at `https://www.saronidasailing.gr` on **the same droplet** (preview features removed, DNS switched). See `docs/deployment.md` → Preview.
-- **Verify during implementation** (flagged in the docs): iPhone HEIC upload (Phase 5), Meta app development mode (Phase 6).
+- **Verify during implementation** (flagged in the docs): iPhone HEIC upload (Phase 5, tested on the Phase 8 preview), Meta app development mode (Phase 8 preview, with the owner; Phase 6 uses a fake Instagram API).
 
 ## Emergency: take the site offline
 
