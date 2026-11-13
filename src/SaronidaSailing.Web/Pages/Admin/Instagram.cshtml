@@ -1,0 +1,62 @@
+@page "/admin/instagram"
+@model InstagramModel
+@using SaronidaSailing.Core.Interfaces
+@{
+    ViewData["Title"] = "Instagram";
+    var status = Model.Status;
+    var connected = status.State != InstagramConnectionState.NotConnected;
+    var connectLabel = status.State == InstagramConnectionState.NotConnected ? "Connect Instagram" : "Reconnect";
+}
+
+<h1>Instagram</h1>
+
+@if (Model.BannerText is not null)
+{
+    <p class="@(Model.BannerIsError ? "admin-error" : "admin-notice")" role="@(Model.BannerIsError ? "alert" : "status")">@Model.BannerText</p>
+}
+
+@switch (status.State)
+{
+    case InstagramConnectionState.Connected:
+        <p>Connected as @@@status.Username.</p>
+        <p>Access is valid until @Model.ExpiresAtText.</p>
+        <p>Connected on @Model.ConnectedAtText by @status.ConnectedBy.</p>
+        break;
+    case InstagramConnectionState.Disconnected:
+        <p class="admin-error" role="alert">Instagram disconnected — reconnect.</p>
+        break;
+    default:
+        <p>Not connected.</p>
+        break;
+}
+
+<form method="post" asp-page-handler="Connect">
+    @if (!status.CanConnect)
+    {
+        <p id="instagram-not-set-up">@InstagramModel.NotSetUpText</p>
+        <button type="submit" class="admin-button" disabled aria-describedby="instagram-not-set-up">@connectLabel</button>
+    }
+    else
+    {
+        <button type="submit" class="admin-button">@connectLabel</button>
+    }
+</form>
+
+@if (connected)
+{
+    <form method="post" asp-page-handler="Disconnect" class="instagram-disconnect" data-instagram-disconnect>
+        <button type="button" class="admin-button admin-button-secondary" data-disconnect-open hidden>Disconnect</button>
+        <div data-disconnect-confirm>
+            <p id="instagram-disconnect-question">Disconnect Instagram? Visitors keep seeing the last posts.</p>
+            <button type="submit" class="admin-button admin-button-danger" aria-describedby="instagram-disconnect-question">Disconnect</button>
+            <button type="button" class="admin-button admin-button-secondary" data-disconnect-cancel hidden>Cancel</button>
+        </div>
+    </form>
+    <p>This removes the connection from this site. To also remove the site's access in Instagram: Settings → Website permissions → Apps and websites.</p>
+}
+
+<p><a href="/">Back to the site</a></p>
+
+@section Scripts {
+    <script type="module" src="~/js/admin-instagram.js" asp-append-version="true"></script>
+}

@@ -12,6 +12,7 @@ public static class InstagramServiceCollectionExtensions
     public static IHttpClientBuilder AddInstagram(this IServiceCollection services, IConfiguration configuration)
     {
         services.TryAddSingleton(TimeProvider.System);
+        services.TryAddSingleton<ISecretProtector, DataProtectionSecretProtector>();
 
         services.AddOptions<InstagramOptions>()
             .Bind(configuration.GetSection(InstagramOptions.SectionName))

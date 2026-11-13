@@ -22,6 +22,7 @@ using SaronidaSailing.Web.Diagnostics;
 using SaronidaSailing.Web.Endpoints;
 using SaronidaSailing.Web.Health;
 using SaronidaSailing.Web.Identity;
+using SaronidaSailing.Web.Instagram;
 using SaronidaSailing.Web.Localization;
 
 var isAdminCommand = AdminCommandRunner.IsAdminCommand(args);
@@ -73,6 +74,8 @@ try
         .AddSignInManager()
         .AddDefaultTokenProviders();
     builder.Services.AddScoped<IAdminAccountService, AdminAccountService>();
+    builder.Services.AddScoped<IInstagramConnectionService, InstagramConnectionService>();
+    builder.Services.AddSingleton<InstagramOAuthState>();
     builder.Services.AddOutputCache(options => options.AddPolicy(CacheTags.PolicyName, policy => policy
         .Expire(TimeSpan.FromHours(1))
         .Tag(CacheTags.AllPages)

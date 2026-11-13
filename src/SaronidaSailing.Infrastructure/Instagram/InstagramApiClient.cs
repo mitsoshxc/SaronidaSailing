@@ -25,6 +25,8 @@ public sealed partial class InstagramApiClient(
 
     private InstagramOptions Options => options.Value;
 
+    public bool IsConfigured => Options.IsConfigured;
+
     [GeneratedRegex(@"https?://\S+", RegexOptions.IgnoreCase)]
     private static partial Regex UrlPattern();
 

@@ -201,3 +201,36 @@
     max-width: 100%;
     height: auto;
 }
+
+.admin [hidden] {
+    display: none;
+}
+
+.admin-notice {
+    margin: 0 0 1rem;
+    padding: 0.75rem 1rem;
+    border-left: 4px solid var(--admin-primary);
+    color: var(--admin-text);
+    font-weight: 600;
+}
+
+.admin-button:disabled {
+    border-color: var(--admin-border);
+    background: #dfe6ea;
+    color: #3f4d54;
+    cursor: not-allowed;
+}
+
+.admin-button-secondary {
+    background: #ffffff;
+    color: var(--admin-primary);
+}
+
+.admin-button-danger {
+    border-color: var(--admin-error);
+    background: var(--admin-error);
+}
+
+.instagram-disconnect {
+    margin: 1.5rem 0 0.5rem;
+}
