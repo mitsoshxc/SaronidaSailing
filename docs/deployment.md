@@ -1,6 +1,6 @@
 # Deployment
 
-Status: **the `Dockerfile`, the app configuration and the local development PostgreSQL (`deploy/dev/docker-compose.yml`) are implemented. Everything about the droplet, k3s, nginx, the deploy script and backups is agreed design (2026-11-11, `PLAN.md` → Phase 4.5 and Phase 8), not yet built.** The earlier Docker Compose + SQLite + DigitalOcean-backups design is gone.
+Status: **the `Dockerfile`, the app configuration (including the Instagram settings) and the local development PostgreSQL (`deploy/dev/docker-compose.yml`) are implemented. Everything about the droplet, k3s, nginx, the deploy script and backups is agreed design (2026-11-11, `PLAN.md` → Phase 4.5 and Phase 8), not yet built.** The earlier Docker Compose + SQLite + DigitalOcean-backups design is gone.
 
 The app itself is ready for it (Phase 4.5): it runs correctly as two pods against one PostgreSQL database (cache eviction across pods, shared log files, migrations by a separate command). Launch runs one pod.
 
@@ -92,6 +92,9 @@ Defaults are in `src/SaronidaSailing.Web/appsettings.json`; environment variable
 | `Logs:Instance` | not set | Name written as the 2nd field of every log line. Defaults to the machine name, which in Kubernetes is the pod name. An empty value or one containing `\|` or control characters fails startup. As an environment variable: `Logs__Instance` |
 | `Diagnostics:*` | not set (defaults in code) | Thresholds and intervals of the runtime diagnostics; values must be greater than 0. Keys and defaults: `docs/architecture.md` → Logging → Diagnostics |
 | `DataProtection:KeysPath` | `/var/saronida/data/keys` | Data Protection keys (unencrypted at rest); created if missing, must be writable for UID 1654; startup fails if the key is missing |
+| `Instagram:AppId` | `""` in `appsettings.json` | The Meta app's id (not secret); set the real value as `Instagram__AppId` in the pod spec (Phase 8) or in the file. Without both AppId and AppSecret the app starts normally and **Connect Instagram** is disabled ("Instagram is not set up on this server") |
+| `Instagram:AppSecret` | not set; **only** from the Kubernetes Secret | Environment variable `Instagram__AppSecret`, filled from a Kubernetes Secret in the pod spec (Phase 8, `deploy/k8s/`, next to the database password Secret). Never in the repo, never in `appsettings.json`. On the developer's PC it lives in .NET user secrets (`dotnet user-secrets set "Instagram:AppSecret" ...` in `src/SaronidaSailing.Web`, `UserSecretsId` in the project file) |
+| `Instagram:AuthorizeUrl`, `ApiBaseUrl`, `GraphBaseUrl` | not set (defaults are the real Instagram endpoints) | Overridable, absolute http(s) URLs (an invalid value fails startup); used by the tests to point at a stub. Do not set them in production |
 | `ForwardedHeaders:KnownNetworks` | `["172.30.0.0/24"]` in `appsettings.json` | CIDR networks allowed to set `X-Forwarded-For` / `X-Forwarded-Proto`; an invalid value fails startup. As an environment variable: `ForwardedHeaders__KnownNetworks__0`. The value in the file is the old Docker Compose subnet; Phase 8 sets it to the k3s network (see below) |
 
 A missing `ConnectionStrings:Content`, `Media:RootPath`, `Media:OriginalsPath`, `Logs:Path` or `DataProtection:KeysPath` fails startup.
@@ -101,6 +104,14 @@ A missing `ConnectionStrings:Content`, `Media:RootPath`, `Media:OriginalsPath`, 
 **Admin CLI.** `saronida-admin` (Phase 8) wraps `kubectl exec` into an app pod running `dotnet SaronidaSailing.Web.dll admin <command>`. The commands read the password from a hidden prompt and need a TTY, so `kubectl exec` must allocate one. Without a TTY the command fails with a message and exit code 1.
 
 **Migrations.** The deploy script runs a `migrate` Job (same image, `dotnet SaronidaSailing.Web.dll migrate`) before each rollout; the first deploy creates the schema this way. After the very first deploy, create the first admin with `saronida-admin add <email>`.
+
+**Instagram (Phase 6 code; deployment parts are Phase 8).**
+
+- **Meta app redirect URIs:** `{Site:BaseUrl}/admin/instagram/callback`, one per host that will connect: `https://saronida.visualpivot.net/admin/instagram/callback` (preview) and `https://www.saronidasailing.gr/admin/instagram/callback` (production). The path must match exactly (`InstagramPaths.Callback`). nginx must pass `/admin/instagram/callback` through like any other path (it is reached without an admin cookie).
+- **Secret and AppId:** see the `Instagram:*` rows above. After setting the Secret, a pod restart is needed (environment variables are read at start).
+- **Token and keys:** the access token is encrypted with the Data Protection keys in `/var/saronida/data/keys`. Those keys are in the backup (see Backups); after a restore without them, or if they are lost, the admin sees "Instagram disconnected — reconnect" and presses Reconnect.
+- **Time zone data:** the app resolves the IANA zone `Europe/Athens` (`TimeZoneInfo.FindSystemTimeZoneById`) for the job schedules (`InstagramJobScheduler`) and for the times shown on `/admin/instagram` (`AthensTime`). On Linux this needs the zone database (the `tzdata` package) inside the image. The `Dockerfile` does not install anything and nothing in the repo checks it, so **whether the `aspnet:10.0.14-noble` image has it is unverified**: check on the first Linux run (the Phase 8 preview); if the zone is missing, startup fails when `home.instagram` is active (the schedule sync registers the jobs with that zone), and the times on `/admin/instagram` and the date in a tile's fallback alt text cannot be computed.
+- **Jobs:** Hangfire runs in every pod; the recurring jobs (`instagram-fetch` 06:00 and 18:00, `instagram-token-refresh` Mondays 04:00, Europe/Athens) are visible in the dashboard at `/admin/jobs`.
 
 ## nginx
 
@@ -191,7 +202,7 @@ After local development and testing, the site is shown to the owner on the Digit
 | **Not crawlable** | (1) nginx **HTTP Basic Auth** on the whole site (crawlers only ever get 401), (2) `X-Robots-Tag: noindex, nofollow` on every response, (3) `robots.txt` → `Disallow: /`, no `sitemap.xml`. One shared username/password for the owner, kept in an htpasswd file on the droplet (never in the repo) |
 | App config | `ASPNETCORE_ENVIRONMENT=Preview`; `Site:BaseUrl` = the preview URL (set as the environment variable `Site__BaseUrl`; required, the app refuses to start without a valid absolute http(s) URL with no path), used for canonical, `hreflang`, Open Graph and JSON-LD URLs |
 | Redirects | No canonical `www.saronidasailing.gr` redirect and no old-site redirects |
-| Instagram | The Meta app needs the preview URL as an allowed OAuth redirect URI too |
+| Instagram | The Meta app needs `https://saronida.visualpivot.net/admin/instagram/callback` as an allowed OAuth redirect URI too, and the `Instagram__AppSecret` Secret must be set. The **first real connection** (and the Instagram-login-versus-Unified-login question, `docs/architecture.md` → Instagram Feed → Not yet verified) happens here, with the owner's account added as Instagram tester |
 | Monitoring | Not needed |
 | Backups | The PC backup script runs from the start of the preview (no DO backups at all), so the owner's content is protected from day one |
 | Output cache | Effectively off: Basic Auth adds an `Authorization` header to every request, and the default cache policy skips such requests. Fine for a demo; caching is exercised locally and in production |
@@ -199,7 +210,7 @@ After local development and testing, the site is shown to the owner on the Digit
 
 ## Go-Live (switchover)
 
-1. The preview droplet becomes production — **remove the preview features**: Basic Auth, the `X-Robots-Tag` header, `ASPNETCORE_ENVIRONMENT=Preview` → `Production`, `Site:BaseUrl` → `https://www.saronidasailing.gr`; add the canonical/old-site redirect server blocks; add the production host to the Meta app's redirect URIs. Test via a hosts-file entry on the developer's PC (`www.saronidasailing.gr` and the no-www name → droplet IP) **before** touching DNS. Certificates for the production names are issued right after DNS points to the droplet.
+1. The preview droplet becomes production — **remove the preview features**: Basic Auth, the `X-Robots-Tag` header, `ASPNETCORE_ENVIRONMENT=Preview` → `Production`, `Site:BaseUrl` → `https://www.saronidasailing.gr`; add the canonical/old-site redirect server blocks; add `https://www.saronidasailing.gr/admin/instagram/callback` to the Meta app's redirect URIs. Test via a hosts-file entry on the developer's PC (`www.saronidasailing.gr` and the no-www name → droplet IP) **before** touching DNS. Certificates for the production names are issued right after DNS points to the droplet.
 2. Copy **every** existing DNS record (MX, SPF, DKIM, verification records, subdomains) into Cloudflare — see `OWNER-QUESTIONS.md` 1–4.
 3. A day before: lower the DNS TTL.
 4. Switch: point DNS to the droplet (via Cloudflare), issue the Let's Encrypt certificate, check pages, redirects (old URLs, http, no-www), admin login, Instagram, map, backups.

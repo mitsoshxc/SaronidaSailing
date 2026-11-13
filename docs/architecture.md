@@ -1,6 +1,6 @@
 # Architecture
 
-Status: **Phases 0-5 are implemented (decisions, foundation, admin authentication, CMS core, inline editing, PostgreSQL and two-pod readiness: cross-pod cache eviction, shared logs, runtime diagnostics; media: upload pipeline, library, `<cms-image>`, image window), except the real-iPhone HEIC upload test, which stays open until the Phase 8 preview (it needs HTTPS). Everything else (Instagram, jobs, public pages, k3s deploy) is agreed design, not yet built.** Update as phases land.
+Status: **Phases 0-6 are implemented (decisions, foundation, admin authentication, CMS core, inline editing, PostgreSQL and two-pod readiness: cross-pod cache eviction, shared logs, runtime diagnostics; media: upload pipeline, library, `<cms-image>`, image window; Instagram feed: Connect flow, encrypted token, fetch and renewal jobs, section switch, feed on the placeholder Home, toolbar warning). Open until the Phase 8 preview: the real-iPhone HEIC upload test (needs HTTPS) and every check against the real Meta app (Phase 6 is verified against stub Instagram answers only, see Instagram Feed → Not yet verified). Everything else (public pages, k3s deploy) is agreed design, not yet built.** Update as phases land.
 
 ## Tech Stack
 
@@ -49,9 +49,9 @@ SaronidaSailing.slnx
 global.json, Directory.Build.props, Directory.Packages.props, nuget.config
 .config/dotnet-tools.json          dotnet-ef local tool
 src/
-  SaronidaSailing.Core/            Entities/ (BaseEntity, ApplicationUser, Content*, MediaAsset), Interfaces/ (repositories, IContentService, IMediaService, MediaImportResult, IRichTextSanitizer, IUnitOfWork, IPageCacheInvalidator, ICacheTagEvictor, ICacheEvictionBus, PageContent, PageImage), Services/ (ContentService, ContentBatch, ContentKeys, ContentLocales, ContentLink, MediaFileNames, MediaLimits, MediaDimensions, Slugs); no EF, no ASP.NET
-  SaronidaSailing.Infrastructure/  Data/ (AppDbContext, DatabaseInitializer, DatabaseSettings, UnitOfWork, Configurations/, Migrations), Caching/ (PostgresCacheEvictionBus, PostgresCacheEvictionListener, CacheEvictionChannel), Repositories/, Content/ (RichTextSanitizer), Health/, Logging/ (AuditLog), Media/ (MediaService, ImageProcessor, MediaProcessingGate, MediaOptions, MediaFolder), DependencyInjection.cs
-  SaronidaSailing.Web/             Program.cs, SiteOptions.cs, LogInstance.cs, DevelopmentMediaFiles.cs, Caching/ (CacheTags, OutputCachePageInvalidator, OutputCacheTagEvictor), Diagnostics/ (lifecycle, crash, metrics, request and health logging), Content/ (PageContentAccessor, CmsEditContext, CmsEditorConfig), Endpoints/ (ContentEndpoints, ContentApiModels, MediaEndpoints, MediaApiModels, AdminEndpoints), TagHelpers/, Cli/ (admin and migrate commands), Identity/, Localization/, Health/, Pages/ (Pages/Admin/, Pages/Dev/), wwwroot (css/ (`site.css` holds the base page rules, see docs/conventions.md -> CSS and fonts), js/cms/, lib/quill/, lib/sortablejs/), appsettings*.json
+  SaronidaSailing.Core/            Entities/ (BaseEntity, ApplicationUser, Content*, MediaAsset, MediaSource, InstagramPost, IntegrationSetting), Interfaces/ (repositories, IContentService, IMediaService, MediaImportResult, IRichTextSanitizer, IUnitOfWork, IPageCacheInvalidator, ICacheTagEvictor, ICacheEvictionBus, PageContent, PageImage, ISectionActivationHandler, ISecretProtector, IInstagram* services, InstagramApiException, InstagramApiModels), Services/ (ContentService, ContentBatch, ContentKeys, ContentLocales, ContentLink, MediaFileNames, MediaLimits, MediaDimensions, Slugs, Instagram* services and constants); no EF, no ASP.NET
+  SaronidaSailing.Infrastructure/  Data/ (AppDbContext, DatabaseInitializer, DatabaseSettings, UnitOfWork, Configurations/, Migrations), Caching/ (PostgresCacheEvictionBus, PostgresCacheEvictionListener, CacheEvictionChannel), Repositories/, Content/ (RichTextSanitizer), Health/, Logging/ (AuditLog), Media/ (MediaService, ImageProcessor, MediaProcessingGate, MediaOptions, MediaFolder), Instagram/ (InstagramApiClient, InstagramDtos, InstagramOptions, DataProtectionSecretProtector, InstagramServiceCollectionExtensions), Jobs/ (InstagramFetchJob, InstagramTokenRefreshJob, InstagramJobQueue, InstagramJobScheduler), DependencyInjection.cs
+  SaronidaSailing.Web/             Program.cs, SiteOptions.cs, LogInstance.cs, DevelopmentMediaFiles.cs, Caching/ (CacheTags, OutputCachePageInvalidator, OutputCacheTagEvictor), Diagnostics/ (lifecycle, crash, metrics, request and health logging), Content/ (PageContentAccessor, CmsEditContext, CmsEditorConfig), Endpoints/ (ContentEndpoints, ContentApiModels, MediaEndpoints, MediaApiModels, AdminEndpoints), TagHelpers/, ViewComponents/ (InstagramFeedViewComponent), Models/ (InstagramFeedViewModel), Instagram/ (InstagramOAuthState, InstagramPaths, AthensTime), Cli/ (admin and migrate commands), Identity/, Localization/, Health/, Pages/ (Pages/Admin/, Pages/Dev/, Pages/Shared/Components/InstagramFeed/), wwwroot (css/ (`site.css` holds the base page rules, see docs/conventions.md -> CSS and fonts), js/cms/, lib/quill/, lib/sortablejs/), appsettings*.json
 tests/
   SaronidaSailing.Tests/           xUnit; one PostgreSQL Testcontainer, one database per test class (see docs/conventions.md -> Tests)
 Dockerfile, .dockerignore
@@ -76,7 +76,7 @@ Root build files:
 Data layer (`Infrastructure/Data/`):
 
 - `AppDbContext` stamps `CreatedAt` / `UpdatedAt` on every `SaveChanges*` from the injected `TimeProvider` (see `docs/domain-model.md` -> Entities). A convention converter (`UtcDateTimeConverter`) marks every `DateTime` read back as `DateTimeKind.Utc`; the columns are `timestamp with time zone`.
-- **Migrations:** `InitialCreate` (`20261111081638_InitialCreate`) holds the Identity tables and the four content tables; `AddMediaAssets` (`20261111133422_AddMediaAssets`) adds `MediaAssets` (see `docs/domain-model.md`). The earlier SQLite migrations were deleted when the provider changed.
+- **Migrations:** `InitialCreate` (`20261111081638_InitialCreate`) holds the Identity tables and the four content tables; `AddMediaAssets` (`20261111133422_AddMediaAssets`) adds `MediaAssets`; `AddInstagram` (`20261113073900_AddInstagram`) adds `InstagramPosts`, `IntegrationSettings` and `MediaAssets.Source` (see `docs/domain-model.md`). The earlier SQLite migrations were deleted when the provider changed.
 - **Who applies migrations** (`Infrastructure/Data/DatabaseInitializer.cs`, flag `Database:MigrateAtStartup`, `DatabaseSettings`): `InitializeDatabaseAsync` runs in `Web/Program.cs` before the app accepts requests. With the flag `true` (set only in `appsettings.Development.json`) it calls `MigrateAsync`: applies pending EF migrations **and** installs or upgrades the Hangfire schema (`PostgreSqlObjectsInstaller.Install`, schema `hangfire`). With the flag `false` (the default in `appsettings.json`, so preview and production) it calls `EnsureUpToDateAsync`, which throws "The database is behind: N pending migration(s): ... Run the 'migrate' command first." Pods never migrate or install the Hangfire schema themselves (Hangfire's `PrepareSchemaIfNecessary` follows the flag). In production the `migrate` command runs as a Kubernetes Job before each rollout (agreed design, Phase 8).
 - Entity configurations are in `Infrastructure/Data/Configurations/` (one per content entity). Repositories (`Infrastructure/Repositories/`: `ContentItemRepository`, `ContentListItemRepository`, `ContentSectionRepository`, `ContentHistoryRepository`) only **stage** changes; `IUnitOfWork` (`Infrastructure/Data/UnitOfWork.cs`) has `SaveChangesAsync` (one commit, one transaction) and `DiscardChanges`. All are scoped (`AddInfrastructure`).
 - Connection string `ConnectionStrings:Content` is an Npgsql string; a missing value fails startup. The same string serves EF Core, Hangfire storage and the cache-eviction bus and listener. `appsettings.json` has no password (`Host=postgres;Port=5432;Database=saronida;Username=saronida`); `appsettings.Development.json` points at the local container (`Host=localhost`).
@@ -163,7 +163,7 @@ Implemented in Phase 3 (`Web/Program.cs`, `Web/Caching/`).
 - Named policy `CmsPage` (`CacheTags.PolicyName`): expiration **1 hour**, tag `pages:all`, built on the default policy, with the query string ignored (`SetVaryByQuery([])`), so `?x=1` variants share one entry.
 - Each page declares the policy and its own tag on its page model: `[OutputCache(PolicyName = CacheTags.PolicyName, Tags = [CacheTags.HomePage])]` (tag `page:{pageKey}`, e.g. `page:home`). Only `IndexModel` is cached so far; a guard test (`OutputCacheTests`) requires every built site page to carry the policy and its page tag, so a new page without it fails the tests.
 - `IContentService.ApplyChangesAsync` calls `IPageCacheInvalidator` once per save with the touched page keys. `OutputCachePageInvalidator` (singleton) turns them into tags: `page:X` for each touched page, or `pages:all` only if `shared` is touched. It evicts them locally through `ICacheTagEvictor`, then publishes them with `ICacheEvictionBus`.
-- A successful Instagram fetch evicts `page:home` (planned, Phase 6).
+- A successful Instagram fetch that added, updated or removed a post evicts `page:home` (`InstagramFeedService` calls `IPageCacheInvalidator.EvictPagesAsync(["home"])`, so the other pods are told too); a fetch that changes nothing does not.
 - Authenticated requests (the admin) are neither served from nor stored in the cache — built-in default policy behaviour (and admin-rendered pages are sent with `Cache-Control: no-store`). `app.UseOutputCache()` is placed **after** `UseAuthentication()`/`UseAuthorization()`.
 - Cache is lost on restart/redeploy; pages rebuild on first request.
 
@@ -219,6 +219,7 @@ Razor templates mark editable spots with tag helper **attributes on real element
 | `<li cms-list="home.highlights" cms-add-label="Add highlight">` | Repeats the element once per **active** entry (the admin also sees inactive ones), in `SortOrder`. Inside it, `cms-field="title"` (with optional `cms-rich`) and `cms-link-field="link"` read that entry's fields. Lists cannot be nested; no active entries omits the element for visitors. `cms-add-label` is **required**: it is the text of the list's Add button in edit mode |
 | `<section cms-section="home.instagram" cms-section-label="Instagram feed">` | Omits the whole element when the section is inactive (a section with no row is active). `cms-section-label` is **required**: the section's name in the admin's section bar and status messages |
 | `<a cms-section-link="home.instagram">` | A menu link to a section (`CmsSectionLinkTagHelper`): omitted for visitors when that section is inactive. Accepts only a section of the current page or of `shared`; any other page key throws at render time |
+| `<section cms-section="home.instagram" cms-section-label="Instagram feed" cms-instagram-count="6" cms-instagram-empty="false">` | `CmsInstagramSectionTagHelper` (targets any element with `cms-instagram-count`; used by the Instagram feed view). Nothing for visitors. For the admin it writes `data-cms-instagram-count` (the stored post count), `data-cms-instagram-count-key` (`home.instagram.post-count`) and, when `cms-instagram-empty` is true, `data-cms-empty`. `instagram-count.js` reads these |
 | `<cms-image key="home.hero.image" label="Hero photo" sizes="..." />` | An element, not an attribute (`CmsImageTagHelper`, no end tag). Renders an `<img>` for an `Image` field; `label` is required (see Media Pipeline → `<cms-image>`) |
 | `<cms-seo fallback-title="...">` | Page `<title>`, description and Open Graph tags (see SEO) |
 
@@ -242,6 +243,7 @@ Tag helpers read a per-request snapshot, `IPageContentAccessor` (`Web/Content/Pa
 | `data-cms-list`, `data-cms-item` | Every list item copy (`data-cms-item` is the item's Id) |
 | `<template data-cms-list-template="{listKey}" data-cms-add-label="...">` | After each list: one empty copy of the item markup, cloned by the Add button; `data-cms-add-label` is the list's `cms-add-label` (the Add button's text) |
 | `data-cms-section`, `data-cms-section-label`, `data-cms-section-link` | Sections (with their required `cms-section-label`) and their menu links |
+| `data-cms-instagram-count`, `data-cms-instagram-count-key` | The Instagram feed section only (`CmsInstagramSectionTagHelper`): the stored post count and its content key |
 | `data-cms-active="false"` | Inactive list items, sections and section links; shown dimmed |
 | `<script type="application/json" id="cms-config">` | `CmsEditorConfig` (`Web/Content/CmsEditorConfig.cs`): `pageKey`, `locale`, `saveUrl`, `historyUrl`, `savesUrl`, `antiforgeryToken`, `opensInNewTab` and `seo` (the page's SEO title and description, each with its Greek value when English falls back; the link-preview `image` (`{value, previewUrl}`, the 960 px file or the largest) and `imageAlt` (`{value, greek}`); null on non-site pages) |
 | `_AdminToolbar` partial, `~/css/cms-edit.css`, `~/js/cms-edit.js` (module) | Layout |
@@ -282,6 +284,8 @@ The write API is one method, `IContentService.ApplyChangesAsync(changes, Content
 
 Changes are validated and applied in order (keys, locale, type, value present, list item belongs to the list, then the sanitizing and link checks below); then **one** `IUnitOfWork.SaveChangesAsync` commit, **one** `IPageCacheInvalidator.EvictPagesAsync` call with the touched pages, and **one** `content-saved` audit line. Any invalid change means nothing is written: the pending staging is discarded, errors are returned in `ContentSaveResult`, and `content-save-rejected` is audited. Changes that alter nothing do not count as touching a page, and a batch that touches no page returns success without a `SaveId`. The editor is identified by email (`ContentEditor(Email, IpAddress)`).
 
+**Section activation hook.** After the commit, the cache eviction and the audit line, `ContentService` calls every registered `ISectionActivationHandler` (`Core/Interfaces/`: `SectionKey` = the full section key such as `home.instagram`, and `OnActiveChangedAsync(isActive, ct)`) whose key matches a section whose final state differs from its state before the batch (`ContentBatch.SectionChanges`; a section with no row counts as active; a toggle that returns to the original state fires nothing). A handler that throws is logged at Error and the save still succeeds. The only handler so far is `InstagramSectionHandler` (see Instagram Feed → Section switch).
+
 ### Sanitizing and validation
 
 Both run inside `ContentService.ApplyChangesAsync` (`ContentBatch.SetFieldAsync`), so every writer is covered (the save endpoint, the Phase 7 seed, jobs), not only the HTTP endpoint.
@@ -290,7 +294,7 @@ Both run inside `ContentService.ApplyChangesAsync` (`ContentBatch.SetFieldAsync`
 |---|---|
 | `RichText` | Passed through `IRichTextSanitizer` (`Core/Interfaces/`), implemented by `RichTextSanitizer` (`Infrastructure/Content/`, HtmlSanitizer 11.0.16, registered as a singleton). Allowed tags: `p`, `br`, `strong`, `em`, `a`, `ul`, `ol`, `li`, `h3`. The only allowed attribute is `href`; no classes, CSS or `data-` attributes. Allowed URL schemes: `https`, `mailto`, `tel`, and only on `a`. Disallowed tags are unwrapped (children kept), except `script`, `style`, `iframe`, `frame`, `frameset`, `object`, `embed`, `applet`, `noscript`, `template`, `textarea`, `title`, `svg` and `math`, which are dropped with their content. A result that is only empty paragraphs becomes `""` |
 | `Link` | An empty value clears the link. Otherwise the JSON must parse with `ContentLink.TryParse`: `https:`, `mailto:` or `tel:` URL and a non-blank label; if not, the save is rejected with an error naming the field |
-| `Text` | Stored as sent |
+| `Text` | Stored as sent, except `home.instagram.post-count` (`ContentBatch.IsValidPostCount`): locale `el` only, type `Text`, and empty or a whole number 1-12 (`InstagramPostCount.IsValid`); an English value or another number rejects the save |
 | `Image` | Checked in `ContentBatch` (`SetFieldAsync`, then `ValidateImagesAsync` once all changes are applied): see Media Pipeline → Save checks |
 
 ### History
@@ -313,7 +317,8 @@ Both run inside `ContentService.ApplyChangesAsync` (`ContentBatch.SetFieldAsync`
 | Discard | Does nothing when there are no pending changes; otherwise opens an in-page confirmation ("Discard changes?", buttons "Keep editing" (focused) and "Discard"), then reloads the page |
 | Page settings | Only on a site page |
 | "N missing in English" | English pages only; hidden when the count is 0 |
-| Language link, Jobs, Log out | Log out is a POST form with an antiforgery token |
+| Language link, Jobs, Instagram, Log out | Instagram links to `/admin/instagram` (after Jobs). Log out is a POST form with an antiforgery token |
+| Instagram warning | `a.cms-toolbar-warning` to `/admin/instagram`, outside the More panel: "Instagram not connected — connect" before the first connect, "Instagram disconnected — reconnect" after expiry, revocation or a failed renewal. Shown only while the `home.instagram` section is active (`IInstagramWarningService`, `Core/Services/InstagramWarningService.cs`, read in `_AdminToolbar.cshtml`). Under 720 px it is its own full-width 44 px line under the toolbar; from 720 px it sits inline |
 
 A status line (`role="status"`, `aria-live="polite"`) and an error list (`role="alert"`) sit below the controls on a phone. From 720 px the status sits **between the unsaved counter and the buttons** (CSS `order`; it takes the remaining width and is cut with an ellipsis; the full text is in its `title` attribute and is announced through `aria-live`), so the buttons stay at the same place whatever the status says.
 
@@ -338,10 +343,11 @@ A status line (`role="status"`, `aria-live="polite"`) and an error list (`role="
 | `missing.js` | Counts elements flagged `data-cms-fallback` and jumps to the next one |
 | `lists.js` | List editing (below) |
 | `sections.js` | Section bar (below) |
+| `instagram-count.js` | `createInstagramCount`: adds the "Posts shown" select (1-12) to the section bar of every element with `data-cms-instagram-count` (see Instagram Feed → Post count) |
 
 **Lists** (`lists.js`): each list item gets an **item bar** (drag handle, Move up, Move down, Hide/Show, Delete), shown while the pointer or keyboard focus is inside the item. Each list ends with an Add button whose text is the list's required `cms-add-label` (carried by `data-cms-add-label` on the list template; "Add item" only as a script fallback): it clones the `data-cms-list-template`, gives the copy a new GUID and focuses its first field. Delete asks first in a window titled with the item's name (Delete, "Hide instead", Cancel); a saved item has no history, so its deletion cannot be undone after Save. The list operations are **computed from the DOM** against the state at page load, not recorded as clicks: `addListItem` for new ids, `deleteListItem` for missing ids, `setListItemActive` for changed visibility, and one `reorderList` when the order differs from the expected one. The result goes into the slot `list:{listKey}`. Pending edits of a deleted item's fields are dropped. Drag-and-drop uses SortableJS, loaded lazily only when the page has a list; if it fails to load, the buttons still work.
 
-**Sections** (`sections.js`): every `data-cms-section` gets an always-visible **section bar** showing the section's name (`data-cms-section-label`) and the button "Hide section" / "Show section" (visible as "{label} · Hide section"; the bar's and the button's accessible names include the label). The toggle also dims or restores the section's menu links (`data-cms-section-link`) and sets the slot `section:{sectionKey}` with a `setSectionActive` op (empty when the state returns to the original). Status messages name the section ("Section 'Intro' hidden from visitors (both languages). Save page to apply."). The same visibility applies to both languages.
+**Sections** (`sections.js`): every `data-cms-section` gets an always-visible **section bar** showing the section's name (`data-cms-section-label`) and the button "Hide section" / "Show section" (visible as "{label} · Hide section"; the bar's and the button's accessible names include the label). The toggle also dims or restores the section's menu links (`data-cms-section-link`) and sets the slot `section:{sectionKey}` with a `setSectionActive` op (empty when the state returns to the original). Status messages name the section ("Section 'Intro' hidden from visitors (both languages). Save page to apply."). The same visibility applies to both languages. A section can also carry its own control in the bar: the Instagram section's "Posts shown" select (`instagram-count.js`).
 
 **Distinct controls.** Every admin control has a name that tells it from the others of its kind, for people using a screen reader or voice control. Templates must give: `cms-add-label` on every `cms-list`, `label` on every `<cms-image>`, `cms-section-label` on every `cms-section` (a missing or blank value throws at render time). The client adds: an **item bar** whose button names include the item title (`itemName` in `lists.js`: the first text field of the item, cut to 40 characters, else "item N"; "Move up: Intro", "Hide item: Intro"), kept current as the text changes; a **field bar** whose button names include the field name (`fieldName` in `values.js`: `data-cms-name`, else an image's `data-cms-label`, else the last segment of the key with `-` as spaces); and window **subtitles** that name the field ("{field name} · {key}") in the History, rich-text and link windows. An image placeholder reads "Add image: {label}" and the image window is titled "Edit image: {label}".
 
@@ -492,28 +498,105 @@ Linux native assets: `SkiaSharp.NativeAssets.Linux.NoDependencies` (nothing to i
 
 ## Instagram Feed
 
-- Uses the official Instagram API for Business/Creator accounts (the old Basic Display API was shut down in December 2024). The owner's account must be Business or Creator.
-- **Connect Instagram** button in the admin: the owner logs in to Instagram once (OAuth); the app exchanges the code for a long-lived token (expires after ~60 days) and stores it in `IntegrationSetting`. Nobody copies tokens by hand.
-- Meta app ID in configuration; **app secret only in the environment file on the droplet**, never in the repo. Whether the app can stay in development mode (owner's account as tester, no app review) is confirmed when creating the app.
-- **Number of posts shown: set by the admin** (field `home.instagram.post-count`, 1–12, default 6 — the design shows 6). The fetch job always stores the latest 12, so changing the number needs no refetch.
-- Video posts and reels show their cover image; carousels show the first photo. Every tile links to the post on Instagram.
-- **Disconnected warning:** if the token refresh fails or the token has expired, the admin toolbar shows "Instagram disconnected — reconnect" (links to Connect Instagram). Visitors keep seeing the last good posts.
-- Hangfire recurring jobs: **fetch latest posts twice a day**; **refresh the token weekly**.
-- Thumbnails are downloaded and processed through the media pipeline, so the page never depends on Instagram's image URLs.
-- If a fetch fails, the last good posts stay on the page.
-- **Section switch:** deactivating the `home.instagram` section removes both recurring jobs (`RecurringJob.RemoveIfExists`); activating it registers them again. At startup the jobs are registered **only if the section is active**, so a restart never brings them back while the section is off.
+Implemented in Phase 6 and verified only against stub Instagram answers (a fake HTTP handler in the tests); the first real connection is on the Phase 8 preview (see **Not yet verified** below).
+
+- **API:** Instagram API with Instagram Login (Business or Creator account, scope `instagram_business_basic`, no Facebook Page). The old Basic Display API was shut down in December 2024. The owner's account must be Business or Creator.
+- **Placement:** the feed is a view component (`<vc:instagram-feed>`, `Web/ViewComponents/InstagramFeedViewComponent.cs`, view `Pages/Shared/Components/InstagramFeed/Default.cshtml`, view models `Web/Models/InstagramFeedViewModel.cs`) placed on the placeholder Home page (`Pages/Index.cshtml`, page key `home`). Phase 7 restyles it with the design. The dev sandbox does not show it: the sandbox loads only `shared.*` content, so the section needs the `home` page's content.
+
+```
+Connect (admin)                                 Hangfire: 06:00 and 18:00 Europe/Athens, or Fetch now, or right after Connect
+POST /admin/instagram?handler=Connect                         │
+  state + cookie ─► instagram.com login                      ▼
+  ◄─ /admin/instagram/callback?code&state    InstagramFeedService.FetchAsync
+  CompleteConnectAsync:                        token ─► GET me/media (latest 12) ─► new posts: download thumbnail
+   code ─► short-lived ─► long-lived token                 ─► MediaService.ImportAsync (Source=Instagram)
+   ─► profile ─► encrypted token + settings    ─► add / update / remove InstagramPosts ─► one commit
+   ─► enqueue a fetch                          ─► changed? evict page:home (all pods)
+```
+
+### Configuration and token
+
+| Item | Rule |
+|---|---|
+| `Instagram:AppId` | In `appsettings.json` (empty by default); the production value is set with the deployment |
+| `Instagram:AppSecret` | **Never in the repo**: the Kubernetes Secret as the environment variable `Instagram__AppSecret` (Phase 8), and .NET user secrets on the developer's PC (`UserSecretsId` in `SaronidaSailing.Web.csproj`). Without AppId or AppSecret the app starts normally (`InstagramOptions.IsConfigured` is false) and the Connect button is disabled with the text "Instagram is not set up on this server (the Meta app ID or secret is missing)." |
+| Base URLs | `Instagram:AuthorizeUrl`, `ApiBaseUrl` and `GraphBaseUrl` default to the real endpoints and must be absolute http(s) URLs (validated on start); the tests point them at a stub |
+| OAuth redirect URI | `{Site:BaseUrl}/admin/instagram/callback` (`InstagramPaths.RedirectUri`); it must be listed in the Meta app, one entry per environment that will connect (preview, production; a local run would need an HTTPS tunnel, none is part of the setup) |
+| Token storage | Long-lived token (about 60 days) in `IntegrationSettings` key `instagram.access-token`, **encrypted with ASP.NET Data Protection** through `ISecretProtector` (`Infrastructure/Instagram/DataProtectionSecretProtector.cs`, purpose `SaronidaSailing.Instagram.AccessToken.v1`). The keys live on the file volume (`DataProtection:KeysPath`), not in the database, so a `pg_dump` holds no usable token. Lost keys mean the token cannot be decrypted: the connection shows as disconnected and the admin reconnects |
+| Other settings keys | `instagram.token-expires-at`, `token-issued-at`, `user-id`, `username`, `connected-at`, `connected-by`, `token-invalid-at`; status keys `last-fetch-at`, `last-fetch-result`, `last-refresh-at`, `last-refresh-result` (constants in `Core/Services/InstagramSettingKeys.cs`; see `docs/domain-model.md`) |
+
+### Connection status
+
+`IInstagramConnectionService.GetStatusAsync` (`Core/Services/InstagramConnectionService.cs`) returns one of three states:
+
+| State | When |
+|---|---|
+| `NotConnected` | No `instagram.access-token` row |
+| `Connected` | A token exists, `instagram.token-invalid-at` is unset, the expiry is in the future and the token decrypts |
+| `Disconnected` | A token exists but `token-invalid-at` is set, the expiry has passed or the token cannot be decrypted |
+
+**Decision (tech lead, 2026-11-13): only `TokenInvalid` marks the connection disconnected.** Only an answer with Meta error code 190 (`InstagramApiErrorKind.TokenInvalid`) sets `instagram.token-invalid-at`, in a fetch or in a renewal. A transient or other failure keeps the connection `Connected`: the token stays valid for weeks, the next scheduled run retries, and the status turns `Disconnected` by itself at the expiry. Posts already stored stay in every case.
+
+### API client rules (`Infrastructure/Instagram/InstagramApiClient.cs`)
+
+- A typed `HttpClient` (`AddInstagram`), 30 second timeout. Tokens and the secret travel as `access_token` / `client_secret` query parameters or form fields; the `HttpClient` log lines do not contain the token or the secret (`InstagramOptionsTests.HttpClientLogs_NeverContainTheTokenOrTheSecret`) and NLog drops `System.*` up to Info, so a token never reaches a log.
+- Errors are `InstagramApiException` with a kind: `TokenInvalid` (code 190), `Transient` (codes 1, 2, 4, 17, 341, HTTP 5xx, timeouts, network errors) or `Other`. The message carries the HTTP status, the code and Meta's message with the token, the secret and every URL replaced (`[redacted]`, `[url]`), cut at 300 characters.
+- Media mapping: `IMAGE` uses `media_url`; `VIDEO` its `thumbnail_url`; `CAROUSEL_ALBUM` the first child (image `media_url`, video `thumbnail_url`), else the post's own `media_url`. A post with `media_product_type` `REELS` is stored as `REELS`. A post with no usable image or a missing field (id, permalink, type, timestamp) is skipped with a Warning.
+- `DownloadImageAsync` accepts only absolute `https` URLs and refuses more than `MediaLimits.MaxUploadBytes`.
+- `ExchangeCodeAsync`, `ExchangeForLongLivedAsync` and `BuildAuthorizeUrl` throw `InvalidOperationException` when not configured, so callers check `IsConfigured` first. `ExchangeCodeAsync` strips a trailing `#_` from the code.
+
+### OAuth state and `SameSite=Strict`
+
+The admin cookie is `SameSite=Strict`, so the browser does not send it on the cross-site return from instagram.com and the callback cannot rely on a signed-in session. `InstagramOAuthState` (`Web/Instagram/InstagramOAuthState.cs`, singleton):
+
+1. Connect (`POST /admin/instagram?handler=Connect`, Admin policy, antiforgery) creates a `state`: a Data Protection payload (purpose `SaronidaSailing.Instagram.OAuthState.v1`) holding the admin's id, a random nonce and an expiry 10 minutes ahead (checked against `TimeProvider`), and sets the cookie `saronida.ig-oauth` with the nonce (`Lax`, `HttpOnly`, `Secure`, path `/admin/instagram`, 10 minutes). `Lax` cookies are sent on a top-level GET navigation, which is what the return is.
+2. The callback (`/admin/instagram/callback`, anonymous) accepts the request only when the `state` decrypts, has not expired and its nonce equals the cookie (fixed-time comparison); the cookie is deleted on every attempt. It also requires the admin to exist, have 2FA enabled and not be locked out. The connect is then audited under that admin's email.
+3. The callback answers 200 with a meta refresh and a "Continue" link to `/admin/instagram?result=...` (`noindex`, `no-referrer`, `no-store`); it never echoes `code` or `state`. Result codes: `connected`, `denied`, `expired`, `invalid`, `failed`.
+
+### Admin pages
+
+| Path | Purpose |
+|---|---|
+| `/admin/instagram` | Admin policy. Shows the state (not set up / not connected / connected as `@name` with the access expiry, connected date and admin / disconnected), **Connect Instagram** or **Reconnect**, **Fetch now** (only while connected), **Disconnect** (in-page confirmation, `wwwroot/js/admin-instagram.js`; it removes the connection keys, the posts stay), and a Status block: "Scheduled fetches: on / off", posts stored, last fetch and last access renewal with their result. All times are shown in Athens time (`Web/Instagram/AthensTime.cs`, invariant culture) |
+| `/admin/instagram/callback` | The OAuth return (above) |
+
+### Fetch, renewal and posts
+
+- **Fetch** (`IInstagramFeedService.FetchAsync`, `Core/Services/InstagramFeedService.cs`): needs a usable token (else result `skipped:not-connected`); asks for the latest 12 posts (`PostLimit`); downloads and imports a thumbnail **only for a post not stored yet** (through `IMediaService.ImportAsync` with `MediaSource.Instagram`, before staging post changes because `ImportAsync` commits itself); updates a stored post's caption and permalink when they changed; removes stored posts that left the latest 12 (their `MediaAsset` stays); then one commit and, only if something was added, updated or removed, an eviction of `page:home`. A failed download or a rejected image skips that post. Any failure or an empty answer keeps the stored posts (`failed:{kind}`, `skipped:no-posts`). `TokenInvalid` marks the connection disconnected. The result is stored in `instagram.last-fetch-*` (`ok:{count}` on success).
+- **Token renewal** (`RefreshTokenAsync`): skips when not connected or when the token is younger than 24 hours (`instagram.token-issued-at`; Meta refuses younger tokens); else stores the renewed protected token, expiry and issue time. Result in `instagram.last-refresh-*`.
+- The status keys survive Disconnect.
+- **Posts as stored:** `InstagramPost` rows (`docs/domain-model.md`); thumbnails go through the media pipeline, so the page never depends on Instagram's image URLs. `MediaAsset.Source` (`Upload` / `Instagram`) keeps Instagram thumbnails out of the media library (`GET /admin/api/media` and `ExistAsync` see only `Upload`; `GET /admin/api/media/{id}` answers 404 for an Instagram asset; `GetByIdAsync` / `GetByIdsAsync` stay unfiltered for rendering). An upload of the same bytes as an Instagram thumbnail turns that asset into an `Upload` (`MediaService.ReuseAsync`).
+
+### Rendering
+
+- Markup: `<section cms-section="home.instagram" cms-section-label="Instagram feed" cms-instagram-count="N" cms-instagram-empty="...">`, a heading `home.instagram.title`, and a list of tiles; each tile links to the post's permalink with the post's own WebP files (`srcset` from `PageImage.SrcSet`, `sizes`, `width` / `height`, `loading="lazy"`). The view component reads the post count from the page content snapshot and the posts from `IInstagramFeedService.GetFeedAsync` (stored posts whose permalink is `https` and whose image exists).
+- **Visitors:** the first `count` posts, newest first; nothing at all (no section) when there are no posts. **Admin:** all stored posts, those beyond `count` marked `hidden` (so the select previews live), and with no posts a note "No Instagram posts yet." linking to `/admin/instagram`.
+- **Alt text** (`Core/Services/InstagramAltText.cs`): the first non-blank line of the caption, whitespace collapsed, cut to at most 125 characters including the "…" and at a word boundary; with no caption "Ανάρτηση στο Instagram, {date}" (Greek) or "Instagram post, {date}" (English), the date being the post date in Athens time.
+- **Post count:** the content field `home.instagram.post-count` (Text, 1-12, default 6), **Greek only** (an English value is rejected on save, both languages follow the Greek one). Edited with the "Posts shown" select in the section bar (`instagram-count.js`; label "Posts shown", accessible name "Posts shown: Instagram feed", hint "Same for both languages."): changing it previews live and becomes a pending `setField` (locale `el`) saved with Save page, with history; Discard restores it. The fetch always stores 12, so changing the number needs no refetch.
+- Visitors keep seeing the last good posts whatever happens to the connection.
+
+### Section switch
+
+Deactivating `home.instagram` removes the recurring jobs; activating registers them. `InstagramSectionHandler` (an `ISectionActivationHandler`, see CMS Editing Flow → Write service) calls `IInstagramJobScheduler.Remove()` / `Register()` (`Infrastructure/Jobs/InstagramJobScheduler.cs`, `IRecurringJobManager`; both idempotent). At startup `IInstagramScheduleSync.SyncAsync` runs in `Program.cs` after `InitializeDatabaseAsync` and after the `admin` CLI branch: it registers the jobs only when the section is active and removes them otherwise, so a restart never brings them back while the section is off; a failure stops startup. The toolbar warning is shown only while the section is active, and `/admin/instagram` always states "Scheduled fetches: on/off".
+
+### Not yet verified
+
+Decided 2026-11-13: the developer will not use a personal Facebook or Instagram profile, so there was **no real Meta round trip** in Phase 6 (connect, fetch, feed, renewal, revoke, development mode). The first real connection happens on the Phase 8 preview with the owner (`PLAN.md` → Phase 8).
+
+**Risk for Phase 8 (finding 2026-11-13).** A Meta app the developer created (Business type) offered only "API setup with Unified login" (needs a business portfolio, Facebook Login for Business with a `config_id`, `facebook.com/dialog/oauth`, `graph.facebook.com`, a system-user token and `instagram_basic`) and "API setup with Facebook login", not the "API setup with Instagram login" this code uses. Meta's guide still says the "Other" use case with the Business type adds Instagram login automatically, but developers report newer apps no longer get it. If the owner's app cannot get Instagram login, the API client, the Connect flow and the token renewal need a Unified-login rework before go-live. The first Phase 8 Instagram task is to create the app and check this.
 
 ## Background Jobs (Hangfire)
 
-| Job | Schedule |
-|---|---|
-| Instagram fetch | Twice a day |
-| Instagram token refresh | Weekly |
+| Job | Id | Schedule (Europe/Athens) |
+|---|---|---|
+| Instagram fetch | `instagram-fetch` | `0 6,18 * * *` (06:00 and 18:00) |
+| Instagram token renewal | `instagram-token-refresh` | `0 4 * * 1` (Mondays 04:00) |
 
-The database backup is not a Hangfire job: a nightly `pg_dump` Kubernetes CronJob does it (agreed design, see `docs/deployment.md` → Backups).
+Ids and cron strings are in `Core/Services/InstagramJobIds.cs`; the time zone is `InstagramJobScheduler.TimeZoneId`. The schedule is registered only while the `home.instagram` section is active (see Instagram Feed → Section switch). The database backup is not a Hangfire job: a nightly `pg_dump` Kubernetes CronJob does it (agreed design, see `docs/deployment.md` → Backups).
 
 - Storage: `Hangfire.PostgreSql` 1.21.1 (`Infrastructure/DependencyInjection.cs`), schema `hangfire` in the content database, same connection string (`ConnectionStrings:Hangfire` no longer exists). The schema is installed by `migrate` (or at startup in Development), never by a pod in production: `PrepareSchemaIfNecessary` equals `Database:MigrateAtStartup`.
-- Server: Hangfire 1.8.25, **2 workers**, registered in `AddInfrastructure`. **Every pod runs a server**; Hangfire's distributed locks keep each recurring job running once. **Implemented so far: storage, server and the dashboard** - no jobs yet, so the single-run behaviour is checked in the Phase 8 two-pod rehearsal.
+- Server: Hangfire 1.8.25, **2 workers**, registered in `AddInfrastructure`. **Every pod runs a server**; Hangfire's distributed locks keep each recurring job running once (the single-run behaviour across two pods is checked in the Phase 8 rehearsal).
+- Job classes (`Infrastructure/Jobs/`): `InstagramFetchJob` and `InstagramTokenRefreshJob` are thin (one call into `IInstagramFeedService` / `IInstagramConnectionService`), with `[AutomaticRetry(Attempts = 0)]` (the next scheduled run is the retry) and `[DisableConcurrentExecution(600)]`. `IInstagramJobQueue.EnqueueFetch()` (`InstagramJobQueue`) enqueues a one-off fetch: after a successful connect and from **Fetch now**.
 - Dashboard at `/admin/jobs`, mapped in `Web/Program.cs` with `MapHangfireDashboardWithAuthorizationPolicy(AdminPolicy.Name, ...)`: only requests that satisfy the `Admin` policy (authenticated + `amr=mfa`) get in; the dashboard's own authorization filter list is empty. Hangfire's antiforgery works with our `Secure` / `SameSite=Strict` cookies (`HangfireDashboardTests`).
 - Every job must be safe to run twice.
 - Possible later job: delete media files never referenced by any content or history (uploads discarded before Save). Not in scope until needed.
@@ -576,6 +659,8 @@ A health-check publisher also runs the checks every 30 s and logs state changes 
 | `/admin/login/recovery` | Recovery code instead of a TOTP code |
 | `/admin/two-factor/setup` | Mandatory authenticator setup |
 | `/admin/logout` | The GET page only shows a confirm form; signing out is a POST |
+| `/admin/instagram` | Instagram connection and status (Admin policy; see Instagram Feed → Admin pages) |
+| `/admin/instagram/callback` | OAuth return from Instagram; **anonymous**, because the `SameSite=Strict` admin cookie is not sent on the cross-site return (see Instagram Feed → OAuth state and `SameSite=Strict`) |
 
 ```
 password ──► 2FA on?  yes ─► /admin/login/code ─► signed in (amr=mfa) ─► returnUrl or /
@@ -597,6 +682,7 @@ password ──► 2FA on?  yes ─► /admin/login/code ─► signed in (amr=m
 
 **Data Protection keys** are persisted to `DataProtection:KeysPath` (`/var/saronida/data/keys`; Development `data/keys`), application name `SaronidaSailing` — otherwise every deploy logs admins out and invalidates antiforgery tokens. The keys are **not encrypted at rest** (file permissions only). When a key is created, `XmlKeyManager` logs a warning that reaches the app log.
 
+- The Instagram access token is protected with these same keys (purpose `SaronidaSailing.Instagram.AccessToken.v1`), as is the Instagram OAuth `state`; the keys must therefore be backed up with the database (see `docs/deployment.md` → Backups), or the admin must reconnect after a restore.
 - Several admins may edit at once; concurrent saves to the same field: last save wins. `ContentHistory` records who changed what.
 - Hangfire dashboard `/admin/jobs`: see Background Jobs.
 
@@ -645,6 +731,19 @@ Implemented. Configuration is the `NLog` section of `appsettings.json`, loaded i
 | `content-save-rejected` | A content batch had an invalid change and nothing was written (details: error count and the first error) |
 
 The user field of the content events is the editor's email.
+
+Instagram events (`InstagramConnectionService`, `Web/Pages/Admin/Instagram*.cshtml.cs`):
+
+| Event | Written when |
+|---|---|
+| `instagram-connected` | The callback completed the connect (user: the admin's email; details `username=@name`) |
+| `instagram-connect-failed` | The callback refused or the exchange failed. Details `reason=denied`, `expired`, `invalid-state`, `missing-code` or `invalid-user` (user `-`: the request is anonymous), or `kind=` the `InstagramApiErrorKind` plus `code=` when Meta gave one (user: the admin) |
+| `instagram-disconnected` | **Disconnect** on `/admin/instagram` |
+| `instagram-fetch-requested` | **Fetch now** on `/admin/instagram` |
+
+The scheduled fetch and renewal write no audit line: their outcome is the status line on `/admin/instagram` (`instagram.last-fetch-*`, `instagram.last-refresh-*`).
+
+**Known gap (recorded 2026-11-13, NLog rules not changed).** The routing rules drop Info lines of every logger not named in them (the last rule writes only Warn and above), so the Info lines of the Core services never reach a file or the console: `Instagram schedules synced at startup` (`InstagramScheduleSync`), `Instagram schedules registered/removed` (`InstagramSectionHandler`), `Instagram fetch finished: added= updated= removed= skipped=` (`InstagramFeedService`) and `Instagram access token renewed` (`InstagramConnectionService`). Warnings and errors do get through: a failed fetch or renewal, a skipped post, an empty answer from Instagram, a section handler that threw. Until the rules change, the admin page's Status block is the place to see what the jobs did.
 
 ### Diagnostics
 
@@ -732,6 +831,8 @@ Code in `Web/Diagnostics/`. Goal: find out afterwards what went wrong. A pod kil
 | Admin pages in caches | Pages rendered for an admin carry `Cache-Control: no-store` and are never stored by the output cache |
 | XSS | Razor encoding by default; rich text sanitized with HtmlSanitizer on save, inside `ContentService` (see CMS Editing Flow); link URLs restricted to `https:`, `tel:`, `mailto:` and validated on save |
 | Transport | Cloudflare SSL mode **Full (strict)**; Let's Encrypt cert on the origin |
+| Instagram access token | Stored only encrypted (ASP.NET Data Protection, keys on the file volume, so a database dump holds no usable token); never logged; API error messages and HttpClient logs have token, secret and URLs removed. The app secret comes only from the Kubernetes Secret / user secrets |
+| Instagram OAuth | Connect issues a Data-Protection-protected `state` (admin id, nonce, 10 minute expiry) plus a short-lived `SameSite=Lax` cookie with the nonce; the anonymous callback accepts only a matching pair and an admin who still exists with 2FA and no lockout. The callback never echoes `code` or `state`. See Instagram Feed → OAuth state and `SameSite=Strict` |
 | Uploads | `POST /admin/api/media` is admin-only with antiforgery; the file is validated by decoding (not by extension or content type), limited to 25 MB and 50 megapixels, one at a time per pod; re-encoding strips all metadata; originals are kept outside the served folder, and startup fails if they would be inside it. Only `.webp` is served from the media folder in Development; file names are generated from a slug and the content hash, never from the raw upload name |
 
 ## Cookies & Privacy

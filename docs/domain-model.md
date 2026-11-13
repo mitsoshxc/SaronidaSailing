@@ -1,8 +1,8 @@
 # Domain Model
 
-Status: **`BaseEntity`, `ApplicationUser`, the four content entities (`ContentItem`, `ContentListItem`, `ContentSection`, `ContentHistory`) and `MediaAsset` are implemented on PostgreSQL: the first five in the migration `InitialCreate`, `MediaAsset` in `AddMediaAssets`. `InstagramPost` and `IntegrationSetting` are planned, not yet implemented.**
+Status: **All entities are implemented on PostgreSQL: `BaseEntity`, `ApplicationUser` and the four content entities (`ContentItem`, `ContentListItem`, `ContentSection`, `ContentHistory`) in the migration `InitialCreate`, `MediaAsset` in `AddMediaAssets`, `InstagramPost`, `IntegrationSetting` and `MediaAsset.Source` in `AddInstagram`.**
 
-Storage: PostgreSQL through the Npgsql EF Core provider. `Guid` columns are `uuid`; every `DateTime` (`CreatedAt`, `UpdatedAt`) is `timestamp with time zone` and read back as UTC (`docs/conventions.md` → EF Core and PostgreSQL). Table names are the ones below (`ContentItems`, `ContentListItems`, `ContentSections`, `ContentHistory`, `MediaAssets`, plus the Identity `AspNet*` tables) in the default `public` schema. Hangfire's tables are not EF entities: they live in the separate schema `hangfire` of the same database, created by the `migrate` command (`docs/architecture.md` → Background Jobs).
+Storage: PostgreSQL through the Npgsql EF Core provider. `Guid` columns are `uuid`; every `DateTime` (`CreatedAt`, `UpdatedAt`) is `timestamp with time zone` and read back as UTC (`docs/conventions.md` → EF Core and PostgreSQL). Table names are the ones below (`ContentItems`, `ContentListItems`, `ContentSections`, `ContentHistory`, `MediaAssets`, `InstagramPosts`, `IntegrationSettings`, plus the Identity `AspNet*` tables) in the default `public` schema. Hangfire's tables are not EF entities: they live in the separate schema `hangfire` of the same database, created by the `migrate` command (`docs/architecture.md` → Background Jobs).
 
 ## Content Keys
 
@@ -75,7 +75,7 @@ Implemented (`Core/Entities/ContentSection.cs`, table `ContentSections`). Visibi
 | `SectionKey` | string (max 100) | Unique together with `PageKey` (`UX_ContentSections_PageKey_SectionKey`) |
 | `IsActive` | bool | Default true; a section with no row counts as active. Inactive sections are hidden from visitors (and their menu links), shown dimmed to the admin |
 
-The section bar in edit mode toggles it (`SetSectionActive`). Toggling `home.instagram` will also remove / re-register the Instagram recurring jobs (planned, Phase 6, see `docs/architecture.md` → Instagram Feed).
+The section bar in edit mode toggles it (`SetSectionActive`). Toggling `home.instagram` also removes / re-registers the Instagram recurring jobs, through `ISectionActivationHandler` (see `docs/architecture.md` → Instagram Feed → Section switch).
 
 ### ContentHistory
 
@@ -104,6 +104,9 @@ Implemented (`Core/Entities/MediaAsset.cs`, table `MediaAssets`, migration `AddM
 | `Widths` | string (max 50) | Generated widths, ascending, comma-separated, e.g. `480,960,1600` (`GetWidths()` parses it). Never wider than the image; an image narrower than 480 has one entry, its own width |
 | `Width` / `Height` | int | Dimensions after the orientation fix |
 | `OriginalFileExtension` | string (max 10) | `.jpg`, `.png` or `.webp`, chosen from the decoded format. Together with `ContentHash` it names the private original (`MediaFileNames.OriginalFileName`); the table stores **no path**, the folder comes from `Media:OriginalsPath` |
+| `Source` | `MediaSource` enum (`Core/Entities/MediaSource.cs`) | `Upload` or `Instagram`; stored as a string (max 20), default `Upload` (migration `AddInstagram`). Set by `MediaService.ImportAsync(..., source)`; `Instagram` marks a thumbnail downloaded by the feed fetch. Changed only by `MarkAsUpload()` |
+
+`Source` decides what the admin sees. `MediaAssetRepository.ListNewestFirstAsync` and `ExistAsync` consider only `Upload` assets, so Instagram thumbnails are not in the media library and cannot be chosen as a content image (the save check "Image '...' does not exist." rejects them), and `GET /admin/api/media/{id}` answers 404 for them. `GetByIdAsync` and `GetByIdsAsync` stay unfiltered, so rendering (the feed, `PageImage`) still finds them. The content hash is unique across sources: uploading a file whose bytes equal an Instagram thumbnail returns that asset and flips it to `Upload` (`MediaService.ReuseAsync`); an Instagram import of bytes that already exist as an upload leaves it `Upload`.
 
 | Index | Columns |
 |---|---|
@@ -119,24 +122,48 @@ Files on disk (names built by `Core/Services/MediaFileNames.cs`): `{Slug}-{Conte
 
 ### InstagramPost
 
-Planned. Cached posts for the Home page feed.
+Implemented (`Core/Entities/InstagramPost.cs`, table `InstagramPosts`, migration `AddInstagram`). A cached post of the Home page feed; the latest 12 are kept (`docs/architecture.md` → Instagram Feed). Created with `InstagramPost.Create(...)` by `InstagramFeedService`. `Permalink` and `Caption` change only through `Update(caption, permalink)`, which reports whether anything changed.
 
 | Field | Type | Notes |
 |---|---|---|
-| `InstagramId` | string | Unique |
-| `Permalink` | string | Link to the post |
-| `Caption` | string? | |
-| `MediaAssetId` | Guid | FK → `MediaAsset` (downloaded thumbnail) |
-| `PostedAt` | DateTime (UTC) | |
+| `InstagramId` | string (max 100) | The post's Instagram id. **Unique** |
+| `Permalink` | string | Link to the post; the feed renders only `https` permalinks |
+| `Caption` | string? | Source of the tile's alt text |
+| `MediaType` | string (max 30) | `IMAGE`, `VIDEO`, `CAROUSEL_ALBUM` or `REELS` (a post with `media_product_type` `REELS` is stored as `REELS`) |
+| `MediaAssetId` | Guid | FK → `MediaAsset` (the downloaded thumbnail, `Source = Instagram`), `ON DELETE RESTRICT` |
+| `PostedAt` | DateTime (UTC) | From the post's timestamp |
+
+| Index | Columns |
+|---|---|
+| `UX_InstagramPosts_InstagramId` (unique) | `InstagramId` |
+| `IX_InstagramPosts_PostedAt` | `PostedAt` descending; serves the newest-first read |
+| `IX_InstagramPosts_MediaAssetId` | `MediaAssetId` (the foreign key) |
+
+A post that leaves the latest 12 is deleted; its `MediaAsset` and files stay.
 
 ### IntegrationSetting
 
-Planned. Key/value store for integration state, e.g. the Instagram access token and its expiry.
+Implemented (`Core/Entities/IntegrationSetting.cs`, table `IntegrationSettings`, migration `AddInstagram`). Key/value store for integration state. Read and written through `IIntegrationSettingRepository` (`GetAsync`, `SetAsync`, `RemoveAsync`; stages only, the service commits).
 
 | Field | Type | Notes |
 |---|---|---|
-| `Key` | string | Unique, e.g. `instagram.access-token` |
-| `Value` | string | |
+| `Key` | string (max 100) | **Unique** (`UX_IntegrationSettings_Key`) |
+| `Value` | string | Changed with `SetValue` |
+
+Keys in use (constants in `Core/Services/InstagramSettingKeys.cs`). Timestamps are stored as ISO 8601 round-trip UTC strings (`InstagramTimestamps`).
+
+| Key | Value | Removed by Disconnect |
+|---|---|---|
+| `instagram.access-token` | The long-lived token, **encrypted** with Data Protection (`ISecretProtector`); never plain text | yes |
+| `instagram.token-expires-at` | When the token expires | yes |
+| `instagram.token-issued-at` | When it was issued or last renewed (Meta refuses to renew a token younger than 24 hours) | yes |
+| `instagram.user-id`, `instagram.username` | The connected account | yes |
+| `instagram.connected-at`, `instagram.connected-by` | When and by which admin (email) | yes |
+| `instagram.token-invalid-at` | Set only when Meta answers error 190 (the only thing that marks the connection disconnected before the expiry); cleared by a new connect | yes |
+| `instagram.last-fetch-at`, `instagram.last-fetch-result` | Latest fetch: `ok:{count}`, `skipped:not-connected`, `skipped:no-posts`, `failed:{TokenInvalid\|Transient\|Other}` | **no** |
+| `instagram.last-refresh-at`, `instagram.last-refresh-result` | Latest renewal: `ok`, `skipped:not-connected`, `skipped:too-recent`, `failed:{kind}` | **no** |
+
+Related content key: `home.instagram.post-count` is an ordinary `ContentItem` (Text, locale `el` only, 1-12, default 6), not an integration setting (`docs/architecture.md` → Instagram Feed → Rendering).
 
 ### ApplicationUser
 

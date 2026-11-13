@@ -8,7 +8,7 @@ Stack: ASP.NET Core 10 Razor Pages · Entity Framework Core 10 · PostgreSQL · 
 
 Languages: Greek (default, no URL prefix) and English (`/en/`). Pages and sections come from the "Saronida Sailing Redesign" design canvas: https://claude.ai/artifact/RcU5iMfQSTJ34rH5gFB7MC (read it with the Artifact tool; desktop artboards `Desktop*.dc.html` hold the full layouts, the canvas notes hold design decisions).
 
-Project status: **Phase 5 (Media) is complete except the real-iPhone test (Phase 8); Phase 6 (Instagram Feed) is next**. Docs mark what is implemented and what is still agreed design; `PLAN.md` tracks the rest of the build.
+Project status: **Phases 0–6 are complete (Phase 6, Instagram Feed, verified against stub Instagram answers); the real-iPhone HEIC test and the first real Instagram connection wait for the Phase 8 preview; Phase 7 (Public Pages) is next**. Docs mark what is implemented and what is still agreed design; `PLAN.md` tracks the rest of the build.
 
 ## Before You Start (working agreements)
 
