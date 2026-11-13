@@ -24,6 +24,7 @@ internal sealed class ContentBatch(
     private readonly Dictionary<(string Page, string List), List<ContentListItem>> _lists = [];
     private readonly Dictionary<(string Page, string Section), ContentSection> _sections = [];
     private readonly List<ContentSection> _newSections = [];
+    private readonly Dictionary<(string Page, string Section), bool> _sectionOriginalStates = [];
 
     public IReadOnlyList<string> Errors => _errors;
 
@@ -42,6 +43,11 @@ internal sealed class ContentBatch(
     public int ListItemsActivated { get; private set; }
 
     public int SectionsChanged { get; private set; }
+
+    public IReadOnlyList<(string PageKey, string SectionKey, bool IsActive)> SectionChanges =>
+        [.. _sectionOriginalStates
+            .Where(s => _sections[s.Key].IsActive != s.Value)
+            .Select(s => (s.Key.Page, s.Key.Section, _sections[s.Key].IsActive))];
 
     public async Task ApplyAsync(ContentChange change, CancellationToken ct)
     {
@@ -424,12 +430,14 @@ internal sealed class ContentBatch(
                 return;
             }
 
+            _sectionOriginalStates.TryAdd((page, sectionKey), true);
             section = ContentSection.Create(page, sectionKey, isActive: false);
             _sections[(page, sectionKey)] = section;
             _newSections.Add(section);
         }
         else if (section.IsActive != change.IsActive)
         {
+            _sectionOriginalStates.TryAdd((page, sectionKey), section.IsActive);
             section.SetActive(change.IsActive);
         }
         else

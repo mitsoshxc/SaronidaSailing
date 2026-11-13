@@ -76,6 +76,8 @@ try
     builder.Services.AddScoped<IAdminAccountService, AdminAccountService>();
     builder.Services.AddScoped<IInstagramConnectionService, InstagramConnectionService>();
     builder.Services.AddScoped<IInstagramFeedService, InstagramFeedService>();
+    builder.Services.AddScoped<IInstagramScheduleSync, InstagramScheduleSync>();
+    builder.Services.AddScoped<ISectionActivationHandler, InstagramSectionHandler>();
     builder.Services.AddSingleton<InstagramOAuthState>();
     builder.Services.AddOutputCache(options => options.AddPolicy(CacheTags.PolicyName, policy => policy
         .Expire(TimeSpan.FromHours(1))
@@ -163,6 +165,11 @@ try
 
         LogManager.Shutdown();
         return exitCode;
+    }
+
+    using (var scope = app.Services.CreateScope())
+    {
+        await scope.ServiceProvider.GetRequiredService<IInstagramScheduleSync>().SyncAsync();
     }
 
     if (app.Environment.IsDevelopment())

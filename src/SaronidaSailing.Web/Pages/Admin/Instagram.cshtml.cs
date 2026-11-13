@@ -14,6 +14,7 @@ public class InstagramModel(
     IInstagramConnectionService connection,
     IInstagramApiClient client,
     IInstagramFeedService feed,
+    IInstagramScheduleSync schedule,
     IInstagramJobQueue jobQueue,
     IAuditLog audit,
     InstagramOAuthState oauthState,
@@ -56,6 +57,8 @@ public class InstagramModel(
 
     public InstagramActivity Activity { get; private set; } = null!;
 
+    public bool SchedulesOn { get; private set; }
+
     public string? BannerText { get; private set; }
 
     public bool BannerIsError { get; private set; }
@@ -72,6 +75,7 @@ public class InstagramModel(
     {
         Status = await connection.GetStatusAsync(ct);
         Activity = await feed.GetActivityAsync(ct);
+        SchedulesOn = await schedule.IsSectionActiveAsync(ct);
         if (result is not null && Banners.TryGetValue(result, out var banner))
         {
             (BannerText, BannerIsError) = banner;

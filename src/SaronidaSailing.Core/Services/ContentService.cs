@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using SaronidaSailing.Core.Entities;
 using SaronidaSailing.Core.Interfaces;
 
@@ -12,7 +13,9 @@ public sealed class ContentService(
     IUnitOfWork unitOfWork,
     IRichTextSanitizer sanitizer,
     IPageCacheInvalidator cacheInvalidator,
-    IAuditLog auditLog) : IContentService
+    IAuditLog auditLog,
+    IEnumerable<ISectionActivationHandler> activationHandlers,
+    ILogger<ContentService> logger) : IContentService
 {
     public async Task<PageContent> GetPageContentAsync(string pageKey, string locale, CancellationToken ct = default)
     {
@@ -135,7 +138,31 @@ public sealed class ContentService(
             + $"list-deleted={batch.ListItemsDeleted} reordered={batch.ListsReordered} "
             + $"list-activated={batch.ListItemsActivated} sections={batch.SectionsChanged} save={batch.SaveId}");
 
+        await NotifySectionHandlersAsync(batch.SectionChanges, ct);
+
         return ContentSaveResult.Saved(batch.SaveId);
+    }
+
+    private async Task NotifySectionHandlersAsync(
+        IReadOnlyList<(string PageKey, string SectionKey, bool IsActive)> changes, CancellationToken ct)
+    {
+        foreach (var (pageKey, sectionKey, isActive) in changes)
+        {
+            var fullKey = $"{pageKey}.{sectionKey}";
+            foreach (var handler in activationHandlers.Where(h => h.SectionKey == fullKey))
+            {
+                try
+                {
+                    await handler.OnActiveChangedAsync(isActive, ct);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(
+                        ex, "Section handler for {SectionKey} failed after the content was saved (active={IsActive}).",
+                        fullKey, isActive);
+                }
+            }
+        }
     }
 
     public async Task<IReadOnlyList<FieldVersion>> GetFieldHistoryAsync(

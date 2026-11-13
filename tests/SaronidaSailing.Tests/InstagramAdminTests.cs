@@ -3,11 +3,14 @@ using System.Web;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Time.Testing;
+using SaronidaSailing.Core.Entities;
 using SaronidaSailing.Core.Interfaces;
 using SaronidaSailing.Core.Services;
+using SaronidaSailing.Infrastructure.Data;
 using SaronidaSailing.Infrastructure.Jobs;
 using static SaronidaSailing.Tests.AdminTestHelpers;
 
@@ -461,15 +464,59 @@ public class InstagramAdminTests(InstagramWebApplicationFactory factory) : IClas
     }
 
     [Fact]
-    public async Task Status_IsHidden_WhenNothingHasHappened()
+    public async Task Status_HasNoActivityLines_WhenNothingHasHappened()
     {
         await ResetAsync();
         var client = await LoggedInClientAsync("ig-nostatus@example.com");
 
         var html = await (await client.GetAsync(Page)).Content.ReadAsStringAsync();
 
-        Assert.DoesNotContain("<h2>Status</h2>", html);
+        Assert.Contains("<h2>Status</h2>", html);
         Assert.DoesNotContain("Posts stored", html);
+    }
+
+    [Fact]
+    public async Task Status_ScheduleLine_FollowsTheSectionState()
+    {
+        var client = await LoggedInClientAsync($"ig-schedule-{Guid.NewGuid():N}@example.com");
+        try
+        {
+            await SetSectionActiveAsync(true);
+            var on = await (await client.GetAsync(Page)).Content.ReadAsStringAsync();
+            await SetSectionActiveAsync(false);
+            var off = await (await client.GetAsync(Page)).Content.ReadAsStringAsync();
+
+            Assert.Contains("Scheduled fetches: on (06:00 and 18:00, access renewal Mondays 04:00).", on);
+            Assert.DoesNotContain("Scheduled fetches: off", on);
+            Assert.Contains("Scheduled fetches: off (the Instagram feed section is hidden on the home page).", off);
+            Assert.DoesNotContain("Scheduled fetches: on", off);
+        }
+        finally
+        {
+            await SetSectionActiveAsync(true);
+        }
+    }
+
+    [Fact]
+    public async Task Status_ScheduleLine_IsOn_WhenTheSectionHasNoRow()
+    {
+        var client = await LoggedInClientAsync($"ig-schedule-norow-{Guid.NewGuid():N}@example.com");
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<AppDbContext>().Set<ContentSection>().ExecuteDeleteAsync();
+        }
+
+        var html = await (await client.GetAsync(Page)).Content.ReadAsStringAsync();
+
+        Assert.Contains("Scheduled fetches: on", html);
+    }
+
+    private async Task SetSectionActiveAsync(bool active)
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var result = await scope.ServiceProvider.GetRequiredService<IContentService>().ApplyChangesAsync(
+            [new SetSectionActive(InstagramSection.Key, active)], new ContentEditor("ig-schedule@example.com", null));
+        Assert.True(result.Succeeded);
     }
 
     [Fact]

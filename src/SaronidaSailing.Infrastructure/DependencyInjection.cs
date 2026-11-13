@@ -63,6 +63,7 @@ public static class DependencyInjection
         services.AddScoped<IIntegrationSettingRepository, IntegrationSettingRepository>();
         services.AddInstagram(configuration);
         services.AddSingleton<IInstagramJobQueue, InstagramJobQueue>();
+        services.AddSingleton<IInstagramJobScheduler, InstagramJobScheduler>();
         services.AddScoped<InstagramFetchJob>();
         services.AddScoped<InstagramTokenRefreshJob>();
         services.AddSingleton<MediaProcessingGate>();

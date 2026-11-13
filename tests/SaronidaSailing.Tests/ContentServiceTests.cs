@@ -17,6 +17,8 @@ public sealed class ContentServiceTests : IAsyncLifetime
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 3, 1, 10, 0, 0, TimeSpan.Zero));
     private readonly RecordingInvalidator _invalidator = new();
     private readonly RecordingAuditLog _audit = new();
+    private readonly List<ISectionActivationHandler> _handlers = [];
+    private readonly CapturingLogger<ContentService> _logger = new();
     private readonly ContentEditor _editor = new(Email, "10.0.0.1");
 
     public async Task InitializeAsync() => _connectionString = await PostgresTestServer.CreateDatabaseAsync();
@@ -1149,6 +1151,107 @@ public sealed class ContentServiceTests : IAsyncLifetime
         return asset.Id;
     }
 
+    [Fact]
+    public async Task SectionHandler_IsCalledAfterTheSave_WithTheNewState()
+    {
+        var evictionsAtCall = new List<int>();
+        var handler = new RecordingSectionHandler("home.instagram") { OnCall = () => evictionsAtCall.Add(_invalidator.Calls.Count) };
+        _handlers.Add(handler);
+
+        await Apply(new SetSectionActive("home.instagram", false));
+        await Apply(new SetSectionActive("home.instagram", true));
+
+        Assert.Equal([false, true], handler.Calls);
+        Assert.Equal([1, 2], evictionsAtCall);
+    }
+
+    [Fact]
+    public async Task SectionHandler_SeesTheCommittedState()
+    {
+        bool? stored = null;
+        var handler = new RecordingSectionHandler("home.instagram");
+        handler.OnCall = () =>
+        {
+            using var verify = CreateContext();
+            stored = verify.Set<ContentSection>().Single().IsActive;
+        };
+        _handlers.Add(handler);
+
+        await Apply(new SetSectionActive("home.instagram", false));
+
+        Assert.False(stored);
+    }
+
+    [Fact]
+    public async Task SectionHandler_IsNotCalled_WhenTheStateDoesNotChange()
+    {
+        var handler = new RecordingSectionHandler("home.instagram");
+        _handlers.Add(handler);
+
+        await Apply(new SetSectionActive("home.instagram", true));
+        await Apply(new SetSectionActive("home.instagram", false));
+        handler.Calls.Clear();
+        await Apply(new SetSectionActive("home.instagram", false));
+        await Apply(new SetSectionActive("home.instagram", true), new SetSectionActive("home.instagram", false));
+
+        Assert.Empty(handler.Calls);
+    }
+
+    [Fact]
+    public async Task SectionHandler_UsesTheFinalStatePerSection()
+    {
+        var handler = new RecordingSectionHandler("home.instagram");
+        _handlers.Add(handler);
+
+        await Apply(
+            new SetSectionActive("home.instagram", false),
+            new SetSectionActive("home.instagram", true),
+            new SetSectionActive("home.instagram", false));
+
+        Assert.Equal([false], handler.Calls);
+    }
+
+    [Fact]
+    public async Task SectionHandler_IsNotCalled_ForAnotherSection()
+    {
+        var handler = new RecordingSectionHandler("home.instagram");
+        _handlers.Add(handler);
+
+        await Apply(new SetSectionActive("home.hero", false), new SetSectionActive("boat.instagram", false));
+
+        Assert.Empty(handler.Calls);
+    }
+
+    [Fact]
+    public async Task SectionHandler_IsNotCalled_ForARejectedBatch()
+    {
+        var handler = new RecordingSectionHandler("home.instagram");
+        _handlers.Add(handler);
+
+        var result = await Apply(new SetSectionActive("home.instagram", false), new SetSectionActive("bad key", false));
+
+        Assert.False(result.Succeeded);
+        Assert.Empty(handler.Calls);
+    }
+
+    [Fact]
+    public async Task SectionHandler_Failure_KeepsTheSaveAndLogsAnError()
+    {
+        _handlers.Add(new RecordingSectionHandler("home.instagram") { Failure = new InvalidOperationException("boom") });
+
+        var result = await Apply(new SetSectionActive("home.instagram", false));
+
+        Assert.True(result.Succeeded);
+        await using (var verify = CreateContext())
+        {
+            Assert.False((await verify.Set<ContentSection>().SingleAsync()).IsActive);
+        }
+
+        var error = Assert.Single(_logger.Entries, e => e.Level == Microsoft.Extensions.Logging.LogLevel.Error);
+        Assert.Contains("home.instagram", error.Message);
+        Assert.Equal("boom", error.Exception?.Message);
+    }
+
     private static SetField Field(string key, string locale, string value, Guid? listItemId = null) =>
         new(key, locale, ContentType.Text, value, listItemId);
 
@@ -1176,7 +1279,9 @@ public sealed class ContentServiceTests : IAsyncLifetime
             new UnitOfWork(context),
             new RichTextSanitizer(),
             _invalidator,
-            _audit);
+            _audit,
+            _handlers,
+            _logger);
 
     private AppDbContext CreateContext() =>
         new(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(_connectionString).Options, _time);
@@ -1218,6 +1323,38 @@ public sealed class ContentServiceTests : IAsyncLifetime
             OnEvict?.Invoke();
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class RecordingSectionHandler(string sectionKey) : ISectionActivationHandler
+    {
+        public string SectionKey => sectionKey;
+
+        public List<bool> Calls { get; } = [];
+
+        public Action? OnCall { get; set; }
+
+        public Exception? Failure { get; set; }
+
+        public Task OnActiveChangedAsync(bool isActive, CancellationToken ct)
+        {
+            Calls.Add(isActive);
+            OnCall?.Invoke();
+            return Failure is null ? Task.CompletedTask : Task.FromException(Failure);
+        }
+    }
+
+    private sealed class CapturingLogger<T> : Microsoft.Extensions.Logging.ILogger<T>
+    {
+        public List<(Microsoft.Extensions.Logging.LogLevel Level, string Message, Exception? Exception)> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state,
+            Exception? exception, Func<TState, Exception?, string> formatter) =>
+            Entries.Add((logLevel, formatter(state, exception), exception));
     }
 
     private sealed class RecordingAuditLog : IAuditLog

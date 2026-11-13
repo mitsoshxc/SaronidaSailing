@@ -49,9 +49,17 @@
     </form>
 }
 
+<h2>Status</h2>
+@if (Model.SchedulesOn)
+{
+    <p>Scheduled fetches: on (06:00 and 18:00, access renewal Mondays 04:00).</p>
+}
+else
+{
+    <p>Scheduled fetches: off (the Instagram feed section is hidden on the home page).</p>
+}
 @if (Model.Activity.HasAnything)
 {
-    <h2>Status</h2>
     <p>Posts stored: @Model.Activity.PostCount.</p>
     @if (Model.LastFetchText is { } fetchText)
     {
