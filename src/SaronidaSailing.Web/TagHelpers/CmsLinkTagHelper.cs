@@ -21,6 +21,8 @@ public sealed class CmsLinkTagHelper(
 
     public override async Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
     {
+        var keepContent = context.AllAttributes.ContainsName("cms-keep-content");
+        output.Attributes.RemoveAll("cms-keep-content");
         var field = await CmsFieldResolver.ReadAsync(context, accessor, Key, ItemField, "cms-link", "cms-link-field");
         var editor = await editContext.IsEditorAsync();
         var value = field.Value;
@@ -55,6 +57,11 @@ public sealed class CmsLinkTagHelper(
 
         if (editor)
         {
+            if (keepContent)
+            {
+                CmsFieldResolver.Flag(output, "data-cms-keep-content");
+            }
+
             output.Attributes.SetAttribute("data-cms-key", field.Key);
             output.Attributes.SetAttribute("data-cms-type", "link");
             if (value is { IsFallback: true })
@@ -74,21 +81,52 @@ public sealed class CmsLinkTagHelper(
             output.Attributes.RemoveAll("target");
             output.Attributes.RemoveAll("rel");
             CmsFieldResolver.Flag(output, invalid ? "data-cms-invalid" : "data-cms-empty");
-            output.Content.SetContent(string.Empty);
+            if (keepContent)
+            {
+                await FillSlotsAsync(context, output, string.Empty);
+            }
+            else
+            {
+                output.Content.SetContent(string.Empty);
+            }
+
             return;
         }
 
         output.Attributes.SetAttribute("href", link.Url);
-        output.Content.SetContent(link.Label);
+        if (keepContent)
+        {
+            await FillSlotsAsync(context, output, link.Label);
+        }
+        else
+        {
+            output.Content.SetContent(link.Label);
+        }
 
         if (link.Url.StartsWith("https:", StringComparison.OrdinalIgnoreCase))
         {
             var locale = (await accessor.GetAsync()).Locale;
             output.Attributes.SetAttribute("target", "_blank");
             output.Attributes.SetAttribute("rel", "noopener");
-            output.Content.AppendHtml("<span class=\"visually-hidden\">");
+            output.Content.AppendHtml(keepContent && editor
+                ? "<span class=\"visually-hidden\" data-cms-new-tab-notice>"
+                : "<span class=\"visually-hidden\">");
             output.Content.Append(UiText.OpensInNewTab(locale));
             output.Content.AppendHtml("</span>");
+        }
+    }
+
+    private static async Task FillSlotsAsync(TagHelperContext context, TagHelperOutput output, string label)
+    {
+        CmsFieldResolver.EnterLinkLabel(context, label);
+        try
+        {
+            var children = await output.GetChildContentAsync();
+            output.Content.SetHtmlContent(children);
+        }
+        finally
+        {
+            CmsFieldResolver.LeaveLinkLabel(context);
         }
     }
 }

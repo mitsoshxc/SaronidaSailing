@@ -20,6 +20,24 @@ internal static class CmsFieldResolver
 
     public static void LeaveListItem(TagHelperContext context) => context.Items.Remove(ListItemKey);
 
+    private static readonly object LinkLabelKey = new();
+
+    public static void EnterLinkLabel(TagHelperContext context, string label) => context.Items[LinkLabelKey] = label;
+
+    public static void LeaveLinkLabel(TagHelperContext context) => context.Items.Remove(LinkLabelKey);
+
+    public static bool TryGetLinkLabel(TagHelperContext context, out string label)
+    {
+        if (context.Items.TryGetValue(LinkLabelKey, out var value) && value is string text)
+        {
+            label = text;
+            return true;
+        }
+
+        label = string.Empty;
+        return false;
+    }
+
     public static void Flag(TagHelperOutput output, string name) =>
         output.Attributes.SetAttribute(new TagHelperAttribute(name));
 

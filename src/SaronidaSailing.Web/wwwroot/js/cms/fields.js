@@ -51,8 +51,37 @@ export const createFields = ({ pending, config }) => {
         element.replaceChildren(cleanFragment(value));
     };
 
+    const previewKeptLink = (element, link) => {
+        element.removeAttribute('target');
+        element.removeAttribute('rel');
+        if (link) {
+            element.setAttribute('href', link.url);
+        } else {
+            element.removeAttribute('href');
+        }
+        for (const slot of element.querySelectorAll('[data-cms-link-label]')) {
+            slot.textContent = link ? link.label : '';
+        }
+        for (const notice of element.querySelectorAll(':scope > [data-cms-new-tab-notice]')) {
+            notice.remove();
+        }
+        if (link && /^https:/i.test(link.url)) {
+            element.setAttribute('target', '_blank');
+            element.setAttribute('rel', 'noopener');
+            const notice = document.createElement('span');
+            notice.className = 'visually-hidden';
+            notice.setAttribute('data-cms-new-tab-notice', '');
+            notice.textContent = config.opensInNewTab;
+            element.append(notice);
+        }
+        return link !== null;
+    };
+
     const previewLink = (element, value) => {
         const link = parseLink(value);
+        if (element.hasAttribute('data-cms-keep-content')) {
+            return previewKeptLink(element, link);
+        }
         element.replaceChildren();
         element.removeAttribute('target');
         element.removeAttribute('rel');
