@@ -19,6 +19,7 @@ public sealed class MediaAssetRepository(AppDbContext db) : IMediaAssetRepositor
     public async Task<IReadOnlyList<MediaAsset>> ListNewestFirstAsync(int skip, int take, CancellationToken ct = default) =>
         await db.Set<MediaAsset>()
             .AsNoTracking()
+            .Where(x => x.Source == MediaSource.Upload)
             .OrderByDescending(x => x.CreatedAt)
             .ThenByDescending(x => x.Id)
             .Skip(skip)
@@ -28,7 +29,7 @@ public sealed class MediaAssetRepository(AppDbContext db) : IMediaAssetRepositor
     public async Task<IReadOnlySet<Guid>> ExistAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct = default) =>
         (await db.Set<MediaAsset>()
             .AsNoTracking()
-            .Where(x => ids.Contains(x.Id))
+            .Where(x => x.Source == MediaSource.Upload && ids.Contains(x.Id))
             .Select(x => x.Id)
             .ToListAsync(ct))
         .ToHashSet();

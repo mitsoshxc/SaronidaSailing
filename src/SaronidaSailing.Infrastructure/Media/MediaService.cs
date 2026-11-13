@@ -18,7 +18,11 @@ public sealed class MediaService(
     private const string UniqueViolation = "23505";
     private const string ContentHashIndex = "UX_MediaAssets_ContentHash";
 
-    public async Task<MediaImportResult> ImportAsync(Stream content, string originalFileName, CancellationToken ct = default)
+    public async Task<MediaImportResult> ImportAsync(
+        Stream content,
+        string originalFileName,
+        MediaSource source = MediaSource.Upload,
+        CancellationToken ct = default)
     {
         var bytes = await ReadLimitedAsync(content, ct);
         if (bytes is null)
@@ -30,7 +34,7 @@ public sealed class MediaService(
         var existing = await assets.GetByContentHashAsync(hash, ct);
         if (existing is not null)
         {
-            return MediaImportResult.Existing(existing);
+            return await ReuseAsync(existing, source, ct);
         }
 
         var slug = Slugs.FromFileName(originalFileName);
@@ -64,7 +68,8 @@ public sealed class MediaService(
             image.Variants.Select(v => v.Width).ToList(),
             image.Width,
             image.Height,
-            image.OriginalExtension);
+            image.OriginalExtension,
+            source: source);
 
         assets.Add(asset);
         try
@@ -76,10 +81,21 @@ public sealed class MediaService(
             unitOfWork.DiscardChanges();
             var winner = await assets.GetByContentHashAsync(hash, ct) ?? throw new InvalidOperationException(
                 "A unique violation on the content hash was reported, but no row with that hash exists.", ex);
-            return MediaImportResult.Existing(winner);
+            return await ReuseAsync(winner, source, ct);
         }
 
         return MediaImportResult.Imported(asset);
+    }
+
+    private async Task<MediaImportResult> ReuseAsync(MediaAsset existing, MediaSource source, CancellationToken ct)
+    {
+        if (source == MediaSource.Upload && existing.Source == MediaSource.Instagram)
+        {
+            existing.MarkAsUpload();
+            await unitOfWork.SaveChangesAsync(ct);
+        }
+
+        return MediaImportResult.Existing(existing);
     }
 
     private async Task WriteFilesAsync(string slug, string hash, ReadOnlyMemory<byte> original, ProcessedImage image, CancellationToken ct)

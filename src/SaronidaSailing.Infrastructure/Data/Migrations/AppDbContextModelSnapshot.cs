@@ -393,6 +393,86 @@ namespace SaronidaSailing.Infrastructure.Data.Migrations
                     b.ToTable("ContentSections", (string)null);
                 });
 
+            modelBuilder.Entity("SaronidaSailing.Core.Entities.InstagramPost", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Caption")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("InstagramId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("MediaAssetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("MediaType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("Permalink")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("PostedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InstagramId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_InstagramPosts_InstagramId");
+
+                    b.HasIndex("MediaAssetId");
+
+                    b.HasIndex("PostedAt")
+                        .IsDescending()
+                        .HasDatabaseName("IX_InstagramPosts_PostedAt");
+
+                    b.ToTable("InstagramPosts", (string)null);
+                });
+
+            modelBuilder.Entity("SaronidaSailing.Core.Entities.IntegrationSetting", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Key")
+                        .IsUnique()
+                        .HasDatabaseName("UX_IntegrationSettings_Key");
+
+                    b.ToTable("IntegrationSettings", (string)null);
+                });
+
             modelBuilder.Entity("SaronidaSailing.Core.Entities.MediaAsset", b =>
                 {
                     b.Property<Guid>("Id")
@@ -424,6 +504,13 @@ namespace SaronidaSailing.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Upload");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -513,6 +600,15 @@ namespace SaronidaSailing.Infrastructure.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade);
 
                     b.Navigation("ListItem");
+                });
+
+            modelBuilder.Entity("SaronidaSailing.Core.Entities.InstagramPost", b =>
+                {
+                    b.HasOne("SaronidaSailing.Core.Entities.MediaAsset", null)
+                        .WithMany()
+                        .HasForeignKey("MediaAssetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("SaronidaSailing.Core.Entities.ContentListItem", b =>

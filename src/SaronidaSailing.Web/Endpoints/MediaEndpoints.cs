@@ -106,7 +106,7 @@ public static class MediaEndpoints
         MediaImportResult result;
         await using (var stream = file.OpenReadStream())
         {
-            result = await media.ImportAsync(stream, file.FileName, ct);
+            result = await media.ImportAsync(stream, file.FileName, ct: ct);
         }
 
         if (result.Error is { } error)
@@ -168,7 +168,7 @@ public static class MediaEndpoints
     private static async Task<IResult> GetAsync(Guid id, IMediaAssetRepository assets, CancellationToken ct)
     {
         var asset = await assets.GetByIdAsync(id, ct);
-        return asset is null
+        return asset is null || asset.Source != MediaSource.Upload
             ? Error(StatusCodes.Status404NotFound, "notFound", "Image not found.")
             : Json(StatusCodes.Status200OK, ToResponse(asset, null));
     }

@@ -20,6 +20,8 @@ public class MediaAsset : BaseEntity
 
     public required string OriginalFileExtension { get; init; }
 
+    public MediaSource Source { get; private set; }
+
     public static MediaAsset Create(
         string originalFileName,
         string contentHash,
@@ -28,7 +30,8 @@ public class MediaAsset : BaseEntity
         int width,
         int height,
         string originalFileExtension,
-        Guid? id = null) =>
+        Guid? id = null,
+        MediaSource source = MediaSource.Upload) =>
         new()
         {
             Id = id ?? Guid.CreateVersion7(),
@@ -39,7 +42,10 @@ public class MediaAsset : BaseEntity
             Width = width,
             Height = height,
             OriginalFileExtension = originalFileExtension,
+            Source = source,
         };
+
+    public void MarkAsUpload() => Source = MediaSource.Upload;
 
     public IReadOnlyList<int> GetWidths() =>
         Widths.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)

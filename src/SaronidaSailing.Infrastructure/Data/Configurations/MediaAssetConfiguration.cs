@@ -16,6 +16,7 @@ public sealed class MediaAssetConfiguration : IEntityTypeConfiguration<MediaAsse
         builder.Property(x => x.Slug).HasMaxLength(50).IsRequired();
         builder.Property(x => x.Widths).HasMaxLength(50).IsRequired();
         builder.Property(x => x.OriginalFileExtension).HasMaxLength(10).IsRequired();
+        builder.Property(x => x.Source).HasConversion<string>().HasMaxLength(20).IsRequired().HasDefaultValue(MediaSource.Upload);
 
         builder.HasIndex(x => x.ContentHash)
             .IsUnique()

@@ -284,6 +284,62 @@ public sealed class MediaServiceTests(ITestOutputHelper output) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task InstagramImport_StoresTheAssetAsInstagram()
+    {
+        var result = await NewService().ImportAsync(new MemoryStream(MediaTestImages.Photo(1200, 800)), "ig.jpg", MediaSource.Instagram);
+
+        Assert.False(result.AlreadyExisted);
+        Assert.Equal(MediaSource.Instagram, result.Asset!.Source);
+        await using var verify = NewContext();
+        Assert.Equal(MediaSource.Instagram, (await verify.Set<MediaAsset>().SingleAsync()).Source);
+    }
+
+    [Fact]
+    public async Task UploadMatchingAnInstagramAsset_FlipsItToUpload_AndReturnsItAsExisting()
+    {
+        var bytes = MediaTestImages.Photo(1200, 800);
+        var instagram = await NewService().ImportAsync(new MemoryStream(bytes), "ig.jpg", MediaSource.Instagram);
+        var filesAfterFirst = ListFiles();
+
+        var upload = await NewService().ImportAsync(new MemoryStream(bytes), "mine.jpg");
+
+        Assert.True(upload.AlreadyExisted);
+        Assert.Equal(instagram.Asset!.Id, upload.Asset!.Id);
+        Assert.Equal(MediaSource.Upload, upload.Asset.Source);
+        Assert.Equal(filesAfterFirst, ListFiles());
+        await using var verify = NewContext();
+        Assert.Equal(MediaSource.Upload, (await verify.Set<MediaAsset>().SingleAsync()).Source);
+    }
+
+    [Fact]
+    public async Task InstagramImportMatchingAnUpload_KeepsUpload()
+    {
+        var bytes = MediaTestImages.Photo(1200, 800);
+        var upload = await NewService().ImportAsync(new MemoryStream(bytes), "mine.jpg");
+
+        var instagram = await NewService().ImportAsync(new MemoryStream(bytes), "ig.jpg", MediaSource.Instagram);
+
+        Assert.True(instagram.AlreadyExisted);
+        Assert.Equal(upload.Asset!.Id, instagram.Asset!.Id);
+        Assert.Equal(MediaSource.Upload, instagram.Asset.Source);
+        await using var verify = NewContext();
+        Assert.Equal(MediaSource.Upload, (await verify.Set<MediaAsset>().SingleAsync()).Source);
+    }
+
+    [Fact]
+    public async Task InstagramImportMatchingAnInstagramAsset_ReturnsItUnchanged()
+    {
+        var bytes = MediaTestImages.Photo(1200, 800);
+        var first = await NewService().ImportAsync(new MemoryStream(bytes), "ig.jpg", MediaSource.Instagram);
+
+        var second = await NewService().ImportAsync(new MemoryStream(bytes), "ig-again.jpg", MediaSource.Instagram);
+
+        Assert.True(second.AlreadyExisted);
+        Assert.Equal(first.Asset!.Id, second.Asset!.Id);
+        Assert.Equal(MediaSource.Instagram, second.Asset.Source);
+    }
+
+    [Fact]
     public async Task ExistingHash_DoesNotNeedTheGate()
     {
         var bytes = MediaTestImages.Photo(1200, 800);

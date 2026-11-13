@@ -102,6 +102,21 @@ public sealed class MediaLibraryApiTests : IAsyncLifetime
         Assert.Equal(2, body.GetProperty("sources").GetArrayLength());
     }
 
+    [Fact]
+    public async Task InstagramAssets_AreNotInTheLibrary_AndGetReturnsNotFound()
+    {
+        var upload = await AddAssetAsync("mine");
+        var instagram = await AddAssetAsync("from-instagram", source: MediaSource.Instagram);
+        var client = await SignInAsync("library-instagram@example.com");
+
+        var list = await (await client.GetAsync(ApiPath)).Content.ReadFromJsonAsync<JsonElement>();
+        var single = await client.GetAsync($"{ApiPath}/{instagram}");
+
+        Assert.Equal([upload], list.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("id").GetGuid()));
+        Assert.Equal(HttpStatusCode.NotFound, single.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"{ApiPath}/{upload}")).StatusCode);
+    }
+
     private async Task<HttpClient> SignInAsync(string email)
     {
         var client = NewClient(_factory);
@@ -109,10 +124,10 @@ public sealed class MediaLibraryApiTests : IAsyncLifetime
         return client;
     }
 
-    private async Task<Guid> AddAssetAsync(string name, int[]? widths = null)
+    private async Task<Guid> AddAssetAsync(string name, int[]? widths = null, MediaSource source = MediaSource.Upload)
     {
         var hash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(name)));
-        var asset = MediaAsset.Create($"{name}.jpg", hash, name, widths ?? [480, 960, 1600], 3000, 2000, ".jpg");
+        var asset = MediaAsset.Create($"{name}.jpg", hash, name, widths ?? [480, 960, 1600], 3000, 2000, ".jpg", source: source);
         using var scope = _factory.Services.CreateScope();
         scope.ServiceProvider.GetRequiredService<IMediaAssetRepository>().Add(asset);
         await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync();
