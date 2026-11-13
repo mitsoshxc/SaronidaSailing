@@ -1,0 +1,58 @@
+@using System.Globalization
+@using SaronidaSailing.Web.Localization
+@using SaronidaSailing.Web.Models
+@inject ILocalizedUrlService UrlService
+@{
+    var locale = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == SiteCultures.English
+        ? SiteCultures.English
+        : SiteCultures.Greek;
+    var current = UrlService.GetCurrentPage();
+    var inner = current is not null && current.Key != "home";
+    var homePath = UrlService.GetPath("home", locale);
+    var bookPath = UrlService.GetPath("trips", locale);
+    var alternate = UrlService.GetAlternatePath();
+    var language = UiText.LanguageLink(locale);
+    var menuOpen = UiText.MenuOpen.For(locale);
+    var menuClose = UiText.MenuClose.For(locale);
+    var logo = new SiteLogoViewModel("header", false, homePath, UiText.LogoLink.For(locale), "");
+    string? CurrentFor(string key) => current?.Key == key ? "page" : null;
+}
+<header class="site-header@(inner ? " site-header--inner" : "")" data-site-header>
+    <div class="wrap site-header__bar">
+        <partial name="_Logo" model="logo" />
+        @if (inner)
+        {
+            <a class="site-header__back" href="@homePath" aria-label="@UiText.BackToHome.For(locale)" data-top-focus>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 5l-7 7 7 7"></path></svg>
+            </a>
+            <span class="site-header__title">@UiText.PageTitle(current!.Key).For(locale)</span>
+        }
+        <div class="site-header__actions">
+            @if (alternate is not null)
+            {
+                <a class="site-lang site-lang--bar" href="@alternate" hreflang="@language.Lang" lang="@language.Lang" aria-label="@language.Name">@language.Code</a>
+            }
+            <button type="button" class="site-header__menu-btn" data-menu-button aria-expanded="false" aria-controls="site-menu" aria-label="@menuOpen" data-label-open="@menuOpen" data-label-close="@menuClose">
+                <svg class="site-header__icon-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
+                <svg class="site-header__icon-close" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+            </button>
+        </div>
+        <div class="site-menu" id="site-menu">
+            <nav class="site-nav" aria-label="@UiText.MainNavigation.For(locale)">
+                <ul class="site-nav__list">
+                    <li><a class="site-nav__link" href="@UrlService.GetPath("trips", locale)" aria-current="@CurrentFor("trips")">@UiText.TripsMenu.For(locale)</a></li>
+                    <li><a class="site-nav__link" href="@UrlService.GetPath("boat", locale)" aria-current="@CurrentFor("boat")">@UiText.Boat.For(locale)</a></li>
+                    <li><a class="site-nav__link" cms-link="shared.social.instagram" cms-keep-content>@UiText.InstagramMenu.For(locale)</a></li>
+                    <li><a class="site-nav__link" href="@UrlService.GetPath("contact", locale)" aria-current="@CurrentFor("contact")">@UiText.Contact.For(locale)</a></li>
+                </ul>
+            </nav>
+            <div class="site-menu__tools">
+                @if (alternate is not null)
+                {
+                    <a class="site-lang site-lang--menu" href="@alternate" hreflang="@language.Lang" lang="@language.Lang" aria-label="@language.Name">@language.Code</a>
+                }
+                <a class="btn btn--cta site-menu__book" href="@bookPath">@UiText.Book.For(locale)</a>
+            </div>
+        </div>
+    </div>
+</header>

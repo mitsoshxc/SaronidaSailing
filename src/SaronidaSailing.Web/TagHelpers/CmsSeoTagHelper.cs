@@ -62,6 +62,13 @@ public sealed class CmsSeoTagHelper(
         Append(output, Meta("property", "og:locale", OgLocale(locale)));
         Append(output, Meta("property", "og:locale:alternate", OgLocale(OtherLocale(locale))));
 
+        var greekUrl = site.Value.BaseUrl + urlService.GetPath(page.Key, ContentLocales.Greek);
+        var englishUrl = site.Value.BaseUrl + urlService.GetPath(page.Key, ContentLocales.English);
+        Append(output, Link("canonical", null, locale == ContentLocales.English ? englishUrl : greekUrl));
+        Append(output, Link("alternate", ContentLocales.Greek, greekUrl));
+        Append(output, Link("alternate", ContentLocales.English, englishUrl));
+        Append(output, Link("alternate", "x-default", greekUrl));
+
         if (FindImage(content, $"{page.Key}.seo.image") is { } image)
         {
             var source = image.Sources.Where(s => s.Width <= MaxOgImageWidth).MaxBy(s => s.Width)
@@ -138,6 +145,21 @@ public sealed class CmsSeoTagHelper(
         tag.Append(name);
         tag.AppendHtml("\" content=\"");
         tag.Append(content);
+        tag.AppendHtml("\" />");
+        return tag;
+    }
+
+    private static IHtmlContent Link(string rel, string? hreflang, string href)
+    {
+        var tag = new HtmlContentBuilder();
+        tag.AppendHtml($"<link rel=\"{rel}\"");
+        if (hreflang is not null)
+        {
+            tag.AppendHtml($" hreflang=\"{hreflang}\"");
+        }
+
+        tag.AppendHtml(" href=\"");
+        tag.Append(href);
         tag.AppendHtml("\" />");
         return tag;
     }

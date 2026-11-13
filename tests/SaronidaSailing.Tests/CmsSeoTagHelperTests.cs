@@ -65,8 +65,63 @@ public sealed class CmsSeoTagHelperTests
             "<meta property=\"og:site_name\" content=\"Saronida Sailing\" />",
             "<meta property=\"og:url\" content=\"https://localhost:5001/skafos\" />",
             "<meta property=\"og:locale\" content=\"el_GR\" />",
-            "<meta property=\"og:locale:alternate\" content=\"en_GB\" />");
+            "<meta property=\"og:locale:alternate\" content=\"en_GB\" />",
+            "<link rel=\"canonical\" href=\"https://localhost:5001/skafos\" />",
+            "<link rel=\"alternate\" hreflang=\"el\" href=\"https://localhost:5001/skafos\" />",
+            "<link rel=\"alternate\" hreflang=\"en\" href=\"https://localhost:5001/en/boat\" />",
+            "<link rel=\"alternate\" hreflang=\"x-default\" href=\"https://localhost:5001/skafos\" />");
         Assert.Equal(expected, html);
+    }
+
+    [Fact]
+    public async Task SitePage_English_CanonicalIsEnglish_AlternatesListBothAndDefaultIsGreek()
+    {
+        var html = await Run(BoatContent("en", []));
+
+        Assert.Contains("<link rel=\"canonical\" href=\"https://localhost:5001/en/boat\" />", html);
+        Assert.Contains("<link rel=\"alternate\" hreflang=\"el\" href=\"https://localhost:5001/skafos\" />", html);
+        Assert.Contains("<link rel=\"alternate\" hreflang=\"en\" href=\"https://localhost:5001/en/boat\" />", html);
+        Assert.Contains("<link rel=\"alternate\" hreflang=\"x-default\" href=\"https://localhost:5001/skafos\" />", html);
+    }
+
+    [Fact]
+    public async Task HomePage_CanonicalAndAlternates_UseRootPaths()
+    {
+        var html = await Run(Content("en"), "/Index");
+
+        Assert.Contains("<link rel=\"canonical\" href=\"https://localhost:5001/en/\" />", html);
+        Assert.Contains("<link rel=\"alternate\" hreflang=\"el\" href=\"https://localhost:5001/\" />", html);
+        Assert.Contains("<link rel=\"alternate\" hreflang=\"x-default\" href=\"https://localhost:5001/\" />", html);
+    }
+
+    [Fact]
+    public async Task Canonical_IgnoresTheQueryString()
+    {
+        var httpContext = new DefaultHttpContext();
+        httpContext.Request.RouteValues["page"] = "/Trips";
+        httpContext.Request.QueryString = new QueryString("?trip=islands&utm=x");
+        var helper = new CmsSeoTagHelper(
+            new FakePageContentAccessor(Content("el")),
+            new LocalizedUrlService(new HttpContextAccessor { HttpContext = httpContext }),
+            Options.Create(new SiteOptions { BaseUrl = "https://localhost:5001" }),
+            NullLogger<CmsSeoTagHelper>.Instance);
+        var attributes = new TagHelperAttributeList();
+        var output = NewOutput("cms-seo", attributes);
+
+        await helper.ProcessAsync(NewContext("cms-seo", attributes), output);
+        var html = Render(output);
+
+        Assert.Contains("<link rel=\"canonical\" href=\"https://localhost:5001/ekdromes\" />", html);
+        Assert.DoesNotContain("trip=", html);
+    }
+
+    [Fact]
+    public async Task NonSitePage_EmitsNoCanonicalOrAlternates()
+    {
+        var html = await Run(BoatContent("el", []), pagePath: "/Error");
+
+        Assert.DoesNotContain("canonical", html);
+        Assert.DoesNotContain("hreflang", html);
     }
 
     [Fact]

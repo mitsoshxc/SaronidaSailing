@@ -1,0 +1,13 @@
+@page
+@using SaronidaSailing.Web.Localization
+@model AccessibilityModel
+@{
+    var title = UiText.PageTitle("accessibility").Current;
+    ViewData["Title"] = title;
+}
+
+<section class="section">
+    <div class="wrap">
+        <h1>@title</h1>
+    </div>
+</section>

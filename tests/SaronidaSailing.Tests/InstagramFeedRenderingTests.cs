@@ -289,7 +289,7 @@ public class InstagramFeedRenderingTests(TempDatabaseWebApplicationFactory facto
             var html = await client.GetStringAsync(url);
 
             Assert.DoesNotContain("data-cms", html);
-            Assert.DoesNotContain("hidden=", html);
+            Assert.DoesNotMatch(@"\shidden=", html);
             Assert.DoesNotContain("/admin/instagram", html);
         }
     }

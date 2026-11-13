@@ -9,7 +9,11 @@ export const createMissing = () => {
     let last = null;
 
     const render = () => {
-        const count = document.querySelectorAll(selector).length;
+        const fields = new Set();
+        for (const element of document.querySelectorAll(selector)) {
+            fields.add(`${element.dataset.cmsKey}|${element.closest('[data-cms-item]')?.dataset.cmsItem ?? ''}`);
+        }
+        const count = fields.size;
         button.hidden = count === 0;
         button.textContent = `${count} missing in English`;
     };

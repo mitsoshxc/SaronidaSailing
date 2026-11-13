@@ -1,0 +1,18 @@
+@model SaronidaSailing.Web.Models.SiteLogoViewModel
+@{
+    var ink = Model.Dark ? "#FFFFFF" : "#1F5FA8";
+    var disc = Model.Dark ? "#0B2230" : "#FFFFFF";
+    var top = Model.IdPrefix + "-logo-top";
+    var bottom = Model.IdPrefix + "-logo-bottom";
+}
+<a class="logo@(Model.Dark ? " logo--dark" : "")" href="@Model.Href" aria-label="@Model.Label" data-top-focus="@Model.FocusMarker">
+    <svg class="logo__mark" viewBox="0 0 100 100" aria-hidden="true" focusable="false"><defs><path id="@top" d="M 17 50 A 33 33 0 0 1 83 50"></path><path id="@bottom" d="M 13 50 A 37 37 0 0 0 87 50"></path></defs><circle cx="50" cy="50" r="47" fill="@disc" stroke="#2B7BD6" stroke-width="3"></circle><text font-family="Commissioner, sans-serif" font-size="11.5" font-weight="700" letter-spacing="1.2" fill="@ink"><textPath href="#@top" startOffset="50%" text-anchor="middle">SARONIDA</textPath></text><text font-family="Commissioner, sans-serif" font-size="11.5" font-weight="700" letter-spacing="1.2" fill="@ink"><textPath href="#@bottom" startOffset="50%" text-anchor="middle">SAILING</textPath></text><circle cx="10" cy="50" r="2.2" fill="#2B7BD6"></circle><circle cx="90" cy="50" r="2.2" fill="#2B7BD6"></circle><circle cx="50" cy="50" r="25" fill="#2B7BD6"></circle><path d="M52 30 Q60 45 65 60 L52 60 Z" fill="#FFFFFF"></path><path d="M49.5 35 L39 60 L49.5 60 Z" fill="#FFFFFF"></path><path d="M37 63 H67 L63.5 67 H40.5 Z" fill="#FFFFFF"></path><path d="M34 69 Q50 62 67 66" stroke="#FFFFFF" stroke-width="2.4" fill="none" stroke-linecap="round"></path></svg>
+    @if (Model.Dark)
+    {
+        <span class="logo__name">Saronida Sailing</span>
+    }
+    else
+    {
+        <span class="logo__name"><span class="logo__name-main">Saronida</span><span class="logo__name-sub">Sailing</span></span>
+    }
+</a>

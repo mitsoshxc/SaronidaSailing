@@ -24,13 +24,19 @@
     }
 </head>
 <body>
+    <a class="skip-link" href="#main">@UiText.SkipLink.Current</a>
     @if (isEditor)
     {
         <partial name="_AdminToolbar" />
     }
-    <main>
+    <partial name="_Header" />
+    <main id="main" tabindex="-1">
         @RenderBody()
     </main>
+    <partial name="_Footer" />
+    <button type="button" class="to-top" data-to-top hidden aria-label="@UiText.BackToTop.Current">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 19V5M6 11l6-6 6 6"></path></svg>
+    </button>
     @if (isEditor)
     {
         var config = CmsEditorConfig.Create(
@@ -40,5 +46,6 @@
         <script type="application/json" id="cms-config">@Html.Raw(config.ToJson())</script>
         <script type="module" src="~/js/cms-edit.js" asp-append-version="true"></script>
     }
+    <script type="module" src="~/js/site.js" asp-append-version="true"></script>
 </body>
 </html>

@@ -102,7 +102,7 @@ export const createFields = ({ pending, config }) => {
         return true;
     };
 
-    const write = (element, value) => {
+    const apply = (element, value) => {
         const state = track(element);
         const type = typeOf(element);
         let stored = value;
@@ -131,8 +131,29 @@ export const createFields = ({ pending, config }) => {
         element.toggleAttribute('data-cms-fallback', state.hadFallback && !changed);
         element.toggleAttribute('data-cms-invalid', type === 'link' && stored !== '' && !validLink);
 
-        pending.setField(fieldOf(element), stored, state.original);
-        document.dispatchEvent(new CustomEvent('cms:fieldchange', { detail: { element } }));
+        return stored;
+    };
+
+    const write = (element, value) => {
+        const type = typeOf(element);
+        const copies = type === 'image' ? [element] : findAll(element.dataset.cmsKey, itemOf(element), type);
+        if (!copies.includes(element)) {
+            copies.push(element);
+        }
+        for (const copy of copies) {
+            track(copy);
+        }
+        const stored = apply(element, value);
+        for (const copy of copies) {
+            if (copy !== element) {
+                apply(copy, value);
+            }
+        }
+
+        pending.setField(fieldOf(element), stored, track(element).original);
+        for (const copy of copies) {
+            document.dispatchEvent(new CustomEvent('cms:fieldchange', { detail: { element: copy } }));
+        }
     };
 
     const search = (selector, attribute, key, listItemId) => {
@@ -147,6 +168,16 @@ export const createFields = ({ pending, config }) => {
             }
         }
         return null;
+    };
+
+    const findAll = (key, listItemId, type) => {
+        const wantedItem = listItemId ? String(listItemId).toLowerCase() : null;
+        return [...document.querySelectorAll('[data-cms-key]')].filter((element) => {
+            const item = itemOf(element);
+            return element.dataset.cmsKey === key
+                && (type === undefined || typeOf(element) === type)
+                && (item ? item.toLowerCase() : null) === wantedItem;
+        });
     };
 
     const find = (key, listItemId) => search('[data-cms-key]', 'cmsKey', key, listItemId);
@@ -230,5 +261,5 @@ export const createFields = ({ pending, config }) => {
         return target;
     };
 
-    return { track, fieldOf, valueOf, write, find, findImageByAlt, imageValues, writeImage };
+    return { track, fieldOf, valueOf, write, find, findAll, findImageByAlt, imageValues, writeImage };
 };

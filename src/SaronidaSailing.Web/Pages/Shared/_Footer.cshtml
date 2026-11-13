@@ -1,0 +1,49 @@
+@using System.Globalization
+@using SaronidaSailing.Web.Localization
+@using SaronidaSailing.Web.Models
+@inject ILocalizedUrlService UrlService
+@{
+    var locale = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == SiteCultures.English
+        ? SiteCultures.English
+        : SiteCultures.Greek;
+    var current = UrlService.GetCurrentPage();
+    var logo = new SiteLogoViewModel("footer", true, UrlService.GetPath("home", locale), UiText.LogoLink.For(locale));
+    var pages = new[] { "trips", "boat", "contact", "terms", "privacy", "accessibility" };
+}
+<footer class="site-footer">
+    <div class="wrap site-footer__inner">
+        <div class="site-footer__grid">
+            <div class="site-footer__brand">
+                <partial name="_Logo" model="logo" />
+                <p class="site-footer__tagline" cms="shared.footer.tagline"></p>
+            </div>
+            <nav class="site-footer__col" aria-label="@UiText.FooterPages.For(locale)">
+                <h2 class="site-footer__heading">@UiText.FooterPages.For(locale)</h2>
+                <ul class="site-footer__pages">
+                    @foreach (var key in pages)
+                    {
+                        <li><a href="@UrlService.GetPath(key, locale)" aria-current="@(current?.Key == key ? "page" : null)">@UiText.PageTitle(key).For(locale)</a></li>
+                    }
+                </ul>
+            </nav>
+            <div class="site-footer__col">
+                <h2 class="site-footer__heading">@UiText.FooterContact.For(locale)</h2>
+                <ul class="site-footer__contact">
+                    <li><a cms-link="shared.contact.phone"></a></li>
+                    <li><a cms-link="shared.contact.phone-2"></a></li>
+                    <li><span cms="shared.contact.address"></span></li>
+                </ul>
+            </div>
+            <div class="site-footer__col">
+                <h2 class="site-footer__heading">@UiText.FooterSocial.For(locale)</h2>
+                <ul class="site-footer__social">
+                    <li><a class="site-footer__social-link" cms-link="shared.social.instagram" cms-keep-content><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="18" rx="5"></rect><circle cx="12" cy="12" r="4"></circle><circle cx="17.5" cy="6.5" r="0.8" fill="currentColor"></circle></svg><span cms-link-label class="visually-hidden"></span></a></li>
+                    <li><a class="site-footer__social-link" cms-link="shared.social.facebook" cms-keep-content><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v3H7v4h3v6h4v-6h3l1-4h-4V8z"></path></svg><span cms-link-label class="visually-hidden"></span></a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="site-footer__bottom">
+            <p cms="shared.footer.copyright"></p>
+        </div>
+    </div>
+</footer>
