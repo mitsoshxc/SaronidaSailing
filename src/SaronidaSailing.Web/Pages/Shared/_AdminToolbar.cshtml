@@ -1,10 +1,13 @@
+@using SaronidaSailing.Core.Interfaces
 @using SaronidaSailing.Web.Content
 @using SaronidaSailing.Web.Localization
 @inject IPageContentAccessor ContentAccessor
 @inject ILocalizedUrlService UrlService
+@inject IInstagramWarningService InstagramWarnings
 @{
     var isEnglish = (await ContentAccessor.GetAsync()).Locale == SiteCultures.English;
     var alternatePath = UrlService.GetAlternatePath();
+    var instagramWarning = await InstagramWarnings.GetToolbarWarningAsync();
 }
 <div class="cms-toolbar" role="region" aria-label="Admin toolbar">
     <button type="button" class="cms-toolbar-button" data-cms-action="save" disabled>Save page</button>
@@ -26,10 +29,15 @@
             <a class="cms-toolbar-link" href="@alternatePath" lang="@(isEnglish ? SiteCultures.Greek : SiteCultures.English)">@(isEnglish ? "Ελληνικά" : "English")</a>
         }
         <a class="cms-toolbar-link" href="/admin/jobs">Jobs</a>
+        <a class="cms-toolbar-link" href="/admin/instagram">Instagram</a>
         <form method="post" action="/admin/logout" asp-antiforgery="true" class="cms-toolbar-form">
             <button type="submit" class="cms-toolbar-button">Log out</button>
         </form>
     </div>
+    @if (instagramWarning != InstagramWarning.None)
+    {
+        <a class="cms-toolbar-warning" href="/admin/instagram"><span aria-hidden="true">⚠ </span>@(instagramWarning == InstagramWarning.NotConnected ? "Instagram not connected — connect" : "Instagram disconnected — reconnect")</a>
+    }
     <p class="cms-toolbar-status" data-cms-status role="status" aria-live="polite"></p>
     <div class="cms-toolbar-errors" data-cms-errors role="alert" hidden></div>
 </div>

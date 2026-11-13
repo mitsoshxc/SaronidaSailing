@@ -77,6 +77,7 @@ try
     builder.Services.AddScoped<IInstagramConnectionService, InstagramConnectionService>();
     builder.Services.AddScoped<IInstagramFeedService, InstagramFeedService>();
     builder.Services.AddScoped<IInstagramScheduleSync, InstagramScheduleSync>();
+    builder.Services.AddScoped<IInstagramWarningService, InstagramWarningService>();
     builder.Services.AddScoped<ISectionActivationHandler, InstagramSectionHandler>();
     builder.Services.AddSingleton<InstagramOAuthState>();
     builder.Services.AddOutputCache(options => options.AddPolicy(CacheTags.PolicyName, policy => policy

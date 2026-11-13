@@ -519,6 +519,100 @@ public class InstagramAdminTests(InstagramWebApplicationFactory factory) : IClas
         Assert.True(result.Succeeded);
     }
 
+    private const string NotConnectedText = "Instagram not connected — connect";
+    private const string DisconnectedText = "Instagram disconnected — reconnect";
+
+    [Fact]
+    public async Task Toolbar_NotConnected_ShowsTheWarning_OutsideTheMorePanel()
+    {
+        await ResetAsync();
+        await SetSectionActiveAsync(true);
+        var client = await LoggedInClientAsync($"ig-warn-nc-{Guid.NewGuid():N}@example.com");
+
+        var html = await client.GetStringAsync("/");
+
+        Assert.Contains($"<a class=\"cms-toolbar-warning\" href=\"/admin/instagram\"><span aria-hidden=\"true\">⚠ </span>{NotConnectedText}</a>", html);
+        Assert.DoesNotContain(DisconnectedText, html);
+        var warning = html.IndexOf("cms-toolbar-warning", StringComparison.Ordinal);
+        var panelStart = html.IndexOf("id=\"cms-toolbar-more\"", StringComparison.Ordinal);
+        var panelEnd = html.IndexOf("</form>\n    </div>", panelStart, StringComparison.Ordinal);
+        Assert.True(panelEnd > panelStart);
+        Assert.True(warning > panelEnd);
+        Assert.True(warning < html.IndexOf("data-cms-status", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Toolbar_Disconnected_ShowsTheReconnectWarning_AndConnected_ShowsNone()
+    {
+        await ResetAsync();
+        await SetSectionActiveAsync(true);
+        var admin = await AdminWithClientAsync($"ig-warn-dc-{Guid.NewGuid():N}@example.com");
+        var (state, nonce) = await StartAsync(admin.Client);
+        await CallbackAsync(NewClient(factory), $"code=C&state={Uri.EscapeDataString(state)}", nonce);
+        try
+        {
+            var connected = await admin.Client.GetStringAsync("/");
+            await SetSettingsAsync((InstagramSettingKeys.TokenInvalidAt, "2026-11-13T11:00:00.0000000Z"));
+            var disconnected = await admin.Client.GetStringAsync("/");
+
+            Assert.DoesNotContain("cms-toolbar-warning", connected);
+            Assert.Contains($"<span aria-hidden=\"true\">⚠ </span>{DisconnectedText}</a>", disconnected);
+            Assert.DoesNotContain(NotConnectedText, disconnected);
+        }
+        finally
+        {
+            await ResetAsync();
+        }
+    }
+
+    [Fact]
+    public async Task Toolbar_SectionInactive_ShowsNoWarning_ButStillLinksToInstagram()
+    {
+        await ResetAsync();
+        var client = await LoggedInClientAsync($"ig-warn-off-{Guid.NewGuid():N}@example.com");
+        try
+        {
+            await SetSectionActiveAsync(false);
+
+            var html = await client.GetStringAsync("/");
+
+            Assert.DoesNotContain("cms-toolbar-warning", html);
+            Assert.Contains("href=\"/admin/instagram\">Instagram</a>", html);
+        }
+        finally
+        {
+            await SetSectionActiveAsync(true);
+        }
+    }
+
+    [Fact]
+    public async Task Toolbar_InstagramLink_IsInTheMorePanel_AfterJobs()
+    {
+        var client = await LoggedInClientAsync($"ig-link-{Guid.NewGuid():N}@example.com");
+
+        var html = await client.GetStringAsync("/");
+
+        var panelStart = html.IndexOf("id=\"cms-toolbar-more\"", StringComparison.Ordinal);
+        var jobs = html.IndexOf("<a class=\"cms-toolbar-link\" href=\"/admin/jobs\">Jobs</a>", StringComparison.Ordinal);
+        var link = html.IndexOf("<a class=\"cms-toolbar-link\" href=\"/admin/instagram\">Instagram</a>", StringComparison.Ordinal);
+        Assert.True(jobs > panelStart);
+        Assert.True(link > jobs);
+        Assert.True(link < html.IndexOf("action=\"/admin/logout\"", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Toolbar_Visitors_GetNeitherTheToolbarNorTheWarning()
+    {
+        await ResetAsync();
+        await SetSectionActiveAsync(true);
+
+        var html = await NewClient(factory).GetStringAsync("/");
+
+        Assert.DoesNotContain("cms-toolbar", html);
+        Assert.DoesNotContain(NotConnectedText, html);
+        Assert.DoesNotContain("/admin/instagram", html);
+    }
+
     [Fact]
     public async Task JobClasses_AreResolvableFromTheContainer()
     {
