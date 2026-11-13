@@ -83,13 +83,7 @@ public sealed class ContentService(
             return new Dictionary<Guid, PageImage>();
         }
 
-        return (await media.GetByIdsAsync(ids, ct)).ToDictionary(
-            a => a.Id,
-            a => new PageImage(
-                a.Id,
-                a.Width,
-                a.Height,
-                [.. a.GetWidths().Order().Select(w => new PageImageSource(w, MediaFileNames.PublicUrl(a, w)))]));
+        return (await media.GetByIdsAsync(ids, ct)).ToDictionary(a => a.Id, PageImage.From);
     }
 
     public async Task<ContentSaveResult> ApplyChangesAsync(

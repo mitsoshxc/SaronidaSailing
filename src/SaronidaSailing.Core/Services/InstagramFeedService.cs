@@ -8,6 +8,7 @@ public sealed class InstagramFeedService(
     IInstagramApiClient client,
     IInstagramConnectionService connection,
     IInstagramPostRepository posts,
+    IMediaAssetRepository assets,
     IIntegrationSettingRepository settings,
     IMediaService media,
     IUnitOfWork unitOfWork,
@@ -113,6 +114,31 @@ public sealed class InstagramFeedService(
             await settings.GetAsync(InstagramSettingKeys.LastFetchResult, ct),
             InstagramTimestamps.Parse(await settings.GetAsync(InstagramSettingKeys.LastRefreshAt, ct)),
             await settings.GetAsync(InstagramSettingKeys.LastRefreshResult, ct));
+
+    public async Task<IReadOnlyList<InstagramFeedPost>> GetFeedAsync(int take, CancellationToken ct = default)
+    {
+        if (take <= 0)
+        {
+            return [];
+        }
+
+        var stored = await posts.ListNewestFirstAsync(PostLimit, ct);
+        if (stored.Count == 0)
+        {
+            return [];
+        }
+
+        var images = (await assets.GetByIdsAsync([.. stored.Select(p => p.MediaAssetId).Distinct()], ct))
+            .ToDictionary(a => a.Id, PageImage.From);
+
+        return [.. stored
+            .Where(p => IsHttpsUrl(p.Permalink) && images.TryGetValue(p.MediaAssetId, out var image) && image.Sources.Count > 0)
+            .Select(p => new InstagramFeedPost(p.Permalink, p.Caption, p.PostedAt, images[p.MediaAssetId]))
+            .Take(take)];
+    }
+
+    private static bool IsHttpsUrl(string value) =>
+        Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps;
 
     private async Task<Guid?> ImportThumbnailAsync(InstagramMediaItem item, CancellationToken ct)
     {

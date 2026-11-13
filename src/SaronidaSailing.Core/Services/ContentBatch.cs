@@ -230,6 +230,11 @@ internal sealed class ContentBatch(
             return;
         }
 
+        if (change.Key == InstagramSection.PostCountKey && !IsValidPostCount(change))
+        {
+            return;
+        }
+
         if (change.ListItemId is { } listItemId)
         {
             var listItem = await FindListItemAsync(listItemId, ct);
@@ -305,6 +310,25 @@ internal sealed class ContentBatch(
         }
 
         state.Current = value;
+    }
+
+    private bool IsValidPostCount(SetField change)
+    {
+        if (change.Locale != ContentLocales.Default)
+        {
+            _errors.Add("The number of Instagram posts is shared by both languages; set it in Greek.");
+            return false;
+        }
+
+        if (change.Type != ContentType.Text
+            || (change.Value!.Length > 0 && !InstagramPostCount.IsValid(change.Value)))
+        {
+            _errors.Add(
+                $"The number of Instagram posts must be a whole number from {InstagramPostCount.Min} to {InstagramPostCount.Max}.");
+            return false;
+        }
+
+        return true;
     }
 
     private async Task AddListItemAsync(AddListItem change, CancellationToken ct)

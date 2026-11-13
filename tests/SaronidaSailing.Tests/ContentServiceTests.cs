@@ -195,6 +195,71 @@ public sealed class ContentServiceTests : IAsyncLifetime
         Assert.Equal(["other@example.com", Email], history.Select(h => h.ChangedBy));
     }
 
+    [Theory]
+    [InlineData("1")]
+    [InlineData("6")]
+    [InlineData("12")]
+    [InlineData("")]
+    public async Task Write_InstagramPostCount_InGreek_IsAccepted(string value)
+    {
+        var result = await Apply(Field(InstagramSection.PostCountKey, "el", value));
+
+        Assert.True(result.Succeeded, string.Join("; ", result.Errors));
+        Assert.Equal(value, (await Read("home", "el")).GetField(InstagramSection.PostCountKey)?.Value ?? "");
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("13")]
+    [InlineData("x")]
+    [InlineData(" 6")]
+    [InlineData("+6")]
+    [InlineData("-1")]
+    [InlineData("6.0")]
+    public async Task Write_InstagramPostCount_InvalidNumber_IsRejected(string value)
+    {
+        var result = await Apply(Field(InstagramSection.PostCountKey, "el", value));
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("The number of Instagram posts must be a whole number from 1 to 12.", Assert.Single(result.Errors));
+        await using var verify = CreateContext();
+        Assert.Empty(await verify.Set<ContentItem>().ToListAsync());
+    }
+
+    [Theory]
+    [InlineData("6")]
+    [InlineData("")]
+    public async Task Write_InstagramPostCount_InEnglish_IsRejected(string value)
+    {
+        var result = await Apply(Field(InstagramSection.PostCountKey, "en", value));
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(
+            "The number of Instagram posts is shared by both languages; set it in Greek.", Assert.Single(result.Errors));
+        await using var verify = CreateContext();
+        Assert.Empty(await verify.Set<ContentItem>().ToListAsync());
+    }
+
+    [Fact]
+    public async Task Write_InstagramPostCount_AsAnotherType_IsRejected()
+    {
+        var result = await Apply(new SetField(InstagramSection.PostCountKey, "el", ContentType.RichText, "<p>6</p>"));
+
+        Assert.False(result.Succeeded);
+    }
+
+    [Fact]
+    public async Task Write_InstagramPostCount_RejectionDiscardsTheWholeBatch()
+    {
+        var result = await Apply(
+            Field(InstagramSection.TitleKey, "el", "Instagram"),
+            Field(InstagramSection.PostCountKey, "el", "99"));
+
+        Assert.False(result.Succeeded);
+        await using var verify = CreateContext();
+        Assert.Empty(await verify.Set<ContentItem>().ToListAsync());
+    }
+
     [Fact]
     public async Task Write_TypeMismatch_FailsWritesNothingAndAuditsRejection()
     {

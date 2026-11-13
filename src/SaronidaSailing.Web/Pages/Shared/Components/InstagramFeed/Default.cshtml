@@ -1,0 +1,23 @@
+@using System.Globalization
+@model SaronidaSailing.Web.Models.InstagramFeedViewModel
+@{
+    var greek = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "el";
+    var fallbackPrefix = greek ? "Ανάρτηση στο Instagram, " : "Instagram post, ";
+}
+<section cms-section="home.instagram" cms-section-label="Instagram feed" cms-instagram-count="@Model.Count" cms-instagram-empty="@(Model.Tiles.Count == 0)" class="instagram-feed" aria-labelledby="instagram-feed-title">
+    <h2 id="instagram-feed-title" cms="home.instagram.title"></h2>
+    @if (Model.Tiles.Count == 0)
+    {
+        <p class="instagram-feed-note" data-cms-admin-note>No Instagram posts yet. <a href="/admin/instagram">Instagram settings</a></p>
+    }
+    else
+    {
+        <ul class="instagram-feed-grid">
+            @foreach (var tile in Model.Tiles)
+            {
+                var alt = tile.CaptionAlt ?? fallbackPrefix + tile.PostedOn.ToString("d MMMM yyyy", CultureInfo.CurrentUICulture);
+                <li hidden="@tile.Hidden"><a href="@tile.Permalink"><img src="@tile.Src" srcset="@tile.SrcSet" sizes="(min-width: 960px) 25vw, (min-width: 720px) 33vw, 50vw" alt="@alt" width="@tile.Width" height="@tile.Height" loading="lazy" decoding="async" /></a></li>
+            }
+        </ul>
+    }
+</section>

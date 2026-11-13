@@ -991,3 +991,38 @@ html:not(.cms-view) .cms-image-placeholder::before {
         grid-template-columns: repeat(4, minmax(0, 1fr));
     }
 }
+
+.cms-sectionbar-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    max-width: 100%;
+    padding-inline-start: 0.5rem;
+}
+
+.cms-sectionbar-select {
+    box-sizing: border-box;
+    min-width: 4rem;
+    min-height: 2.75rem;
+    padding: 0.125rem 0.5rem;
+    border: 1px solid #8fa3ad;
+    border-radius: 0.25rem;
+    background: #14232b;
+    color: #ffffff;
+    font: inherit;
+}
+
+.cms-sectionbar-select:focus-visible {
+    outline: 3px solid #ffd166;
+    outline-offset: 2px;
+}
+
+html.cms-view [data-cms-admin-note] {
+    display: none;
+}
+
+@media (min-width: 720px) {
+    .cms-sectionbar-select {
+        min-height: 1.5rem;
+    }
+}

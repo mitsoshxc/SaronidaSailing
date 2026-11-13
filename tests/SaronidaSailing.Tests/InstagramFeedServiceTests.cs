@@ -263,9 +263,101 @@ public sealed class InstagramFeedServiceTests : IAsyncLifetime
         Assert.True(activity.HasAnything);
     }
 
+    [Fact]
+    public async Task GetFeed_IsNewestFirst_AndHonoursTake()
+    {
+        _client.AddPost("old", "old", 30);
+        _client.AddPost("new", "new", 1);
+        _client.AddPost("mid", "mid", 10);
+        await FetchAsync();
+
+        var all = await Feed(NewContext()).GetFeedAsync(12);
+        var two = await Feed(NewContext()).GetFeedAsync(2);
+
+        Assert.Equal(["new", "mid", "old"], all.Select(x => x.Caption));
+        Assert.Equal(["new", "mid"], two.Select(x => x.Caption));
+        Assert.Empty(await Feed(NewContext()).GetFeedAsync(0));
+    }
+
+    [Fact]
+    public async Task GetFeed_WithNoPosts_IsEmpty() => Assert.Empty(await Feed(NewContext()).GetFeedAsync(6));
+
+    [Fact]
+    public async Task GetFeed_BuildsTheImageLikeContentImages()
+    {
+        _client.AddPost("p1");
+        await FetchAsync();
+        var context = NewContext();
+        var asset = await context.Set<MediaAsset>().SingleAsync();
+
+        var post = Assert.Single(await Feed(NewContext()).GetFeedAsync(6));
+
+        Assert.Equal("https://www.instagram.com/p/p1/", post.Permalink);
+        Assert.Equal(new DateTime(2026, 11, 1, 12, 0, 0, DateTimeKind.Utc), post.PostedAt);
+        Assert.Equal(PageImage.From(asset).Sources, post.Image.Sources);
+        Assert.Equal((asset.Id, asset.Width, asset.Height), (post.Image.Id, post.Image.Width, post.Image.Height));
+        Assert.All(post.Image.Sources, s => Assert.StartsWith("/media/", s.Url));
+        Assert.Equal(asset.GetWidths().Order(), post.Image.Sources.Select(s => s.Width));
+    }
+
+    [Fact]
+    public async Task GetFeed_SkipsPostsWithoutUsableAssetOrHttpsPermalink_AndStillFillsTake()
+    {
+        _client.AddPost("good1", "good1", 1);
+        _client.AddPost("insecure", "insecure", 2);
+        _client.AddPost("relative", "relative", 3);
+        _client.AddPost("good2", "good2", 4);
+        await FetchAsync();
+        await using (var context = NewContext())
+        {
+            var posts = await context.Set<InstagramPost>().ToListAsync();
+            posts.Single(p => p.InstagramId == "insecure").Update("insecure", "http://www.instagram.com/p/insecure/");
+            posts.Single(p => p.InstagramId == "relative").Update("relative", "/p/relative/");
+            await context.SaveChangesAsync();
+        }
+
+        var feed = await Feed(NewContext()).GetFeedAsync(12);
+        var two = await Feed(NewContext()).GetFeedAsync(2);
+
+        Assert.Equal(["good1", "good2"], feed.Select(x => x.Caption));
+        Assert.Equal(["good1", "good2"], two.Select(x => x.Caption));
+    }
+
+    [Fact]
+    public async Task GetFeed_SkipsAPostWhoseAssetIsMissing()
+    {
+        _client.AddPost("kept", "kept", 1);
+        _client.AddPost("lost", "lost", 2);
+        await FetchAsync();
+        var lostAssetId = (await NewContext().Set<InstagramPost>().SingleAsync(p => p.InstagramId == "lost")).MediaAssetId;
+
+        var feed = await Feed(NewContext(), assetsWithout: lostAssetId).GetFeedAsync(12);
+
+        Assert.Equal(["kept"], feed.Select(x => x.Caption));
+    }
+
+    private sealed class AssetRepositoryWithout(IMediaAssetRepository inner, Guid missing) : IMediaAssetRepository
+    {
+        public Task<MediaAsset?> GetByIdAsync(Guid id, CancellationToken ct = default) => inner.GetByIdAsync(id, ct);
+
+        public async Task<IReadOnlyList<MediaAsset>> GetByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct = default) =>
+            [.. (await inner.GetByIdsAsync(ids, ct)).Where(a => a.Id != missing)];
+
+        public Task<MediaAsset?> GetByContentHashAsync(string contentHash, CancellationToken ct = default) =>
+            inner.GetByContentHashAsync(contentHash, ct);
+
+        public Task<IReadOnlyList<MediaAsset>> ListNewestFirstAsync(int skip, int take, CancellationToken ct = default) =>
+            inner.ListNewestFirstAsync(skip, take, ct);
+
+        public Task<IReadOnlySet<Guid>> ExistAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct = default) =>
+            inner.ExistAsync(ids, ct);
+
+        public void Add(MediaAsset asset) => inner.Add(asset);
+    }
+
     private Task<InstagramFetchResult> FetchAsync() => Feed(NewContext()).FetchAsync();
 
-    private InstagramFeedService Feed(AppDbContext context)
+    private InstagramFeedService Feed(AppDbContext context, Guid? assetsWithout = null)
     {
         var unitOfWork = new UnitOfWork(context);
         var options = Options.Create(new MediaOptions
@@ -275,8 +367,8 @@ public sealed class InstagramFeedServiceTests : IAsyncLifetime
         });
         var media = new MediaService(new MediaAssetRepository(context), unitOfWork, options, new MediaProcessingGate());
         return new InstagramFeedService(
-            _client, Connection(context), new InstagramPostRepository(context), new IntegrationSettingRepository(context),
-            media, unitOfWork, _cache, NullLogger<InstagramFeedService>.Instance, _time);
+            _client, Connection(context), new InstagramPostRepository(context), assetsWithout is { } lost ? new AssetRepositoryWithout(new MediaAssetRepository(context), lost) : new MediaAssetRepository(context),
+            new IntegrationSettingRepository(context), media, unitOfWork, _cache, NullLogger<InstagramFeedService>.Instance, _time);
     }
 
     private InstagramConnectionService Connection(AppDbContext context) =>

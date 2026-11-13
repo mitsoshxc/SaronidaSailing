@@ -105,11 +105,11 @@ public sealed partial class CmsImageTagHelper(
         }
         else
         {
-            var source = image.Sources.FirstOrDefault(s => s.Width == PreferredWidth) ?? image.Sources[^1];
+            var source = image.SourceAt(PreferredWidth) ?? image.Sources[^1];
             output.TagName = "img";
             output.TagMode = TagMode.StartTagOnly;
             attributes.SetAttribute("src", source.Url);
-            attributes.SetAttribute("srcset", string.Join(", ", image.Sources.Select(s => $"{s.Url} {s.Width}w")));
+            attributes.SetAttribute("srcset", image.SrcSet);
             attributes.SetAttribute("sizes", Sizes);
             attributes.SetAttribute("width", image.Width);
             attributes.SetAttribute("height", image.Height);
