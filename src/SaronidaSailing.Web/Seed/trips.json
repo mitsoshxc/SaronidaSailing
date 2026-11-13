@@ -1,6 +1,6 @@
 {
   "group": "trips",
-  "version": 1,
+  "version": 2,
   "fields": {
     "trips.seo.title": {
       "type": "text",
@@ -81,6 +81,11 @@
       "type": "text",
       "el": "Όλο το Lagoon 500 για μία εβδομάδα ή περισσότερο. Σχεδιάστε τα νησιά με τον σκίπερ πριν έρθετε ή αποφασίστε μέρα με τη μέρα.",
       "en": "The whole Lagoon 500 for a week or longer. Plan the islands with the skipper before you arrive, or decide day by day."
+    },
+    "trips.week.price-label": {
+      "type": "text",
+      "el": "Σκάφος και σκίπερ",
+      "en": "Boat and skipper"
     },
     "trips.week.note": {
       "type": "text",
@@ -287,44 +292,6 @@
           "type": "text",
           "el": "Καπέλο, πετσέτα, αντηλιακό και ένα ελαφρύ αδιάβροχο",
           "en": "A hat, towel, sunscreen and a light waterproof jacket"
-        }
-      }
-    ],
-    "trips.week-prices": [
-      {
-        "label": {
-          "type": "text",
-          "el": "Σκάφος και σκίπερ, ανά εβδομάδα",
-          "en": "Boat and skipper, per week"
-        },
-        "value": {
-          "type": "text",
-          "el": "[ΤΙΜΗ]",
-          "en": "[PRICE]"
-        }
-      },
-      {
-        "label": {
-          "type": "text",
-          "el": "Πακέτο ναύλωσης (σεντόνια, γκάζι, λέμβος, καθαρισμός)",
-          "en": "Charter package (linen, gas, dinghy, cleaning)"
-        },
-        "value": {
-          "type": "text",
-          "el": "[ΤΙΜΗ]",
-          "en": "[PRICE]"
-        }
-      },
-      {
-        "label": {
-          "type": "text",
-          "el": "Εγγύηση",
-          "en": "Security deposit"
-        },
-        "value": {
-          "type": "text",
-          "el": "[ΠΟΣΟ]",
-          "en": "[AMOUNT]"
         }
       }
     ],

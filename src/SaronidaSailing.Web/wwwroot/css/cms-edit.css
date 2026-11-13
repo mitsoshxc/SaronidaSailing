@@ -1076,3 +1076,11 @@ html:not(.cms-view) .visually-hidden[data-cms-key] {
         top: calc(var(--space-5) + var(--cms-toolbar-height, 0px));
     }
 }
+
+html:not(.cms-view) .boat-gallery__grid {
+    overflow: visible;
+}
+
+html:not(.cms-view) .boat-gallery--js .boat-gallery__grid > li:nth-child(n + 6) {
+    display: block;
+}

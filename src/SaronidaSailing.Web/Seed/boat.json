@@ -1,0 +1,244 @@
+{
+  "group": "boat",
+  "version": 1,
+  "fields": {
+    "boat.seo.title": {
+      "type": "text",
+      "el": "Το σκάφος: καταμαράν Lagoon 500 · Saronida Sailing",
+      "en": "The boat: Lagoon 500 catamaran · Saronida Sailing"
+    },
+    "boat.seo.description": {
+      "type": "text",
+      "el": "Γνωρίστε το Lagoon 500: τεχνικά χαρακτηριστικά, χώροι του σκάφους, τι περιλαμβάνεται και ώρες επιβίβασης και αποβίβασης στον Άγιο Νικόλαο.",
+      "en": "Meet the Lagoon 500: specifications, the spaces on board, what's included, and boarding and disembarking times at Agios Nikolaos."
+    },
+    "boat.gallery.cover-alt": {
+      "type": "text",
+      "el": "Το Lagoon 500 εν πλω",
+      "en": "The Lagoon 500 under sail"
+    },
+    "boat.intro.eyebrow": {
+      "type": "text",
+      "el": "Το σκάφος μας",
+      "en": "Our boat"
+    },
+    "boat.intro.title": {
+      "type": "text",
+      "el": "Lagoon 500",
+      "en": "Lagoon 500"
+    },
+    "boat.intro.subtitle": {
+      "type": "text",
+      "el": "Ιστιοπλοϊκό καταμαράν · 2008 · λιμάνι Άγιος Νικόλαος",
+      "en": "Sailing catamaran · 2008 · Agios Nikolaos harbour"
+    },
+    "boat.intro.lead": {
+      "type": "text",
+      "el": "Δύο γάστρες, flybridge και περισσότερος χώρος στο κατάστρωμα απ' ό,τι σε πολλές βίλες. Το Lagoon 500 μένει ίσιο και στην άγκυρα και εν πλω, γι' αυτό είναι ιδανικό για όσους ταξιδεύουν πρώτη φορά, για παιδιά και για όσους ανησυχούν για τη ναυτία.",
+      "en": "Two hulls, a flybridge and more deck space than many villas. The Lagoon 500 stays level both at anchor and under sail, which makes it ideal for first-time sailors, for children and for anyone who worries about seasickness."
+    },
+    "boat.specs.title": {
+      "type": "text",
+      "el": "Τεχνικά χαρακτηριστικά",
+      "en": "Specifications"
+    },
+    "boat.specs.note": {
+      "type": "text",
+      "el": "Εργοστασιακά στοιχεία του Lagoon 500. Καμπίνες, επιβάτες και κινητήρες προς επιβεβαίωση για το συγκεκριμένο σκάφος.",
+      "en": "Factory data for the Lagoon 500. Cabins, passengers and engines to be confirmed for this particular boat."
+    },
+    "boat.life.title": {
+      "type": "text",
+      "el": "Η ζωή στο σκάφος",
+      "en": "Life on board"
+    },
+    "boat.life.plan-alt": {
+      "type": "text",
+      "el": "Κάτοψη: η διάταξη των καμπινών",
+      "en": "Floor plan: the layout of the cabins"
+    },
+    "boat.included.title": {
+      "type": "text",
+      "el": "Περιλαμβάνονται",
+      "en": "Included"
+    },
+    "boat.charter.title": {
+      "type": "text",
+      "el": "Στοιχεία ναύλωσης",
+      "en": "Charter details"
+    },
+    "boat.charter.note": {
+      "type": "text",
+      "el": "Θέλετε άλλη ώρα ή άλλο σημείο επιβίβασης; Πείτε μας όταν κάνετε την κράτηση.",
+      "en": "Want a different time or boarding point? Tell us when you book."
+    },
+    "boat.booking.title": {
+      "type": "text",
+      "el": "Έτοιμοι να επιβιβαστείτε;",
+      "en": "Ready to come aboard?"
+    },
+    "boat.booking.week-label": {
+      "type": "text",
+      "el": "Εβδομαδιαία ναύλωση με σκίπερ",
+      "en": "Weekly charter with skipper"
+    },
+    "boat.booking.cta": {
+      "type": "text",
+      "el": "Δείτε διαθεσιμότητα",
+      "en": "Check availability"
+    },
+    "boat.booking.day-label": {
+      "type": "text",
+      "el": "Ή ημερήσια κρουαζιέρα από",
+      "en": "Or a day cruise from"
+    },
+    "boat.booking.questions": {
+      "type": "text",
+      "el": "Ερωτήσεις; Καλέστε στο",
+      "en": "Questions? Call"
+    }
+  },
+  "lists": {
+    "boat.gallery-photos": [
+      {
+        "image-alt": {
+          "type": "text",
+          "el": "Το σαλόνι του Lagoon 500, με χώρο καθιστικού και κουζίνα στον ίδιο χώρο",
+          "en": "The saloon of the Lagoon 500, with the seating area and galley in one open space"
+        }
+      },
+      {
+        "image-alt": {
+          "type": "text",
+          "el": "Μια διπλή καμπίνα του Lagoon 500",
+          "en": "A double cabin on the Lagoon 500"
+        }
+      },
+      {
+        "image-alt": {
+          "type": "text",
+          "el": "Το flybridge του Lagoon 500, με το πάνω τιμόνι και χώρο για ηλιοθεραπεία",
+          "en": "The flybridge of the Lagoon 500, with the upper helm and a sunbathing area"
+        }
+      },
+      {
+        "image-alt": {
+          "type": "text",
+          "el": "Η τραμπολίνα στην πλώρη του Lagoon 500, ακριβώς πάνω από το νερό",
+          "en": "The trampoline at the bow of the Lagoon 500, just above the water"
+        }
+      }
+    ],
+    "boat.specs-items": [
+      {
+        "label": { "type": "text", "el": "Μήκος", "en": "Length" },
+        "value": { "type": "text", "el": "15,54 μ.", "en": "15.54 m" }
+      },
+      {
+        "label": { "type": "text", "el": "Πλάτος", "en": "Beam" },
+        "value": { "type": "text", "el": "8,53 μ.", "en": "8.53 m" }
+      },
+      {
+        "label": { "type": "text", "el": "Βύθισμα", "en": "Draft" },
+        "value": { "type": "text", "el": "1,30 μ.", "en": "1.30 m" }
+      },
+      {
+        "label": { "type": "text", "el": "Έτος κατασκευής", "en": "Year built" },
+        "value": { "type": "text", "el": "2008", "en": "2008" }
+      },
+      {
+        "label": { "type": "text", "el": "Καμπίνες", "en": "Cabins" },
+        "value": { "type": "text", "el": "[4–6]", "en": "[4–6]" }
+      },
+      {
+        "label": { "type": "text", "el": "Μπάνια", "en": "Bathrooms" },
+        "value": { "type": "text", "el": "[4–6]", "en": "[4–6]" }
+      },
+      {
+        "label": { "type": "text", "el": "Επιβάτες, ημερήσια", "en": "Passengers, day trips" },
+        "value": { "type": "text", "el": "[ΑΡ. ΑΤΟΜΩΝ]", "en": "[MAX]" }
+      },
+      {
+        "label": { "type": "text", "el": "Επιβάτες, με διανυκτέρευση", "en": "Passengers, overnight" },
+        "value": { "type": "text", "el": "[ΑΡ. ΑΤΟΜΩΝ]", "en": "[MAX]" }
+      },
+      {
+        "label": { "type": "text", "el": "Νερό", "en": "Water" },
+        "value": { "type": "text", "el": "960 λίτρα", "en": "960 litres" }
+      },
+      {
+        "label": { "type": "text", "el": "Κινητήρες", "en": "Engines" },
+        "value": { "type": "text", "el": "2 × [75] HP", "en": "2 × [75] HP" }
+      }
+    ],
+    "boat.life-items": [
+      {
+        "title": { "type": "text", "el": "Flybridge", "en": "Flybridge" },
+        "text": {
+          "type": "text",
+          "el": "Το πάνω τιμόνι και χώρος για ηλιοθεραπεία, με την καλύτερη θέα του σκάφους.",
+          "en": "The upper helm and a sunbathing area, with the best view on the boat."
+        }
+      },
+      {
+        "title": { "type": "text", "el": "Κόκπιτ", "en": "Cockpit" },
+        "text": {
+          "type": "text",
+          "el": "Σκιερό τραπέζι στο ύπαιθρο για όλη την παρέα.",
+          "en": "A shaded outdoor table for the whole group."
+        }
+      },
+      {
+        "title": { "type": "text", "el": "Σαλόνι και κουζίνα", "en": "Saloon and galley" },
+        "text": {
+          "type": "text",
+          "el": "Ενιαίος χώρος στο ίδιο επίπεδο με το κόκπιτ, για να μη μένει ποτέ κανείς μακριά από την παρέα.",
+          "en": "One open space on the same level as the cockpit, so nobody is ever far from the group."
+        }
+      },
+      {
+        "title": { "type": "text", "el": "Τραμπολίνα στην πλώρη", "en": "Trampoline at the bow" },
+        "text": {
+          "type": "text",
+          "el": "Ξαπλώστε στον ήλιο ακριβώς πάνω από το νερό.",
+          "en": "Lie in the sun just above the water."
+        }
+      },
+      {
+        "title": { "type": "text", "el": "Καμπίνες", "en": "Cabins" },
+        "text": {
+          "type": "text",
+          "el": "[X] διπλές καμπίνες, η καθεμία με δικό της μπάνιο. Η διάταξη προς επιβεβαίωση.",
+          "en": "[X] double cabins, each with its own bathroom. Layout to be confirmed."
+        }
+      }
+    ],
+    "boat.included-items": [
+      { "text": { "type": "text", "el": "Ζεστό νερό", "en": "Hot water" } },
+      { "text": { "type": "text", "el": "Σεντόνια και πετσέτες", "en": "Linen and towels" } },
+      { "text": { "type": "text", "el": "Εξοπλισμός σνόρκελ", "en": "Snorkelling gear" } },
+      { "text": { "type": "text", "el": "Paddle board", "en": "Paddle board" } },
+      { "text": { "type": "text", "el": "Δωρεάν Wi-Fi", "en": "Free Wi-Fi" } },
+      { "text": { "type": "text", "el": "Βοηθητική λέμβος", "en": "Dinghy" } },
+      { "text": { "type": "text", "el": "Εξοπλισμένη κουζίνα", "en": "Fully equipped kitchen" } },
+      { "text": { "type": "text", "el": "Σωσίβια για όλους", "en": "Life jackets for everyone" } }
+    ],
+    "boat.charter-times": [
+      {
+        "label": { "type": "text", "el": "Επιβίβαση", "en": "Boarding" },
+        "time": { "type": "text", "el": "10:00", "en": "10:00" },
+        "place": { "type": "text", "el": "Άγιος Νικόλαος", "en": "Agios Nikolaos" }
+      },
+      {
+        "label": { "type": "text", "el": "Αποβίβαση", "en": "Disembarking" },
+        "time": { "type": "text", "el": "17:00", "en": "17:00" },
+        "place": { "type": "text", "el": "Άγιος Νικόλαος", "en": "Agios Nikolaos" }
+      }
+    ],
+    "boat.booking-points": [
+      { "text": { "type": "text", "el": "Σκίπερ στο σκάφος", "en": "Skipper on board" } },
+      { "text": { "type": "text", "el": "Έως [ΑΡ. ΑΤΟΜΩΝ] επιβάτες", "en": "Up to [MAX] passengers" } },
+      { "text": { "type": "text", "el": "Αναχώρηση από Άγιο Νικόλαο", "en": "Departure from Agios Nikolaos" } }
+    ]
+  }
+}

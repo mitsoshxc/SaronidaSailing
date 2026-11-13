@@ -18,7 +18,7 @@ public sealed class EmbeddedContentSeedSourceTests : IAsyncLifetime
     {
         var groups = new EmbeddedContentSeedSource().GetGroups();
 
-        Assert.Equal(["home", "shared.contact", "shared.footer", "shared.prices", "shared.social", "trips"], groups.Select(g => g.Name));
+        Assert.Equal(["boat", "home", "shared.charter-costs", "shared.contact", "shared.footer", "shared.prices", "shared.social", "trips"], groups.Select(g => g.Name));
         Assert.All(groups, g => Assert.True(g.Version >= 1));
     }
 
@@ -116,5 +116,76 @@ public sealed class EmbeddedContentSeedSourceTests : IAsyncLifetime
             """{ "group": "home", "version": 1, "fields": { "home.seo.title": { "type": "text", "el": "x" } } }""");
 
         Assert.Equal("home.seo.title", Assert.Single(group.Fields).Key);
+    }
+
+    [Fact]
+    public void Parse_ListGroup_MayUseTheGroupNameAsTheListKey()
+    {
+        var group = EmbeddedContentSeedSource.Parse(
+            "shared.charter-costs.json",
+            """
+            {
+              "group": "shared.charter-costs",
+              "version": 1,
+              "lists": { "shared.charter-costs": [ { "label": { "type": "text", "el": "x" } } ] }
+            }
+            """);
+
+        Assert.Equal("shared.charter-costs", Assert.Single(group.Lists).ListKey);
+    }
+
+    [Fact]
+    public void ShippedGroups_HaveTheBoatAndCharterCostVersions_AndTripsDropsItsOwnPriceList()
+    {
+        var groups = new EmbeddedContentSeedSource().GetGroups().ToDictionary(g => g.Name);
+
+        Assert.Equal(1, groups["boat"].Version);
+        Assert.Equal(1, groups["shared.charter-costs"].Version);
+        Assert.Equal(3, Assert.Single(groups["shared.charter-costs"].Lists).Items.Count);
+        Assert.Equal(2, groups["trips"].Version);
+        Assert.DoesNotContain(groups["trips"].Lists, l => l.ListKey == "trips.week-prices");
+        Assert.Contains(groups["trips"].Fields, f => f.Key == "trips.week.price-label");
+    }
+
+    [Fact]
+    public async Task BoatAndCharterCostGroups_ApplyToAFreshDatabase_WithAltTextsButNoImages()
+    {
+        var db = new ContentSeedTestDatabase(_connectionString);
+
+        await db.RunSeederAsync(new EmbeddedContentSeedSource());
+
+        var items = await db.ItemsAsync();
+        Assert.DoesNotContain(items, i => i.Type == ContentType.Image);
+        Assert.Equal(2, items.Count(i => i.PageKey == "boat" && i.SectionKey == "gallery" && i.FieldKey == "cover-alt"));
+        Assert.Equal(8, items.Count(i => i.PageKey == "boat" && i.SectionKey == "gallery-photos" && i.FieldKey == "image-alt"));
+        Assert.Equal(12, items.Count(i => i.PageKey == "shared" && i.SectionKey == "charter-costs"));
+        var lists = await db.ListItemsAsync();
+        Assert.Equal(3, lists.Count(l => l.PageKey == "shared" && l.ListKey == "charter-costs"));
+        Assert.Equal(4, lists.Count(l => l.PageKey == "boat" && l.ListKey == "gallery-photos"));
+        Assert.Contains(await db.MarkersAsync(), m => m.Key == "seed.shared.charter-costs" && m.Value == "1");
+    }
+
+    [Fact]
+    public async Task TripsV2_OnADatabaseSeededWithV1_FillsTheNewLabel_AndLeavesTheOldPriceListAlone()
+    {
+        var db = new ContentSeedTestDatabase(_connectionString);
+        var v1 = new ContentSeedGroup(
+            "trips",
+            1,
+            [],
+            [
+                new SeedList("trips.week-prices", [new SeedListItem([
+                    new SeedField("label", ContentType.Text, new Dictionary<string, string> { ["el"] = "Παλιά γραμμή" }),
+                ])]),
+            ]);
+        await db.RunSeederAsync(new FakeSeedSource(v1));
+
+        var v2 = new EmbeddedContentSeedSource().GetGroups().Single(g => g.Name == "trips");
+        await db.RunSeederAsync(new FakeSeedSource(v2));
+
+        var items = await db.ItemsAsync();
+        Assert.Contains(items, i => i.SectionKey == "week-prices" && i.Value == "Παλιά γραμμή");
+        Assert.Contains(items, i => i.SectionKey == "week" && i.FieldKey == "price-label" && i.Locale == "el" && i.Value == "Σκάφος και σκίπερ");
+        Assert.Single(await db.ListItemsAsync(), l => l.ListKey == "week-prices");
     }
 }

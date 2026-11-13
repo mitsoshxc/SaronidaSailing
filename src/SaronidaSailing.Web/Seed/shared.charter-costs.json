@@ -1,0 +1,44 @@
+{
+  "group": "shared.charter-costs",
+  "version": 1,
+  "lists": {
+    "shared.charter-costs": [
+      {
+        "label": {
+          "type": "text",
+          "el": "Πακέτο ναύλωσης (σεντόνια, γκάζι, λέμβος, τελικός καθαρισμός)",
+          "en": "Charter package (linen, gas, dinghy, final cleaning)"
+        },
+        "value": {
+          "type": "text",
+          "el": "[ΤΙΜΗ]",
+          "en": "[PRICE]"
+        }
+      },
+      {
+        "label": {
+          "type": "text",
+          "el": "Εγγύηση (επιστρέφεται)",
+          "en": "Security deposit (refundable)"
+        },
+        "value": {
+          "type": "text",
+          "el": "[ΠΟΣΟ]",
+          "en": "[AMOUNT]"
+        }
+      },
+      {
+        "label": {
+          "type": "text",
+          "el": "Καύσιμα",
+          "en": "Fuel"
+        },
+        "value": {
+          "type": "text",
+          "el": "[ΤΙΜΗ]",
+          "en": "[PRICE]"
+        }
+      }
+    ]
+  }
+}

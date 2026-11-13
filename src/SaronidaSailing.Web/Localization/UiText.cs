@@ -81,6 +81,16 @@ public static class UiText
 
     public static UiString TripWeekShort { get; } = new("Εβδομαδιαία", "Week");
 
+    public static UiString AllPhotos { get; } = new("Όλες οι φωτογραφίες", "All photos");
+
+    public static UiString Photos { get; } = new("Φωτογραφίες", "Photos");
+
+    public static UiString Close { get; } = new("Κλείσιμο", "Close");
+
+    public static UiString PreviousPhoto { get; } = new("Προηγούμενη φωτογραφία", "Previous photo");
+
+    public static UiString NextPhoto { get; } = new("Επόμενη φωτογραφία", "Next photo");
+
     public static UiString HeroIllustration { get; } = new(
         "Σχέδιο καταμαράν Lagoon με πανιά στο ηλιοβασίλεμα",
         "Drawing of a Lagoon catamaran under sail at sunset");
@@ -112,6 +122,11 @@ public static class UiText
         (nameof(Dates), Dates),
         (nameof(FollowOnInstagram), FollowOnInstagram),
         (nameof(AllTrips), AllTrips),
+        (nameof(AllPhotos), AllPhotos),
+        (nameof(Photos), Photos),
+        (nameof(Close), Close),
+        (nameof(PreviousPhoto), PreviousPhoto),
+        (nameof(NextPhoto), NextPhoto),
         (nameof(HeroIllustration), HeroIllustration),
         (nameof(TripType), TripType),
         (nameof(TripDayLong), TripDayLong),

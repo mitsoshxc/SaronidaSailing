@@ -1,13 +1,126 @@
 @page
+@using System.Globalization
 @using SaronidaSailing.Web.Localization
+@using SaronidaSailing.Web.Models
 @model BoatModel
+@inject ILocalizedUrlService UrlService
 @{
     var title = UiText.PageTitle("boat").Current;
     ViewData["Title"] = title;
+    var locale = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == SiteCultures.English
+        ? SiteCultures.English
+        : SiteCultures.Greek;
+    var tripsPath = UrlService.GetPath("trips", locale);
+    var tripWeek = $"{tripsPath}?{TripTabs.QueryKey}=week";
+    var tripDay = $"{tripsPath}?{TripTabs.QueryKey}=day";
 }
 
-<section class="section">
+<section class="boat-gallery-section" cms-section="boat.gallery" cms-section-label="Photo gallery">
     <div class="wrap">
-        <h1>@title</h1>
+        <div class="boat-gallery" data-gallery>
+            <ul class="boat-gallery__grid" data-gallery-grid>
+                <li class="boat-gallery__tile boat-gallery__cover media-frame media-placeholder">
+                    <cms-image key="boat.gallery.cover" label="Cover photo" sizes="(min-width: 960px) 50vw, 100vw" loading="eager" class="media-frame__img" />
+                </li>
+                <li class="boat-gallery__tile media-frame media-placeholder" cms-list="boat.gallery-photos" cms-add-label="Add photo">
+                    <cms-image field="image" label="Photo" sizes="(min-width: 960px) 25vw, 50vw" class="media-frame__img" />
+                </li>
+            </ul>
+            @if (Model.PhotoCount > 0)
+            {
+                <button type="button" class="boat-gallery__all" data-gallery-all hidden>@UiText.AllPhotos.Current (@Model.PhotoCount)</button>
+            }
+        </div>
+        @if (Model.PhotoCount > 0)
+        {
+            <dialog class="lightbox" aria-label="@UiText.Photos.Current" data-lightbox>
+                <div class="lightbox__bar">
+                    <span class="lightbox__counter" aria-live="polite" data-lightbox-counter></span>
+                    <button type="button" class="lightbox__close" data-lightbox-close autofocus>
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+                        <span class="visually-hidden">@UiText.Close.Current</span>
+                    </button>
+                </div>
+                <div class="lightbox__stage" data-lightbox-stage>
+                    <img class="lightbox__img" alt="" data-lightbox-img />
+                    <button type="button" class="lightbox__nav lightbox__prev" data-lightbox-prev>
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 5l-7 7 7 7"></path></svg>
+                        <span class="visually-hidden">@UiText.PreviousPhoto.Current</span>
+                    </button>
+                    <button type="button" class="lightbox__nav lightbox__next" data-lightbox-next>
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 5l7 7-7 7"></path></svg>
+                        <span class="visually-hidden">@UiText.NextPhoto.Current</span>
+                    </button>
+                </div>
+            </dialog>
+        }
     </div>
 </section>
+
+<div class="wrap boat-layout">
+    <div class="boat-main">
+        <section class="boat-intro" cms-section="boat.intro" cms-section-label="Intro">
+            <p class="eyebrow" cms="boat.intro.eyebrow"></p>
+            <h1 cms="boat.intro.title"></h1>
+            <p class="boat-intro__subtitle" cms="boat.intro.subtitle"></p>
+            <p class="lead boat-intro__lead" cms="boat.intro.lead"></p>
+        </section>
+
+        <section class="boat-block boat-specs" cms-section="boat.specs" cms-section-label="Specifications">
+            <h2 cms="boat.specs.title"></h2>
+            <dl class="boat-specs__grid">
+                <div class="boat-spec" cms-list="boat.specs-items" cms-add-label="Add specification"><dt cms-field="label"></dt><dd cms-field="value"></dd></div>
+            </dl>
+            <p class="boat-specs__note" cms="boat.specs.note"></p>
+        </section>
+
+        <section class="boat-block boat-life" cms-section="boat.life" cms-section-label="Life on board">
+            <h2 cms="boat.life.title"></h2>
+            <div class="boat-life__plan media-frame media-placeholder">
+                <cms-image key="boat.life.plan" label="Floor plan" sizes="(min-width: 960px) 760px, 100vw" class="media-frame__img" />
+            </div>
+            <ul class="boat-life__list">
+                <li class="boat-life__item" cms-list="boat.life-items" cms-add-label="Add area"><strong cms-field="title"></strong><span cms-field="text"></span></li>
+            </ul>
+        </section>
+
+        <section class="boat-block boat-included" cms-section="boat.included" cms-section-label="Included">
+            <h2 cms="boat.included.title"></h2>
+            <ul class="check-list boat-included__list">
+                <li cms-list="boat.included-items" cms-add-label="Add included item"><span cms-field="text"></span></li>
+            </ul>
+        </section>
+
+        <section class="boat-block boat-charter" cms-section="boat.charter" cms-section-label="Charter details">
+            <h2 cms="boat.charter.title"></h2>
+            <div class="boat-times">
+                <div class="boat-time" cms-list="boat.charter-times" cms-add-label="Add time"><span class="boat-time__label" cms-field="label"></span><strong class="boat-time__time" cms-field="time"></strong><span class="boat-time__place" cms-field="place"></span></div>
+            </div>
+            <ul class="boat-costs">
+                <li class="boat-cost" cms-list="shared.charter-costs" cms-add-label="Add charter cost"><span cms-field="label"></span><strong class="boat-cost__value" cms-field="value"></strong></li>
+            </ul>
+            <p class="boat-charter__note" cms="boat.charter.note"></p>
+        </section>
+    </div>
+
+    <section class="trip-booking boat-booking" id="booking" aria-labelledby="boat-booking-title" cms-section="boat.booking" cms-section-label="Booking box">
+        <h2 class="boat-booking__title" id="boat-booking-title" cms="boat.booking.title"></h2>
+        <p class="boat-booking__price"><span class="boat-booking__label" cms="boat.booking.week-label"></span><span class="boat-booking__from">@UiText.From.Current <strong cms="shared.prices.week"></strong></span></p>
+        <ul class="check-list boat-booking__points">
+            <li cms-list="boat.booking-points" cms-add-label="Add booking point"><span cms-field="text"></span></li>
+        </ul>
+        <a class="btn btn--cta btn--block boat-booking__cta" href="@tripWeek"><span cms="boat.booking.cta"></span></a>
+        <a class="boat-booking__alt" href="@tripDay"><span cms="boat.booking.day-label"></span> <strong cms="shared.prices.day"></strong></a>
+        <div class="trip-booking__questions">
+            <span cms="boat.booking.questions"></span>
+            <a class="trip-booking__phone" cms-link="shared.contact.phone" cms-keep-content><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a1 1 0 0 1-1 1A16 16 0 0 1 4 5a1 1 0 0 1 1-1z"></path></svg><span cms-link-label></span></a>
+        </div>
+    </section>
+</div>
+
+<div class="sticky-book" cms-section="boat.sticky" cms-section-label="Sticky booking bar">
+    <div class="sticky-book__price">
+        <span class="sticky-book__group"><span class="sticky-book__label" cms="boat.booking.week-label"></span><strong cms="shared.prices.week"></strong></span>
+    </div>
+    <a class="btn btn--cta" href="#booking">@UiText.Dates.Current</a>
+</div>

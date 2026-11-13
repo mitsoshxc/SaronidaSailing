@@ -2349,3 +2349,611 @@ main[tabindex]:focus-visible {
         display: none;
     }
 }
+
+/* ==========================================================================
+   Boat
+   ========================================================================== */
+
+.boat-gallery-section {
+    padding-top: var(--space-4);
+}
+
+.boat-gallery {
+    position: relative;
+}
+
+.boat-gallery__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: 240px 140px 140px;
+    grid-auto-rows: 140px;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    border-radius: var(--radius-l);
+    list-style: none;
+}
+
+.boat-gallery__tile {
+    min-height: 0;
+    border-radius: 0;
+}
+
+.boat-gallery__cover {
+    grid-column: span 2;
+}
+
+.boat-gallery--js .boat-gallery__grid > li:nth-child(n + 6) {
+    display: none;
+}
+
+.boat-gallery--js .boat-gallery__tile:has(img) {
+    cursor: zoom-in;
+}
+
+.boat-gallery__all {
+    position: absolute;
+    inset-inline-end: var(--space-3);
+    bottom: var(--space-3);
+    display: inline-flex;
+    align-items: center;
+    box-sizing: border-box;
+    min-height: 44px;
+    padding: 0 var(--space-4);
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: #ffffff;
+    box-shadow: 0 2px 10px rgba(11, 34, 48, 0.2);
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.boat-gallery__all:hover {
+    background: var(--surface-tint);
+}
+
+.boat-gallery__all[hidden] {
+    display: none;
+}
+
+html:has(dialog.lightbox[open]) {
+    overflow: hidden;
+}
+
+.lightbox {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: #050f16;
+    color: #ffffff;
+}
+
+.lightbox[open] {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+}
+
+.lightbox::backdrop {
+    background: rgba(5, 15, 22, 0.92);
+}
+
+.lightbox__bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--gutter);
+}
+
+.lightbox__counter {
+    font-size: 0.9375rem;
+    font-weight: 600;
+}
+
+.lightbox__close,
+.lightbox__nav {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.14);
+    color: #ffffff;
+    cursor: pointer;
+}
+
+.lightbox__close:hover,
+.lightbox__nav:hover {
+    background: rgba(255, 255, 255, 0.28);
+}
+
+.lightbox__nav[hidden] {
+    display: none;
+}
+
+.lightbox__stage {
+    position: relative;
+    min-height: 0;
+    touch-action: pan-y;
+}
+
+.lightbox__img {
+    position: absolute;
+    inset: 0 var(--space-3);
+    width: calc(100% - 2 * var(--space-3));
+    height: 100%;
+    object-fit: contain;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+.lightbox__nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(11, 34, 48, 0.78);
+}
+
+.lightbox__prev {
+    inset-inline-start: var(--space-3);
+}
+
+.lightbox__next {
+    inset-inline-end: var(--space-3);
+}
+
+.boat-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    padding-block: var(--space-6) var(--space-8);
+}
+
+.boat-main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-7);
+    min-width: 0;
+    margin-bottom: var(--space-7);
+}
+
+.boat-intro .eyebrow {
+    margin-bottom: var(--space-2);
+}
+
+.boat-intro h1 {
+    margin-bottom: var(--space-2);
+    font-size: 2.5rem;
+    line-height: 1.05;
+}
+
+.boat-intro__subtitle {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.9375rem;
+    font-weight: 600;
+}
+
+.boat-intro__lead {
+    max-width: 42em;
+    margin: var(--space-2) 0 0;
+    font-size: 1rem;
+}
+
+.boat-block h2 {
+    margin-bottom: var(--space-4);
+    font-size: 1.5rem;
+}
+
+.boat-specs__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin: 0 0 var(--space-4);
+}
+
+.boat-spec {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 12px 14px;
+    border-radius: var(--radius-s);
+    background: var(--surface-soft);
+}
+
+.boat-spec dt {
+    color: var(--text-secondary);
+    font-size: 0.8125rem;
+}
+
+.boat-spec dd {
+    margin: 0;
+    color: var(--ink);
+    font-size: 1.125rem;
+    font-weight: 700;
+}
+
+.boat-specs__note,
+.boat-charter__note {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+}
+
+.boat-charter__note {
+    font-size: 0.875rem;
+}
+
+.boat-life__plan {
+    height: 220px;
+    min-height: 0;
+    margin-bottom: var(--space-4);
+}
+
+.boat-life__plan .media-frame__img {
+    object-fit: contain;
+}
+
+.boat-life__list {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.boat-life__item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding-block: 14px;
+}
+
+.boat-life__item + .boat-life__item {
+    border-top: 1px solid var(--border);
+}
+
+.boat-life__item strong {
+    color: var(--ink);
+    font-size: 1rem;
+}
+
+.boat-life__item span {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    line-height: 1.45;
+}
+
+.boat-included__list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 12px;
+    margin: 0;
+    font-size: 0.875rem;
+}
+
+.boat-included__list li {
+    margin: 0;
+}
+
+.boat-times {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+}
+
+.boat-time {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 14px;
+    border-radius: var(--radius-s);
+    background: var(--surface-soft);
+}
+
+.boat-time__label,
+.boat-time__place {
+    color: var(--text-secondary);
+    font-size: 0.8125rem;
+}
+
+.boat-time__time {
+    color: var(--ink);
+    font-size: 1.125rem;
+}
+
+.boat-costs {
+    margin: 0 0 var(--space-4);
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-s);
+    list-style: none;
+}
+
+.boat-cost {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: 14px;
+    font-size: 0.9375rem;
+}
+
+.boat-cost + .boat-cost {
+    border-top: 1px solid var(--border);
+}
+
+.boat-cost__value {
+    flex: none;
+    color: var(--ink);
+    white-space: nowrap;
+}
+
+.boat-booking__title {
+    font-size: 1.625rem;
+    line-height: 1.15;
+}
+
+.boat-booking__price {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    gap: var(--space-1);
+}
+
+.boat-booking__label,
+.boat-booking__from {
+    color: var(--text-muted-on-dark);
+}
+
+.boat-booking__label {
+    font-size: 0.875rem;
+}
+
+.boat-booking__from {
+    font-size: 0.9375rem;
+}
+
+.boat-booking__from strong {
+    color: #ffffff;
+    font-size: 1.875rem;
+    line-height: 1.15;
+}
+
+.boat-booking__points {
+    margin: 0;
+    font-size: 0.9375rem;
+}
+
+.boat-booking__points li {
+    margin-bottom: 10px;
+}
+
+.boat-booking__points li:last-child {
+    margin-bottom: 0;
+}
+
+.boat-booking__cta {
+    min-height: 52px;
+    border-radius: 26px;
+    font-size: 1rem;
+}
+
+.boat-booking__alt {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1);
+    min-height: 44px;
+    color: #ffffff;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    text-align: center;
+    text-decoration: none;
+}
+
+.boat-booking__alt:hover {
+    color: var(--text-on-dark);
+    text-decoration: underline;
+}
+
+@media (min-width: 720px) {
+    .boat-gallery-section {
+        padding-top: var(--space-6);
+    }
+
+    .boat-gallery__grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-rows: 230px 230px;
+        grid-auto-rows: 230px;
+        gap: 10px;
+    }
+
+    .boat-gallery__cover {
+        grid-row: span 2;
+    }
+
+    .lightbox__img {
+        inset: 0 80px;
+        width: calc(100% - 160px);
+    }
+
+    .boat-intro__subtitle {
+        font-size: 1.0625rem;
+    }
+
+    .boat-intro__lead {
+        font-size: 1.125rem;
+        line-height: 1.6;
+    }
+
+    .boat-block h2 {
+        font-size: 1.75rem;
+    }
+
+    .boat-specs__grid {
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    }
+
+    .boat-spec {
+        padding: 14px 16px;
+        border-radius: 14px;
+    }
+
+    .boat-spec dd {
+        font-size: 1.25rem;
+    }
+
+    .boat-specs__note {
+        font-size: 0.875rem;
+    }
+
+    .boat-charter__note {
+        font-size: 0.9375rem;
+    }
+
+    .boat-life__plan {
+        height: 300px;
+    }
+
+    .boat-life__list {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--space-5) var(--space-6);
+    }
+
+    .boat-life__item {
+        padding-block: 0;
+    }
+
+    .boat-life__item + .boat-life__item {
+        border-top: 0;
+    }
+
+    .boat-life__item strong {
+        font-size: 1.0625rem;
+    }
+
+    .boat-life__item span {
+        font-size: 0.9375rem;
+        line-height: 1.5;
+    }
+
+    .boat-included__list {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: var(--space-3) var(--space-5);
+        font-size: 1rem;
+    }
+
+    .boat-times {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+
+    .boat-time {
+        padding: var(--space-4);
+        border-radius: 14px;
+    }
+
+    .boat-time__time {
+        font-size: 1.25rem;
+    }
+
+    .boat-time__place {
+        font-size: 0.875rem;
+    }
+
+    .boat-costs {
+        border-radius: 14px;
+    }
+
+    .boat-cost {
+        padding: var(--space-4) 18px;
+        font-size: 1rem;
+    }
+}
+
+@media (min-width: 960px) {
+    .boat-layout {
+        grid-template-columns: minmax(0, 1fr) 340px;
+        column-gap: var(--space-8);
+        padding-block: var(--space-7) 88px;
+    }
+
+    .boat-main {
+        grid-column: 1;
+        grid-row: 1;
+        gap: var(--space-8);
+        margin-bottom: 0;
+    }
+
+    .boat-intro h1 {
+        font-size: clamp(2.5rem, 4vw, 3.5rem);
+    }
+
+    .boat-booking {
+        border: 1px solid var(--border);
+        background: #ffffff;
+        box-shadow: 0 12px 32px rgba(11, 34, 48, 0.08);
+        color: var(--text);
+    }
+
+    .boat-booking .boat-booking__title {
+        position: static;
+        width: auto;
+        height: auto;
+        margin: 0;
+        overflow: visible;
+        clip-path: none;
+        color: var(--ink);
+        white-space: normal;
+    }
+
+    .boat-booking__label,
+    .boat-booking__from {
+        color: var(--text-secondary);
+    }
+
+    .boat-booking__from strong {
+        color: var(--ink);
+    }
+
+    .boat-booking__cta {
+        min-height: 54px;
+        border-radius: 27px;
+    }
+
+    .boat-booking__alt {
+        color: var(--link);
+    }
+
+    .boat-booking__alt:hover {
+        color: var(--link-hover);
+    }
+
+    .boat-booking .trip-booking__questions {
+        border-top-color: var(--border);
+        color: var(--ink);
+    }
+
+    .boat-booking .trip-booking__phone {
+        color: var(--ink);
+    }
+
+    .boat-booking .trip-booking__phone:hover {
+        color: var(--link-hover);
+    }
+}

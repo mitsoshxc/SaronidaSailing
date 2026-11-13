@@ -91,7 +91,7 @@ public class TripsPageTests(SeededWebApplicationFactory factory) : IClassFixture
         Assert.True(IsHidden(Panel(html, "day")));
         Assert.Contains("Weekly charter with skipper", html);
         Assert.Contains("href=\"/en/trips?trip=islands\"", TabLink(html, "islands"));
-        Assert.Contains("Boat and skipper, per week", html);
+        Assert.Contains("Boat and skipper", html);
         Assert.Contains("[PRICE] / week", html);
     }
 
@@ -193,7 +193,7 @@ public class TripsPageTests(SeededWebApplicationFactory factory) : IClassFixture
                 "Μαλακή τσάντα αντί για βαλίτσα",
                 "Έως [ΑΡ. ΑΤΟΜΩΝ] άτομα",
                 "Εβδομαδιαία ναύλωση με σκίπερ",
-                "Πακέτο ναύλωσης (σεντόνια, γκάζι, λέμβος, καθαρισμός)",
+                "Πακέτο ναύλωσης (σεντόνια, γκάζι, λέμβος, τελικός καθαρισμός)",
                 "[ΠΟΣΟ]",
                 "[Ημέρες προς επιβεβαίωση]",
                 "Κλείστε ημερομηνία",
@@ -235,7 +235,7 @@ public class TripsPageTests(SeededWebApplicationFactory factory) : IClassFixture
                 "A soft bag instead of a suitcase",
                 "Up to [MAX] people",
                 "Weekly charter with skipper",
-                "Charter package (linen, gas, dinghy, cleaning)",
+                "Charter package (linen, gas, dinghy, final cleaning)",
                 "[AMOUNT]",
                 "[Days to be confirmed]",
                 "Book a date",
@@ -279,10 +279,49 @@ public class TripsPageTests(SeededWebApplicationFactory factory) : IClassFixture
 
         Assert.Equal(2, Regex.Matches(html, "<li class=\"trip-slot\"").Count);
         Assert.Equal(2, Regex.Matches(html, "<li class=\"trip-route\"").Count);
-        Assert.Equal(3, Regex.Matches(html, "<li class=\"trip-price-line\"").Count);
+        Assert.Equal(4, Regex.Matches(html, "<li class=\"trip-price-line\"").Count);
         Assert.Equal(5, Regex.Matches(html, "<details class=\"accordion\"").Count);
         Assert.Equal(5, Regex.Matches(html, "<summary>").Count);
         Assert.Contains("<li><span>Σκίπερ</span></li>", html);
+    }
+
+    [Theory]
+    [InlineData("/ekdromes", "Σκάφος και σκίπερ", "[ΤΙΜΗ] / εβδ.", "Εγγύηση (επιστρέφεται)", "Καύσιμα")]
+    [InlineData("/en/trips", "Boat and skipper", "[PRICE] / week", "Security deposit (refundable)", "Fuel")]
+    public async Task WeekPanel_StartsWithTheSharedWeekPrice_ThenListsTheSharedCharterCosts(
+        string url, string label, string weekPrice, string deposit, string fuel)
+    {
+        var html = await GetAsync(url);
+
+        var panel = Regex.Match(html, "<ul class=\"trip-prices\">.*?</ul>", RegexOptions.Singleline).Value;
+        var lines = Regex.Matches(panel, "<li class=\"trip-price-line\">.*?</li>", RegexOptions.Singleline).Select(m => m.Value).ToList();
+        Assert.Equal(4, lines.Count);
+        Assert.Contains($"<span class=\"trip-price-line__label\">{label}</span>", lines[0]);
+        Assert.Contains($"<strong class=\"trip-price-line__value\">{weekPrice}</strong>", lines[0]);
+        Assert.Contains(deposit, lines[2]);
+        Assert.Contains(fuel, lines[3]);
+        Assert.DoesNotContain("trips.week-prices", html);
+    }
+
+    [Fact]
+    public async Task WeekPanel_FirstLine_FollowsAnEditOfTheSharedWeekPrice()
+    {
+        using var scope = factory.Services.CreateScope();
+        var content = scope.ServiceProvider.GetRequiredService<IContentService>();
+        var original = (await content.GetPageContentAsync("trips", "el")).GetField("shared.prices.week")!.Value;
+        Assert.True((await content.ApplyChangesAsync(
+            [new SetField("shared.prices.week", "el", ContentType.Text, "999 EUR")], Editor)).Succeeded);
+        try
+        {
+            var panel = Regex.Match(await GetAsync("/ekdromes"), "<ul class=\"trip-prices\">.*?</ul>", RegexOptions.Singleline).Value;
+
+            Assert.Contains("<strong class=\"trip-price-line__value\">999 EUR</strong>", panel);
+        }
+        finally
+        {
+            Assert.True((await content.ApplyChangesAsync(
+                [new SetField("shared.prices.week", "el", ContentType.Text, original)], Editor)).Succeeded);
+        }
     }
 
     [Fact]
