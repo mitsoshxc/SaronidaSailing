@@ -1,0 +1,166 @@
+{
+  "group": "contact",
+  "version": 1,
+  "fields": {
+    "contact.seo.title": {
+      "type": "text",
+      "el": "Επικοινωνία · Saronida Sailing",
+      "en": "Contact · Saronida Sailing"
+    },
+    "contact.seo.description": {
+      "type": "text",
+      "el": "Καλέστε μας, στείλτε email ή μήνυμα στο Instagram. Θα μας βρείτε στο λιμάνι του Αγίου Νικολάου, στην Ανάβυσσο.",
+      "en": "Call us, send an email or message us on Instagram. You will find us at Agios Nikolaos harbour in Anavyssos."
+    },
+    "contact.intro.eyebrow": {
+      "type": "text",
+      "el": "Επικοινωνία",
+      "en": "Contact"
+    },
+    "contact.intro.title": {
+      "type": "text",
+      "el": "Μιλήστε μας απευθείας",
+      "en": "Talk to us directly"
+    },
+    "contact.intro.lead": {
+      "type": "text",
+      "el": "Χωρίς φόρμες και αναμονή. Πάρτε τηλέφωνο, στείλτε email ή μήνυμα στο Instagram, όπως σας βολεύει.",
+      "en": "No forms and no waiting. Call us, send an email or message us on Instagram, whichever suits you."
+    },
+    "contact.intro.phone-label": {
+      "type": "text",
+      "el": "Καλέστε μας",
+      "en": "Call us"
+    },
+    "contact.intro.phone-2-label": {
+      "type": "text",
+      "el": "Δεύτερο τηλέφωνο",
+      "en": "Second phone"
+    },
+    "contact.intro.email-label": {
+      "type": "text",
+      "el": "Στείλτε email",
+      "en": "Send an email"
+    },
+    "contact.intro.instagram-label": {
+      "type": "text",
+      "el": "Μήνυμα στο Instagram",
+      "en": "Message on Instagram"
+    },
+    "contact.intro.instagram": {
+      "type": "link",
+      "url": "https://ig.me/m/saronidasailing",
+      "el": "@saronidasailing",
+      "en": "@saronidasailing"
+    },
+    "contact.where.eyebrow": {
+      "type": "text",
+      "el": "Πού θα μας βρείτε",
+      "en": "Where to find us"
+    },
+    "contact.where.title": {
+      "type": "text",
+      "el": "Λιμάνι Αγίου Νικολάου",
+      "en": "Agios Nikolaos harbour"
+    },
+    "contact.where.text": {
+      "type": "text",
+      "el": "Ανάβυσσος, Αττική, στον παραλιακό δρόμο προς το Σούνιο.",
+      "en": "Anavyssos, Attica, on the coastal road towards Sounion."
+    },
+    "contact.where.directions": {
+      "type": "link",
+      "url": "https://maps.app.goo.gl/UPT73MuDqkViH82M9",
+      "el": "Οδηγίες στον χάρτη",
+      "en": "Directions on the map"
+    },
+    "contact.map.image-alt": {
+      "type": "text",
+      "el": "Χάρτης: λιμάνι Αγίου Νικολάου, Ανάβυσσος",
+      "en": "Map: Agios Nikolaos harbour, Anavyssos"
+    },
+    "contact.map.notice": {
+      "type": "text",
+      "el": "Ο χάρτης της Google φορτώνει μόνο με τη συναίνεσή σας.",
+      "en": "The Google map loads only with your consent."
+    },
+    "contact.details.title": {
+      "type": "text",
+      "el": "Χρήσιμα στοιχεία",
+      "en": "Useful details"
+    },
+    "contact.cta.title": {
+      "type": "text",
+      "el": "Έτοιμοι για θάλασσα;",
+      "en": "Ready for the sea?"
+    },
+    "contact.cta.text": {
+      "type": "text",
+      "el": "Δείτε τις εκδρομές και κλείστε ημερομηνία online.",
+      "en": "See the trips and book a date online."
+    },
+    "contact.cta.button": {
+      "type": "text",
+      "el": "Δείτε τις εκδρομές",
+      "en": "See the trips"
+    }
+  },
+  "lists": {
+    "contact.where-items": [
+      {
+        "title": {
+          "type": "text",
+          "el": "Με αυτοκίνητο",
+          "en": "By car"
+        },
+        "text": {
+          "type": "text",
+          "el": "Από την παραλιακή λεωφόρο Αθηνών–Σουνίου, μέχρι τον Άγιο Νικόλαο Αναβύσσου.",
+          "en": "Along the Athens–Sounion coastal avenue, as far as Agios Nikolaos in Anavyssos."
+        }
+      },
+      {
+        "title": {
+          "type": "text",
+          "el": "Μεταφορά",
+          "en": "Transfer"
+        },
+        "text": {
+          "type": "text",
+          "el": "Μπορούμε να κανονίσουμε μεταφορά από την Αθήνα, κατόπιν αιτήματος.",
+          "en": "We can arrange a transfer from Athens on request."
+        }
+      },
+      {
+        "title": {
+          "type": "text",
+          "el": "Σημείο συνάντησης",
+          "en": "Meeting point"
+        },
+        "text": {
+          "type": "text",
+          "el": "Σας στέλνουμε την ακριβή τοποθεσία του σκάφους με την κράτηση.",
+          "en": "We send you the exact location of the boat with your booking."
+        }
+      }
+    ],
+    "contact.details-items": [
+      {
+        "label": { "type": "text", "el": "Γλώσσες", "en": "Languages" },
+        "value": { "type": "text", "el": "Ελληνικά, English", "en": "Greek, English" }
+      },
+      {
+        "label": { "type": "text", "el": "Ώρες επικοινωνίας", "en": "Contact hours" },
+        "value": { "type": "text", "el": "[ΩΡΕΣ]", "en": "[HOURS]" }
+      },
+      {
+        "label": { "type": "text", "el": "Σεζόν", "en": "Season" },
+        "value": { "type": "text", "el": "[ΜΗΝΕΣ]", "en": "[MONTHS]" }
+      },
+      {
+        "label": { "type": "text", "el": "Αναχώρηση", "en": "Departure" },
+        "value": { "type": "text", "el": "Άγιος Νικόλαος", "en": "Agios Nikolaos" }
+      }
+    ]
+  }
+}

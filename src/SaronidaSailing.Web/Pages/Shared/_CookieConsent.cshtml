@@ -1,0 +1,61 @@
+@using System.Globalization
+@using SaronidaSailing.Web.Localization
+@inject ILocalizedUrlService UrlService
+@{
+    var locale = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == SiteCultures.English
+        ? SiteCultures.English
+        : SiteCultures.Greek;
+    var privacyPath = UrlService.GetPath("privacy", locale);
+}
+<div class="consent" data-consent hidden
+     data-msg-accepted="@UiText.CookiesAccepted.For(locale)"
+     data-msg-rejected="@UiText.CookiesRejected.For(locale)"
+     data-msg-saved="@UiText.CookiesSaved.For(locale)">
+    <div class="consent__card" role="dialog" aria-modal="false" aria-labelledby="consent-title" data-consent-dialog>
+        <div class="consent__view" data-consent-view="banner">
+            <div class="consent__head">
+                <span class="icon-badge" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M12 3l8 3v6c0 4.5-3.2 7.8-8 9-4.8-1.2-8-4.5-8-9V6z"></path><path d="M9 12l2.2 2.2L15.5 10"></path></svg></span>
+                <h2 class="consent__title" id="consent-title" cms="shared.cookies.title"></h2>
+            </div>
+            <p class="consent__text"><span cms="shared.cookies.text"></span> <a href="@privacyPath">@UiText.Privacy.For(locale)</a></p>
+            <div class="consent__actions consent__actions--two">
+                <button type="button" class="btn btn--dark consent__btn" data-consent-action="reject">@UiText.CookiesReject.For(locale)</button>
+                <button type="button" class="btn btn--dark consent__btn" data-consent-action="accept">@UiText.CookiesAccept.For(locale)</button>
+            </div>
+            <button type="button" class="consent__link" data-consent-action="choose">@UiText.CookiesChoose.For(locale)</button>
+        </div>
+        <div class="consent__view" data-consent-view="settings" hidden>
+            <div class="consent__head consent__head--split">
+                <h2 class="consent__title" id="consent-settings-title" tabindex="-1" data-consent-settings-title cms="shared.cookies.settings-title"></h2>
+                <button type="button" class="consent__icon-btn" data-consent-action="back" aria-label="@UiText.Back.For(locale)">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 5l-7 7 7 7"></path></svg>
+                </button>
+            </div>
+            <ul class="consent__rows">
+                <li class="consent__row">
+                    <span class="consent__row-text"><strong cms="shared.cookies.necessary-title"></strong><span cms="shared.cookies.necessary-text"></span></span>
+                    <span class="consent__always">@UiText.CookiesAlwaysOn.For(locale)</span>
+                </li>
+                <li class="consent__row">
+                    <span class="consent__row-text"><strong id="consent-external-title" cms="shared.cookies.external-title"></strong><span cms="shared.cookies.external-text"></span></span>
+                    <button type="button" class="consent__switch" role="switch" aria-checked="false" aria-labelledby="consent-external-title" data-consent-switch><span class="consent__track" aria-hidden="true"><span class="consent__knob"></span></span></button>
+                </li>
+            </ul>
+            <div class="consent__actions consent__actions--three">
+                <button type="button" class="btn btn--dark consent__btn" data-consent-action="reject-all">@UiText.CookiesRejectAll.For(locale)</button>
+                <button type="button" class="btn btn--outline consent__btn" data-consent-action="save">@UiText.CookiesSave.For(locale)</button>
+                <button type="button" class="btn btn--dark consent__btn" data-consent-action="accept-all">@UiText.CookiesAcceptAll.For(locale)</button>
+            </div>
+        </div>
+    </div>
+    <div class="consent__status" role="status">
+        <div class="consent__status-card" data-consent-status-card hidden>
+            <svg class="consent__status-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l2.7 2.7L16 9.5"></path></svg>
+            <p class="consent__status-text"><span data-consent-status-message></span> @UiText.CookiesChangeHint.For(locale)</p>
+            <button type="button" class="consent__link consent__link--inline" data-consent-action="change">@UiText.CookiesChange.For(locale)</button>
+            <button type="button" class="consent__icon-btn" data-consent-action="dismiss" aria-label="@UiText.Close.For(locale)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+            </button>
+        </div>
+    </div>
+</div>

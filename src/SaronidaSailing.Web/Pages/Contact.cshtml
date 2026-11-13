@@ -1,13 +1,99 @@
 @page
+@using System.Globalization
 @using SaronidaSailing.Web.Localization
 @model ContactModel
+@inject ILocalizedUrlService UrlService
 @{
     var title = UiText.PageTitle("contact").Current;
     ViewData["Title"] = title;
+    var locale = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == SiteCultures.English
+        ? SiteCultures.English
+        : SiteCultures.Greek;
+    var tripsPath = UrlService.GetPath("trips", locale);
 }
 
-<section class="section">
+<section class="section section--dark contact-intro" cms-section="contact.intro" cms-section-label="Intro">
+    <div class="wrap contact-intro__inner">
+        <div class="contact-intro__text">
+            <p class="eyebrow" cms="contact.intro.eyebrow"></p>
+            <h1 cms="contact.intro.title"></h1>
+            <p class="lead" cms="contact.intro.lead"></p>
+        </div>
+        <ul class="contact-tiles">
+            <li>
+                <a class="contact-tile" cms-link="shared.contact.phone" cms-keep-content>
+                    <span class="contact-tile__head"><span class="icon-badge icon-badge--lg icon-badge--cta"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a1 1 0 0 1-1 1A16 16 0 0 1 4 5a1 1 0 0 1 1-1z"></path></svg></span></span>
+                    <span class="contact-tile__text"><span class="contact-tile__label" cms="contact.intro.phone-label"></span><strong cms-link-label></strong></span>
+                </a>
+            </li>
+            <li>
+                <a class="contact-tile" cms-link="shared.contact.phone-2" cms-keep-content>
+                    <span class="contact-tile__head"><span class="icon-badge icon-badge--lg"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a1 1 0 0 1-1 1A16 16 0 0 1 4 5a1 1 0 0 1 1-1z"></path></svg></span></span>
+                    <span class="contact-tile__text"><span class="contact-tile__label" cms="contact.intro.phone-2-label"></span><strong cms-link-label></strong></span>
+                </a>
+            </li>
+            <li>
+                <a class="contact-tile" cms-link="shared.contact.email" cms-keep-content>
+                    <span class="contact-tile__head"><span class="icon-badge icon-badge--lg"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M3 7l9 6 9-6"></path></svg></span><svg class="contact-tile__arrow" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 17L17 7M9 7h8v8"></path></svg></span>
+                    <span class="contact-tile__text"><span class="contact-tile__label" cms="contact.intro.email-label"></span><strong cms-link-label></strong></span>
+                </a>
+            </li>
+            <li>
+                <a class="contact-tile" cms-link="contact.intro.instagram" cms-keep-content>
+                    <span class="contact-tile__head"><span class="icon-badge icon-badge--lg"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="18" rx="5"></rect><circle cx="12" cy="12" r="4"></circle><circle cx="17.5" cy="6.5" r="0.8" fill="currentColor"></circle></svg></span><svg class="contact-tile__arrow" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 17L17 7M9 7h8v8"></path></svg></span>
+                    <span class="contact-tile__text"><span class="contact-tile__label" cms="contact.intro.instagram-label"></span><strong cms-link-label></strong></span>
+                </a>
+            </li>
+        </ul>
+    </div>
+</section>
+
+<section class="section section--soft contact-where" cms-section="contact.where" cms-section-label="Where to find us">
+    <div class="wrap contact-where__inner">
+        <div class="contact-where__map">
+            <div class="contact-map media-placeholder media-frame" tabindex="-1" data-contact-map data-map-title="@UiText.MapTitle.Current">
+                <cms-image key="contact.map.image" label="Static map" sizes="(min-width: 960px) 50vw, 100vw" class="media-frame__img" />
+                <div class="contact-map__notice">
+                    <p cms="contact.map.notice"></p>
+                    <button type="button" class="btn btn--dark contact-map__button" data-map-settings hidden>@UiText.CookieSettings.Current</button>
+                </div>
+            </div>
+            <div class="contact-map__embed">
+                <span class="contact-map__embed-label">Map embed URL</span>
+                <p class="contact-map__url" cms="contact.map.embed-url" data-map-url hidden></p>
+            </div>
+        </div>
+        <div class="contact-where__text">
+            <div class="contact-where__intro">
+                <p class="eyebrow" cms="contact.where.eyebrow"></p>
+                <h2 cms="contact.where.title"></h2>
+                <p class="contact-where__lead" cms="contact.where.text"></p>
+            </div>
+            <div>
+                <a class="btn btn--dark contact-where__directions" cms-link="contact.where.directions" cms-keep-content><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 11l18-8-8 18-2-8z"></path></svg><span cms-link-label></span></a>
+            </div>
+            <ul class="contact-ways">
+                <li class="contact-way" cms-list="contact.where-items" cms-add-label="Add way to get here"><span class="icon-badge" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"></path><circle cx="12" cy="10" r="2.5"></circle></svg></span><span class="contact-way__text"><strong cms-field="title"></strong><span cms-field="text"></span></span></li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<section class="section contact-details" cms-section="contact.details" cms-section-label="Useful details">
     <div class="wrap">
-        <h1>@title</h1>
+        <h2 class="visually-hidden" cms="contact.details.title"></h2>
+        <ul class="contact-details__grid">
+            <li class="contact-detail" cms-list="contact.details-items" cms-add-label="Add detail"><span class="contact-detail__label" cms-field="label"></span><strong cms-field="value"></strong></li>
+        </ul>
+    </div>
+</section>
+
+<section class="section section--dark contact-cta" cms-section="contact.cta" cms-section-label="Call to action">
+    <div class="wrap contact-cta__inner">
+        <div class="contact-cta__text">
+            <h2 cms="contact.cta.title"></h2>
+            <p cms="contact.cta.text"></p>
+        </div>
+        <a class="btn btn--cta contact-cta__button" href="@tripsPath"><span cms="contact.cta.button"></span></a>
     </div>
 </section>

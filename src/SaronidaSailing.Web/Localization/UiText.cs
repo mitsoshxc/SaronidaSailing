@@ -91,6 +91,42 @@ public static class UiText
 
     public static UiString NextPhoto { get; } = new("Επόμενη φωτογραφία", "Next photo");
 
+    public static UiString Back { get; } = new("Πίσω", "Back");
+
+    public static UiString CookieSettings { get; } = new("Ρυθμίσεις cookies", "Cookie settings");
+
+    public static UiString MapTitle { get; } = new(
+        "Χάρτης Google με το σημείο αναχώρησης",
+        "Google map showing the departure point");
+
+    public static UiString CookiesReject { get; } = new("Απόρριψη", "Reject");
+
+    public static UiString CookiesAccept { get; } = new("Αποδοχή", "Accept");
+
+    public static UiString CookiesChoose { get; } = new("Επιλογή ανά κατηγορία", "Choose by category");
+
+    public static UiString CookiesRejectAll { get; } = new("Απόρριψη όλων", "Reject all");
+
+    public static UiString CookiesSave { get; } = new("Αποθήκευση", "Save");
+
+    public static UiString CookiesAcceptAll { get; } = new("Αποδοχή όλων", "Accept all");
+
+    public static UiString CookiesAlwaysOn { get; } = new("Πάντα ενεργά", "Always on");
+
+    public static UiString CookiesAccepted { get; } = new("Αποδεχτήκατε όλα τα cookies.", "You accepted all cookies.");
+
+    public static UiString CookiesRejected { get; } = new(
+        "Απορρίψατε τα προαιρετικά cookies.",
+        "You rejected the optional cookies.");
+
+    public static UiString CookiesSaved { get; } = new("Οι επιλογές σας αποθηκεύτηκαν.", "Your choices were saved.");
+
+    public static UiString CookiesChangeHint { get; } = new(
+        "Αλλάξτε την επιλογή σας από τις «Ρυθμίσεις cookies» στο κάτω μέρος κάθε σελίδας.",
+        "Change your choice from “Cookie settings” at the bottom of every page.");
+
+    public static UiString CookiesChange { get; } = new("Αλλαγή", "Change");
+
     public static UiString HeroIllustration { get; } = new(
         "Σχέδιο καταμαράν Lagoon με πανιά στο ηλιοβασίλεμα",
         "Drawing of a Lagoon catamaran under sail at sunset");
@@ -128,6 +164,21 @@ public static class UiText
         (nameof(PreviousPhoto), PreviousPhoto),
         (nameof(NextPhoto), NextPhoto),
         (nameof(HeroIllustration), HeroIllustration),
+        (nameof(Back), Back),
+        (nameof(CookieSettings), CookieSettings),
+        (nameof(MapTitle), MapTitle),
+        (nameof(CookiesReject), CookiesReject),
+        (nameof(CookiesAccept), CookiesAccept),
+        (nameof(CookiesChoose), CookiesChoose),
+        (nameof(CookiesRejectAll), CookiesRejectAll),
+        (nameof(CookiesSave), CookiesSave),
+        (nameof(CookiesAcceptAll), CookiesAcceptAll),
+        (nameof(CookiesAlwaysOn), CookiesAlwaysOn),
+        (nameof(CookiesAccepted), CookiesAccepted),
+        (nameof(CookiesRejected), CookiesRejected),
+        (nameof(CookiesSaved), CookiesSaved),
+        (nameof(CookiesChangeHint), CookiesChangeHint),
+        (nameof(CookiesChange), CookiesChange),
         (nameof(TripType), TripType),
         (nameof(TripDayLong), TripDayLong),
         (nameof(TripDayShort), TripDayShort),

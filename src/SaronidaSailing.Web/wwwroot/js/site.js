@@ -1,3 +1,5 @@
+import { initConsent } from './consent.js';
+import { initContactMap } from './contact-map.js';
 import { initGallery } from './gallery.js';
 import { initTripTabs } from './trip-tabs.js';
 
@@ -76,3 +78,5 @@ initMenu();
 initBackToTop();
 initTripTabs();
 initGallery();
+initConsent();
+initContactMap();

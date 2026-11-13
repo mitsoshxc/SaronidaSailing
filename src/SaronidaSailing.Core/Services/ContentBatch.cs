@@ -235,6 +235,11 @@ internal sealed class ContentBatch(
             return;
         }
 
+        if (change.Key == ContactMap.EmbedUrlKey && !IsValidEmbedUrl(change))
+        {
+            return;
+        }
+
         if (change.ListItemId is { } listItemId)
         {
             var listItem = await FindListItemAsync(listItemId, ct);
@@ -325,6 +330,23 @@ internal sealed class ContentBatch(
         {
             _errors.Add(
                 $"The number of Instagram posts must be a whole number from {InstagramPostCount.Min} to {InstagramPostCount.Max}.");
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool IsValidEmbedUrl(SetField change)
+    {
+        if (change.Locale != ContentLocales.Default)
+        {
+            _errors.Add("The map location is shared by both languages; set it in Greek.");
+            return false;
+        }
+
+        if (change.Type != ContentType.Text || !ContactMap.IsValidEmbedUrl(change.Value))
+        {
+            _errors.Add($"The map location must be empty or a Google Maps embed address starting with {ContactMap.EmbedUrlPrefix}.");
             return false;
         }
 

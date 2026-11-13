@@ -24,6 +24,7 @@
                     {
                         <li><a href="@UrlService.GetPath(key, locale)" aria-current="@(current?.Key == key ? "page" : null)">@UiText.PageTitle(key).For(locale)</a></li>
                     }
+                    <li><button type="button" class="site-footer__cookies" data-consent-open hidden>@UiText.CookieSettings.For(locale)</button></li>
                 </ul>
             </nav>
             <div class="site-footer__col">

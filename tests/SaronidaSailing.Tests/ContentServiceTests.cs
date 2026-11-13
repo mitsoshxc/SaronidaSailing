@@ -1317,6 +1317,47 @@ public sealed class ContentServiceTests : IAsyncLifetime
         Assert.Equal("boom", error.Exception?.Message);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3")]
+    [InlineData("https://www.google.com/maps/embed/v1/place?key=abc&q=Anavyssos")]
+    public async Task Write_MapEmbedUrl_EmptyOrGoogleEmbed_IsAccepted(string value)
+    {
+        var result = await Apply(Field(ContactMap.EmbedUrlKey, "el", value));
+
+        Assert.True(result.Succeeded, string.Join("; ", result.Errors));
+        Assert.Equal(value, (await Read("contact", "el")).GetField(ContactMap.EmbedUrlKey)?.Value ?? "");
+    }
+
+    [Theory]
+    [InlineData("http://www.google.com/maps/embed?pb=1")]
+    [InlineData("https://maps.google.com/maps?q=anavyssos")]
+    [InlineData("https://www.google.com/maps/place/Anavyssos")]
+    [InlineData("https://www.google.com/maps/embedded?pb=1")]
+    [InlineData("https://www.google.com/maps/embed?pb=1 onload=x")]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("https://example.com/https://www.google.com/maps/embed")]
+    public async Task Write_MapEmbedUrl_AnythingElse_IsRejected(string value)
+    {
+        var result = await Apply(Field(ContactMap.EmbedUrlKey, "el", value));
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(
+            "The map location must be empty or a Google Maps embed address starting with https://www.google.com/maps/embed.",
+            Assert.Single(result.Errors));
+        await using var verify = CreateContext();
+        Assert.Empty(await verify.Set<ContentItem>().ToListAsync());
+    }
+
+    [Fact]
+    public async Task Write_MapEmbedUrl_InEnglish_IsRejected()
+    {
+        var result = await Apply(Field(ContactMap.EmbedUrlKey, "en", "https://www.google.com/maps/embed?pb=1"));
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("The map location is shared by both languages; set it in Greek.", Assert.Single(result.Errors));
+    }
+
     private static SetField Field(string key, string locale, string value, Guid? listItemId = null) =>
         new(key, locale, ContentType.Text, value, listItemId);
 

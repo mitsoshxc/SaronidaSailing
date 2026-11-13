@@ -18,7 +18,7 @@ public sealed class EmbeddedContentSeedSourceTests : IAsyncLifetime
     {
         var groups = new EmbeddedContentSeedSource().GetGroups();
 
-        Assert.Equal(["boat", "home", "shared.charter-costs", "shared.contact", "shared.footer", "shared.prices", "shared.social", "trips"], groups.Select(g => g.Name));
+        Assert.Equal(["boat", "contact", "home", "shared.charter-costs", "shared.contact", "shared.cookies", "shared.footer", "shared.prices", "shared.social", "trips"], groups.Select(g => g.Name));
         Assert.All(groups, g => Assert.True(g.Version >= 1));
     }
 
@@ -52,7 +52,7 @@ public sealed class EmbeddedContentSeedSourceTests : IAsyncLifetime
         var phone = items.Single(i => i.FieldKey == "phone" && i.Locale == "el");
         Assert.True(ContentLink.TryParse(phone.Value, out var link));
         Assert.Equal("tel:+306940057799", link.Url);
-        var instagram = items.Single(i => i.FieldKey == "instagram" && i.Locale == "el");
+        var instagram = items.Single(i => i.SectionKey == "social" && i.FieldKey == "instagram" && i.Locale == "el");
         Assert.Contains("Η Saronida Sailing στο Instagram", instagram.Value);
     }
 

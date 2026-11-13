@@ -1,6 +1,6 @@
 {
   "group": "shared.contact",
-  "version": 1,
+  "version": 2,
   "fields": {
     "shared.contact.phone": {
       "type": "link",
@@ -13,6 +13,12 @@
       "url": "tel:+306978856418",
       "el": "+30 697 885 6418",
       "en": "+30 697 885 6418"
+    },
+    "shared.contact.email": {
+      "type": "link",
+      "url": "mailto:email@example.com",
+      "el": "[EMAIL]",
+      "en": "[EMAIL]"
     },
     "shared.contact.address": {
       "type": "text",

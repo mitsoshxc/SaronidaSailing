@@ -1,0 +1,41 @@
+{
+  "group": "shared.cookies",
+  "version": 1,
+  "fields": {
+    "shared.cookies.title": {
+      "type": "text",
+      "el": "Cookies και απόρρητο",
+      "en": "Cookies and privacy"
+    },
+    "shared.cookies.text": {
+      "type": "text",
+      "el": "Ο ιστότοπος λειτουργεί χωρίς cookies παρακολούθησης. Με τη συναίνεσή σας δείχνουμε περιεχόμενο άλλων υπηρεσιών, όπως τον χάρτη της Google. Μπορείτε να αλλάξετε γνώμη όποτε θέλετε.",
+      "en": "This website runs without tracking cookies. With your consent we show content from other services, such as the Google map. You can change your mind at any time."
+    },
+    "shared.cookies.settings-title": {
+      "type": "text",
+      "el": "Ρυθμίσεις cookies",
+      "en": "Cookie settings"
+    },
+    "shared.cookies.necessary-title": {
+      "type": "text",
+      "el": "Απαραίτητα",
+      "en": "Necessary"
+    },
+    "shared.cookies.necessary-text": {
+      "type": "text",
+      "el": "Για να λειτουργεί η σελίδα, π.χ. για να θυμόμαστε αυτή την επιλογή.",
+      "en": "So the site works, for example to remember this choice."
+    },
+    "shared.cookies.external-title": {
+      "type": "text",
+      "el": "Εξωτερικό περιεχόμενο",
+      "en": "External content"
+    },
+    "shared.cookies.external-text": {
+      "type": "text",
+      "el": "Ο χάρτης της Google, από άλλη υπηρεσία. Χωρίς αυτό δείχνουμε εικόνα στη θέση του.",
+      "en": "The Google map, from another service. Without it we show a picture in its place."
+    }
+  }
+}
