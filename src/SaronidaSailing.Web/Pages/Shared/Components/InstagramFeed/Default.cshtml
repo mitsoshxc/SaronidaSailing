@@ -1,23 +1,33 @@
 @using System.Globalization
+@using SaronidaSailing.Web.Localization
 @model SaronidaSailing.Web.Models.InstagramFeedViewModel
 @{
     var greek = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "el";
     var fallbackPrefix = greek ? "Ανάρτηση στο Instagram, " : "Instagram post, ";
 }
 <section cms-section="home.instagram" cms-section-label="Instagram feed" cms-instagram-count="@Model.Count" cms-instagram-empty="@(Model.Tiles.Count == 0)" class="instagram-feed" aria-labelledby="instagram-feed-title">
-    <h2 id="instagram-feed-title" cms="home.instagram.title"></h2>
-    @if (Model.Tiles.Count == 0)
-    {
-        <p class="instagram-feed-note" data-cms-admin-note>No Instagram posts yet. <a href="/admin/instagram">Instagram settings</a></p>
-    }
-    else
-    {
-        <ul class="instagram-feed-grid">
-            @foreach (var tile in Model.Tiles)
-            {
-                var alt = tile.CaptionAlt ?? fallbackPrefix + tile.PostedOn.ToString("d MMMM yyyy", CultureInfo.CurrentUICulture);
-                <li hidden="@tile.Hidden"><a href="@tile.Permalink"><img src="@tile.Src" srcset="@tile.SrcSet" sizes="(min-width: 960px) 25vw, (min-width: 720px) 33vw, 50vw" alt="@alt" width="@tile.Width" height="@tile.Height" loading="lazy" decoding="async" /></a></li>
-            }
-        </ul>
-    }
+    <div class="wrap instagram-feed__inner">
+        <div class="instagram-feed__head">
+            <span class="icon-badge icon-badge--dark" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false"><rect x="3" y="3" width="18" height="18" rx="5"></rect><circle cx="12" cy="12" r="4"></circle><circle cx="17.5" cy="6.5" r="0.8" fill="currentColor"></circle></svg></span>
+            <div class="instagram-feed__titles">
+                <h2 id="instagram-feed-title" cms="home.instagram.title"></h2>
+                <p class="instagram-feed__text" cms="home.instagram.text"></p>
+            </div>
+        </div>
+        @if (Model.Tiles.Count == 0)
+        {
+            <p class="instagram-feed-note" data-cms-admin-note>No Instagram posts yet. <a href="/admin/instagram">Instagram settings</a></p>
+        }
+        else
+        {
+            <ul class="instagram-feed-grid">
+                @foreach (var tile in Model.Tiles)
+                {
+                    var alt = tile.CaptionAlt ?? fallbackPrefix + tile.PostedOn.ToString("d MMMM yyyy", CultureInfo.CurrentUICulture);
+                    <li hidden="@tile.Hidden"><a href="@tile.Permalink"><img src="@tile.Src" srcset="@tile.SrcSet" sizes="(min-width: 960px) 25vw, (min-width: 720px) 33vw, 50vw" alt="@alt" width="@tile.Width" height="@tile.Height" loading="lazy" decoding="async" /></a></li>
+                }
+            </ul>
+        }
+        <a class="btn btn--outline instagram-feed__follow" cms-link="shared.social.instagram" cms-keep-content>@UiText.FollowOnInstagram.Current</a>
+    </div>
 </section>

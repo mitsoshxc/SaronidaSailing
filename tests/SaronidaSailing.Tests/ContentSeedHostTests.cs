@@ -77,11 +77,11 @@ public class ContentSeedTwoPodTests
         var groups = new SaronidaSailing.Web.Content.EmbeddedContentSeedSource().GetGroups();
         await using var connection = new NpgsqlConnection(hostA.ContentConnectionString);
         await connection.OpenAsync();
-        Assert.Equal(groups.SelectMany(g => g.Fields).Sum(f => f.Values.Count), await Count(connection, "\"ContentItems\""));
+        Assert.Equal(SeedCounts.ValueCount(groups), await Count(connection, "\"ContentItems\""));
         Assert.Equal(0, await Scalar(
             connection,
-            "SELECT COUNT(*) FROM (SELECT \"SectionKey\", \"FieldKey\", \"Locale\" FROM \"ContentItems\" "
-            + "GROUP BY \"SectionKey\", \"FieldKey\", \"Locale\" HAVING COUNT(*) > 1) d"));
+            "SELECT COUNT(*) FROM (SELECT \"PageKey\", \"SectionKey\", \"FieldKey\", \"Locale\", \"ListItemId\" FROM \"ContentItems\" "
+            + "GROUP BY \"PageKey\", \"SectionKey\", \"FieldKey\", \"Locale\", \"ListItemId\" HAVING COUNT(*) > 1) d"));
         Assert.Equal(groups.Count, await Count(connection, "\"IntegrationSettings\" WHERE \"Key\" LIKE 'seed.%'"));
     }
 

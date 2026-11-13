@@ -18,7 +18,7 @@ public sealed class EmbeddedContentSeedSourceTests : IAsyncLifetime
     {
         var groups = new EmbeddedContentSeedSource().GetGroups();
 
-        Assert.Equal(["shared.contact", "shared.footer", "shared.social"], groups.Select(g => g.Name));
+        Assert.Equal(["home", "shared.contact", "shared.footer", "shared.social"], groups.Select(g => g.Name));
         Assert.All(groups, g => Assert.True(g.Version >= 1));
     }
 
@@ -48,7 +48,7 @@ public sealed class EmbeddedContentSeedSourceTests : IAsyncLifetime
         var groups = new EmbeddedContentSeedSource().GetGroups();
         Assert.Equal(groups.Count, (await db.MarkersAsync()).Count);
         var items = await db.ItemsAsync();
-        Assert.Equal(groups.SelectMany(g => g.Fields).Sum(f => f.Values.Count), items.Count);
+        Assert.Equal(SeedCounts.ValueCount(groups), items.Count);
         var phone = items.Single(i => i.FieldKey == "phone" && i.Locale == "el");
         Assert.True(ContentLink.TryParse(phone.Value, out var link));
         Assert.Equal("tel:+306940057799", link.Url);

@@ -155,6 +155,7 @@ public class StartupMigrationModeTests
             await services.MigrateAsync();
         }
 
+        await HomeContentTestData.EnsureGreekHomeContentAsync(factory.ContentConnectionString);
         NpgsqlConnection.ClearAllPools();
 
         var client = factory.CreateClient();

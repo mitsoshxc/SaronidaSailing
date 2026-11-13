@@ -1055,3 +1055,20 @@ html.cms-view [data-cms-admin-note] {
         min-height: 1.5rem;
     }
 }
+
+html:not(.cms-view) .visually-hidden[data-cms-key] {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
+}
+
+@media (min-width: 960px) {
+    html:not(.cms-view) .sticky-book {
+        position: static;
+        display: flex;
+    }
+}

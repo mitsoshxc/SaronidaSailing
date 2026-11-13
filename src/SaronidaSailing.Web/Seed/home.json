@@ -1,0 +1,250 @@
+{
+  "group": "home",
+  "version": 1,
+  "fields": {
+    "home.seo.title": {
+      "type": "text",
+      "el": "Saronida Sailing · Κρουαζιέρες με καταμαράν στην Αθηναϊκή Ριβιέρα",
+      "en": "Saronida Sailing · Catamaran cruises on the Athens Riviera"
+    },
+    "home.seo.description": {
+      "type": "text",
+      "el": "Ημερήσιες κρουαζιέρες στο Σούνιο, εκδρομές στα νησιά του Σαρωνικού και εβδομαδιαίες ναυλώσεις με καταμαράν Lagoon 500 και σκίπερ, από την Ανάβυσσο.",
+      "en": "Day cruises to Sounion, Saronic island trips and weekly charters on a Lagoon 500 catamaran with skipper, from Anavyssos."
+    },
+    "home.hero.eyebrow": {
+      "type": "text",
+      "el": "Καταμαράν με σκίπερ · Αθηναϊκή Ριβιέρα",
+      "en": "Catamaran with skipper · Athens Riviera"
+    },
+    "home.hero.title": {
+      "type": "text",
+      "el": "Η Αθηναϊκή Ριβιέρα με καταμαράν Lagoon 500",
+      "en": "The Athens Riviera on a Lagoon 500 catamaran"
+    },
+    "home.hero.lead": {
+      "type": "text",
+      "el": "Ημερήσιες κρουαζιέρες στο Σούνιο, εκδρομές στα νησιά του Σαρωνικού και ναυλώσεις μιας εβδομάδας, με έμπειρο σκίπερ στο τιμόνι. Εσείς απλώς κολυμπάτε, τρώτε και χαλαρώνετε.",
+      "en": "Day cruises to Sounion, trips to the Saronic islands and week-long charters, with an experienced skipper at the helm. You just swim, eat and relax."
+    },
+    "home.hero.cta-trips": {
+      "type": "text",
+      "el": "Κλείστε ημερήσια κρουαζιέρα",
+      "en": "Book a day cruise"
+    },
+    "home.hero.cta-boat": {
+      "type": "text",
+      "el": "Γνωρίστε το σκάφος",
+      "en": "Discover the boat"
+    },
+    "home.glance.title": {
+      "type": "text",
+      "el": "Με μια ματιά",
+      "en": "At a glance"
+    },
+    "home.trips.eyebrow": {
+      "type": "text",
+      "el": "Εκδρομές",
+      "en": "Trips"
+    },
+    "home.trips.title": {
+      "type": "text",
+      "el": "Πόσο θέλετε να μείνετε στη θάλασσα;",
+      "en": "How long do you want to stay at sea?"
+    },
+    "home.trip-day.duration": {
+      "type": "text",
+      "el": "6 ώρες",
+      "en": "6 hours"
+    },
+    "home.trip-day.when": {
+      "type": "text",
+      "el": "Πρωί ή ηλιοβασίλεμα",
+      "en": "Morning or sunset"
+    },
+    "home.trip-day.title": {
+      "type": "text",
+      "el": "Ημερήσια κρουαζιέρα στο Σούνιο",
+      "en": "Day cruise to Sounion"
+    },
+    "home.trip-day.text": {
+      "type": "text",
+      "el": "Κολύμπι σε απάνεμους όρμους, σνόρκελ, paddle board και ο Ναός του Ποσειδώνα από τη θάλασσα. Στο σκάφος σερβίρεται ελληνικό γεύμα με κρασί.",
+      "en": "Swimming in sheltered coves, snorkelling, paddle boarding and the Temple of Poseidon seen from the sea. A Greek meal with wine is served on board."
+    },
+    "home.trip-day.price": {
+      "type": "text",
+      "el": "[ΤΙΜΗ]",
+      "en": "[PRICE]"
+    },
+    "home.trip-islands.duration": {
+      "type": "text",
+      "el": "2–3 ημέρες",
+      "en": "2–3 days"
+    },
+    "home.trip-islands.when": {
+      "type": "text",
+      "el": "Διανυκτέρευση στο σκάφος",
+      "en": "Overnight on board"
+    },
+    "home.trip-islands.title": {
+      "type": "text",
+      "el": "Γύρος στα νησιά",
+      "en": "Island tour"
+    },
+    "home.trip-islands.text": {
+      "type": "text",
+      "el": "Αίγινα, Πόρος, Ύδρα και Σπέτσες, ή πιο μακριά, Κέα, Κύθνος και Σέριφος. Κάθε βράδυ σε άλλο όρμο, με φίλους ή με την οικογένεια.",
+      "en": "Aegina, Poros, Hydra and Spetses, or further afield, Kea, Kythnos and Serifos. A different cove every night, with friends or family."
+    },
+    "home.trip-islands.price": {
+      "type": "text",
+      "el": "[ΤΙΜΗ]",
+      "en": "[PRICE]"
+    },
+    "home.trip-week.duration": {
+      "type": "text",
+      "el": "1 εβδομάδα +",
+      "en": "1 week +"
+    },
+    "home.trip-week.when": {
+      "type": "text",
+      "el": "Δική σας διαδρομή",
+      "en": "Your own route"
+    },
+    "home.trip-week.title": {
+      "type": "text",
+      "el": "Εβδομαδιαία ναύλωση με σκίπερ",
+      "en": "Weekly charter with skipper"
+    },
+    "home.trip-week.text": {
+      "type": "text",
+      "el": "Όλο το σκάφος για την παρέα σας. Σχεδιάστε τη διαδρομή με τον σκίπερ, που ξέρει τους όρμους, τις ταβέρνες και τους ανέμους.",
+      "en": "The whole boat for your party. Plan the route with the skipper, who knows the coves, the tavernas and the winds."
+    },
+    "home.trip-week.price": {
+      "type": "text",
+      "el": "[ΤΙΜΗ] / εβδ.",
+      "en": "[PRICE] / week"
+    },
+    "home.boat.eyebrow": {
+      "type": "text",
+      "el": "Το σκάφος",
+      "en": "The boat"
+    },
+    "home.boat.title": {
+      "type": "text",
+      "el": "Lagoon 500: χώρος για όλους",
+      "en": "Lagoon 500: room for everyone"
+    },
+    "home.boat.text": {
+      "type": "text",
+      "el": "Ιστιοπλοϊκό καταμαράν 15,5 μέτρων με flybridge, μεγάλο σκιερό κόκπιτ, τραμπολίνα στην πλώρη και φωτεινό σαλόνι. Με τις δύο γάστρες μένει σταθερό και ίσιο: χωρίς κλίση, χωρίς χυμένα ποτά.",
+      "en": "A 15.5-metre sailing catamaran with a flybridge, a large shaded cockpit, a trampoline at the bow and a bright saloon. With its two hulls it stays steady and level: no heeling, no spilled drinks."
+    },
+    "home.boat.cta": {
+      "type": "text",
+      "el": "Δείτε όλο το σκάφος",
+      "en": "See the whole boat"
+    },
+    "home.why.eyebrow": {
+      "type": "text",
+      "el": "Γιατί με σκίπερ",
+      "en": "Why with a skipper"
+    },
+    "home.why.title": {
+      "type": "text",
+      "el": "Εσείς χαλαρώνετε. Εμείς πλέουμε.",
+      "en": "You relax. We sail."
+    },
+    "home.instagram.title": {
+      "type": "text",
+      "el": "@saronidasailing",
+      "en": "@saronidasailing"
+    },
+    "home.instagram.text": {
+      "type": "text",
+      "el": "Στιγμές από τις εκδρομές μας στο Instagram",
+      "en": "Moments from our trips, on Instagram"
+    },
+    "home.departure.text": {
+      "type": "richText",
+      "el": "<p>Αναχωρούμε από το λιμάνι του <strong>Αγίου Νικολάου, Ανάβυσσος</strong>, στον δρόμο προς το Σούνιο</p>",
+      "en": "<p>We depart from the harbour of <strong>Agios Nikolaos, Anavyssos</strong>, on the road to Sounion</p>"
+    },
+    "home.departure.cta": {
+      "type": "text",
+      "el": "Πώς θα έρθετε",
+      "en": "How to get here"
+    },
+    "home.sticky.label": {
+      "type": "text",
+      "el": "Ημερήσια κρουαζιέρα από",
+      "en": "Day cruise from"
+    }
+  },
+  "lists": {
+    "home.glance-stats": [
+      {
+        "value": { "type": "text", "el": "15,5 μ.", "en": "15.5 m" },
+        "label": { "type": "text", "el": "καταμαράν Lagoon 500", "en": "Lagoon 500 catamaran" }
+      },
+      {
+        "value": { "type": "text", "el": "[ΑΡ. ΑΤΟΜΩΝ]", "en": "[MAX]" },
+        "label": { "type": "text", "el": "επιβάτες ανά εκδρομή", "en": "passengers per trip" }
+      },
+      {
+        "value": { "type": "text", "el": "Σκίπερ", "en": "Skipper" },
+        "label": { "type": "text", "el": "πάντα στο σκάφος", "en": "always on board" }
+      },
+      {
+        "value": { "type": "text", "el": "Ανάβυσσος", "en": "Anavyssos" },
+        "label": { "type": "text", "el": "αναχώρηση από Άγ. Νικόλαο", "en": "departing from Agios Nikolaos" }
+      }
+    ],
+    "home.boat-specs": [
+      {
+        "value": { "type": "text", "el": "15,54 μ.", "en": "15.54 m" },
+        "label": { "type": "text", "el": "Μήκος", "en": "Length" }
+      },
+      {
+        "value": { "type": "text", "el": "8,53 μ.", "en": "8.53 m" },
+        "label": { "type": "text", "el": "Πλάτος", "en": "Beam" }
+      },
+      {
+        "value": { "type": "text", "el": "[4–6]", "en": "[4–6]" },
+        "label": { "type": "text", "el": "Καμπίνες", "en": "Cabins" }
+      },
+      {
+        "value": { "type": "text", "el": "2008", "en": "2008" },
+        "label": { "type": "text", "el": "Έτος κατασκευής", "en": "Year built" }
+      }
+    ],
+    "home.why-items": [
+      {
+        "title": { "type": "text", "el": "Όση συμμετοχή θέλετε", "en": "As involved as you like" },
+        "text": { "type": "text", "el": "Πιάστε το τιμόνι και μάθετε λίγη ιστιοπλοΐα, ή μην αγγίξετε σκοινί όλη μέρα.", "en": "Take the helm and learn a little sailing, or don't touch a rope all day." }
+      },
+      {
+        "title": { "type": "text", "el": "Τοπική γνώση", "en": "Local knowledge" },
+        "text": { "type": "text", "el": "Ήσυχοι όρμοι, τα καλύτερα σημεία για μπάνιο και η σωστή ταβέρνα για τον αέρα της ημέρας.", "en": "Quiet coves, the best swimming spots and the right taverna for the wind of the day." }
+      },
+      {
+        "title": { "type": "text", "el": "Κολύμπι, σνόρκελ, paddle", "en": "Swimming, snorkelling, paddle" },
+        "text": { "type": "text", "el": "Εξοπλισμός σνόρκελ και paddle board σε κάθε εκδρομή.", "en": "Snorkelling gear and a paddle board on every trip." }
+      },
+      {
+        "title": { "type": "text", "el": "Ελληνικό φαγητό και κρασί", "en": "Greek food and wine" },
+        "text": { "type": "text", "el": "Σπιτικό ελληνικό γεύμα, φρούτα και ποτά, σερβιρισμένα στο κατάστρωμα.", "en": "A home-cooked Greek meal, fruit and drinks, served on deck." }
+      },
+      {
+        "title": { "type": "text", "el": "Ασφάλεια και σταθερότητα", "en": "Safety and stability" },
+        "text": { "type": "text", "el": "Επαγγελματίας, καταρτισμένος σκίπερ και ένα σταθερό, ίσιο καταμαράν.", "en": "A professional, qualified skipper and a steady, level catamaran." }
+      },
+      {
+        "title": { "type": "text", "el": "Μόνο η παρέα σας", "en": "Just your party" },
+        "text": { "type": "text", "el": "Το σκάφος είναι δικό σας για μια μέρα, ένα Σαββατοκύριακο ή μια εβδομάδα.", "en": "The boat is yours for a day, a weekend or a week." }
+      }
+    ]
+  }
+}

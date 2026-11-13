@@ -147,3 +147,9 @@ internal sealed class ContentSeedTestDatabase(string connectionString)
             .Where(s => s.Key.StartsWith("seed.")).ToListAsync();
     }
 }
+
+internal static class SeedCounts
+{
+    public static int ValueCount(IEnumerable<ContentSeedGroup> groups) =>
+        groups.Sum(g => g.Fields.Concat(g.Lists.SelectMany(l => l.Items).SelectMany(i => i.Fields)).Sum(f => f.Values.Count));
+}

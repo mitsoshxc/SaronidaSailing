@@ -4,8 +4,12 @@ using System.Net;
 namespace SaronidaSailing.Tests;
 
 [Collection(WebHostCollection.Name)]
-public class HealthTests(TempDatabaseWebApplicationFactory factory) : IClassFixture<TempDatabaseWebApplicationFactory>
+public class HealthTests(TempDatabaseWebApplicationFactory factory) : IClassFixture<TempDatabaseWebApplicationFactory>, IAsyncLifetime
 {
+    public Task InitializeAsync() => HomeContentTestData.EnsureGreekHomeContentAsync(factory.ContentConnectionString);
+
+    public Task DisposeAsync() => Task.CompletedTask;
+
     [Fact]
     public async Task Get_Health_WhenEverythingWorks_ReturnsHealthy()
     {

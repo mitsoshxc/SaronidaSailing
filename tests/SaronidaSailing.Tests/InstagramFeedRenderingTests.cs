@@ -141,7 +141,6 @@ public class InstagramFeedRenderingTests(TempDatabaseWebApplicationFactory facto
             var html = await client.GetStringAsync(url);
 
             Assert.DoesNotContain("instagram-feed", html);
-            Assert.DoesNotContain("<section", html);
             Assert.DoesNotContain("data-cms", html);
         }
     }
@@ -232,7 +231,7 @@ public class InstagramFeedRenderingTests(TempDatabaseWebApplicationFactory facto
         Assert.Contains("data-cms-section=\"home.instagram\"", html);
         Assert.Contains("data-cms-section-label=\"Instagram feed\"", html);
         Assert.DoesNotContain("data-cms-admin-note", html);
-        Assert.DoesNotContain("data-cms-empty", Regex.Match(html, "<section[^>]*>").Value);
+        Assert.DoesNotContain("data-cms-empty", Regex.Match(html, @"<section[^>]*home.instagram[^>]*>").Value);
     }
 
     [Fact]
@@ -257,7 +256,7 @@ public class InstagramFeedRenderingTests(TempDatabaseWebApplicationFactory facto
 
         Assert.Contains("data-cms-section=\"home.instagram\"", html);
         Assert.Contains("data-cms-instagram-count=\"6\"", html);
-        Assert.Contains("data-cms-empty", Regex.Match(html, "<section[^>]*>").Value);
+        Assert.Contains("data-cms-empty", Regex.Match(html, @"<section[^>]*home.instagram[^>]*>").Value);
         Assert.Contains("No Instagram posts yet.", html);
         Assert.Contains("<a href=\"/admin/instagram\">Instagram settings</a>", html);
         Assert.Equal(0, Tiles(html));

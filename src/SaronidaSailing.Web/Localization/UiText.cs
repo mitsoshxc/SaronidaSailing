@@ -57,6 +57,20 @@ public static class UiText
 
     public static UiString BackToTop { get; } = new("Επιστροφή στην αρχή της σελίδας", "Back to top of page");
 
+    public static UiString From { get; } = new("Από", "From");
+
+    public static UiString Details { get; } = new("Λεπτομέρειες", "Details");
+
+    public static UiString Dates { get; } = new("Ημερομηνίες", "Dates");
+
+    public static UiString FollowOnInstagram { get; } = new("Ακολουθήστε μας στο Instagram", "Follow us on Instagram");
+
+    public static UiString AllTrips { get; } = new("Όλες οι εκδρομές", "All trips");
+
+    public static UiString HeroIllustration { get; } = new(
+        "Σχέδιο καταμαράν Lagoon με πανιά στο ηλιοβασίλεμα",
+        "Drawing of a Lagoon catamaran under sail at sunset");
+
     public static IReadOnlyList<(string Name, UiString Text)> All { get; } =
     [
         (nameof(Home), Home),
@@ -79,6 +93,12 @@ public static class UiText
         (nameof(BackToHome), BackToHome),
         (nameof(LogoLink), LogoLink),
         (nameof(BackToTop), BackToTop),
+        (nameof(From), From),
+        (nameof(Details), Details),
+        (nameof(Dates), Dates),
+        (nameof(FollowOnInstagram), FollowOnInstagram),
+        (nameof(AllTrips), AllTrips),
+        (nameof(HeroIllustration), HeroIllustration),
     ];
 
     public static UiString MenuName(string pageKey) => pageKey switch
