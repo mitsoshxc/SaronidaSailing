@@ -86,6 +86,48 @@ public sealed class CmsListAndSectionTagHelperTests
         Assert.DoesNotContain("cms-add-label=\"Add step\" class", html);
     }
 
+    private static async Task<(string Html, ContentListEntry[] Entries)> RenderWithPrefix(
+        ICmsEditContext editContext, string? prefix)
+    {
+        ContentListEntry[] entries = [Entry(1, true), Entry(2, false)];
+        var accessor = new FakePageContentAccessor(ListContent(entries));
+        var attributes = new TagHelperAttributeList { { "class", "item" } };
+        var context = NewContext("li", attributes);
+        var output = NewOutput("li", attributes, () => Task.FromResult<TagHelperContent>(Html("")));
+
+        await new CmsListTagHelper(accessor, editContext)
+            { Key = "home.highlights", AddLabel = "Add step", ItemIdPrefix = prefix }
+            .ProcessAsync(context, output);
+
+        return (Render(output), entries);
+    }
+
+    [Fact]
+    public async Task List_ItemIdPrefix_SetsAnIdOnEveryRenderedItem()
+    {
+        var (visitor, entries) = await RenderWithPrefix(Visitor, "section-");
+
+        Assert.Equal($"<li class=\"item\" id=\"section-{entries[0].Id}\"></li>", visitor);
+
+        var (editor, editorEntries) = await RenderWithPrefix(Editor, "section-");
+
+        Assert.Contains($"id=\"section-{editorEntries[0].Id}\"", editor);
+        Assert.Contains($"id=\"section-{editorEntries[1].Id}\"", editor);
+        Assert.DoesNotContain($"section-{Guid.Empty}", editor);
+        Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(editor, "id=\"section-").Count);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public async Task List_WithoutItemIdPrefix_AddsNoId(string? prefix)
+    {
+        var (html, _) = await RenderWithPrefix(Visitor, prefix);
+
+        Assert.DoesNotContain("id=", html);
+        Assert.DoesNotContain("item-id-prefix", html);
+    }
+
     [Fact]
     public async Task List_Visitor_NeverShowsAddLabel()
     {

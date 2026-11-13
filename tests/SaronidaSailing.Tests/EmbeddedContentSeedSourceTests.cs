@@ -18,7 +18,7 @@ public sealed class EmbeddedContentSeedSourceTests : IAsyncLifetime
     {
         var groups = new EmbeddedContentSeedSource().GetGroups();
 
-        Assert.Equal(["boat", "contact", "home", "shared.charter-costs", "shared.contact", "shared.cookies", "shared.footer", "shared.prices", "shared.social", "trips"], groups.Select(g => g.Name));
+        Assert.Equal(["accessibility", "boat", "contact", "home", "privacy", "shared.charter-costs", "shared.contact", "shared.cookies", "shared.footer", "shared.prices", "shared.social", "terms", "trips"], groups.Select(g => g.Name));
         Assert.All(groups, g => Assert.True(g.Version >= 1));
     }
 

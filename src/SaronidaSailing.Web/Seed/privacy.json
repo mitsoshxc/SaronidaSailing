@@ -1,0 +1,164 @@
+{
+  "group": "privacy",
+  "version": 1,
+  "fields": {
+    "privacy.seo.title": {
+      "type": "text",
+      "el": "Πολιτική απορρήτου · Saronida Sailing",
+      "en": "Privacy policy · Saronida Sailing"
+    },
+    "privacy.seo.description": {
+      "type": "text",
+      "el": "Πώς χειρίζεται η Saronida Sailing τα προσωπικά σας δεδομένα, τα cookies και το εξωτερικό περιεχόμενο.",
+      "en": "How Saronida Sailing handles your personal data, cookies and external content."
+    },
+    "privacy.intro.eyebrow": {
+      "type": "text",
+      "el": "Νομικά",
+      "en": "Legal"
+    },
+    "privacy.intro.title": {
+      "type": "text",
+      "el": "Πολιτική απορρήτου",
+      "en": "Privacy policy"
+    },
+    "privacy.intro.updated": {
+      "type": "text",
+      "el": "Τελευταία ενημέρωση: [ΗΜΕΡΟΜΗΝΙΑ]",
+      "en": "Last updated: [DATE]"
+    },
+    "privacy.summary.title": {
+      "type": "text",
+      "el": "Με λίγα λόγια",
+      "en": "In brief"
+    },
+    "privacy.contact.lead": {
+      "type": "text",
+      "el": "Ερωτήσεις για τα δεδομένα σας;",
+      "en": "Questions about your data?"
+    },
+    "privacy.contact.label": {
+      "type": "text",
+      "el": "Επικοινωνήστε μαζί μας",
+      "en": "Contact us"
+    }
+  },
+  "lists": {
+    "privacy.summary-items": [
+      {
+        "text": {
+          "type": "text",
+          "el": "Χωρίς φόρμες και χωρίς λογαριασμούς χρηστών.",
+          "en": "No forms and no user accounts."
+        }
+      },
+      {
+        "text": {
+          "type": "text",
+          "el": "Χρησιμοποιούμε τα στοιχεία σας μόνο για την εκδρομή σας.",
+          "en": "We use your details only for your trip."
+        }
+      },
+      {
+        "text": {
+          "type": "text",
+          "el": "Δεν πουλάμε και δεν μοιραζόμαστε δεδομένα για διαφήμιση.",
+          "en": "We do not sell or share data for advertising."
+        }
+      },
+      {
+        "text": {
+          "type": "text",
+          "el": "Μπορείτε να ζητήσετε διαγραφή των στοιχείων σας όποτε θέλετε.",
+          "en": "You can ask us to delete your details at any time."
+        }
+      }
+    ],
+    "privacy.sections": [
+      {
+        "title": {
+          "type": "text",
+          "el": "Ποιοι είμαστε",
+          "en": "Who we are"
+        },
+        "body": {
+          "type": "richText",
+          "el": "<p>Υπεύθυνος για τα δεδομένα σας είναι η Saronida Sailing, [ΕΠΩΝΥΜΙΑ ΕΠΙΧΕΙΡΗΣΗΣ, ΑΦΜ], Άγιος Νικόλαος, Ανάβυσσος Αττικής. Επικοινωνία: [EMAIL].</p>",
+          "en": "<p>The controller of your data is Saronida Sailing, [BUSINESS NAME, VAT NUMBER], Agios Nikolaos, Anavyssos, Attica. Contact: [EMAIL].</p>"
+        }
+      },
+      {
+        "title": {
+          "type": "text",
+          "el": "Τι δεδομένα συλλέγουμε",
+          "en": "What data we collect"
+        },
+        "body": {
+          "type": "richText",
+          "el": "<p>Ο ιστότοπος δεν έχει φόρμες ούτε λογαριασμούς. Κρατάμε μόνο όσα μας στέλνετε όταν επικοινωνείτε μαζί μας ή κάνετε κράτηση (όνομα, τηλέφωνο, email) και τα χρησιμοποιούμε μόνο για την εκδρομή σας.</p><p>Ο διακομιστής κρατά για 90 ημέρες τυπικά αρχεία καταγραφής (π.χ. διεύθυνση IP), για την ασφάλεια του ιστότοπου.</p><p>Ο ιστότοπος εξυπηρετείται μέσω Cloudflare (φιλοξενία και δίκτυο διανομής περιεχομένου) και χρησιμοποιεί το Cloudflare Web Analytics, που δεν χρησιμοποιεί cookies και δεν παρακολουθεί μεμονωμένα άτομα.</p>",
+          "en": "<p>The website has no forms and no accounts. We keep only what you send us when you contact us or make a booking (name, phone, email), and we use it only for your trip.</p><p>The server keeps standard log files (for example the IP address) for 90 days, for the security of the website.</p><p>The website is served through Cloudflare (hosting and content delivery network) and uses Cloudflare Web Analytics, which uses no cookies and does not track individual people.</p>"
+        }
+      },
+      {
+        "title": {
+          "type": "text",
+          "el": "Κρατήσεις μέσω πλατφορμών",
+          "en": "Bookings through platforms"
+        },
+        "body": {
+          "type": "richText",
+          "el": "<p>Όταν κλείνετε μέσω πλατφόρμας κρατήσεων, τα στοιχεία και την πληρωμή σας τα διαχειρίζεται η πλατφόρμα, σύμφωνα με τη δική της πολιτική απορρήτου. Εμείς λαμβάνουμε μόνο όσα χρειάζονται για την κράτηση.</p>",
+          "en": "<p>When you book through a booking platform, the platform handles your details and payment under its own privacy policy. We receive only what is needed for the booking.</p>"
+        }
+      },
+      {
+        "title": {
+          "type": "text",
+          "el": "Cookies",
+          "en": "Cookies"
+        },
+        "body": {
+          "type": "richText",
+          "el": "<p>Ο ιστότοπος δεν χρησιμοποιεί cookies παρακολούθησης ή διαφήμισης.</p><ul><li><strong>Γλώσσα:</strong> η γλώσσα επιλέγεται από τη διεύθυνση της σελίδας (/en/ για τα αγγλικά), χωρίς cookie.</li><li><strong>Η επιλογή σας για τα cookies:</strong> αποθηκεύεται στον τοπικό χώρο αποθήκευσης (local storage) του browser σας και είναι απολύτως απαραίτητη.</li><li><strong>Cloudflare:</strong> μπορεί να ορίσει απολύτως απαραίτητα cookies ασφαλείας.</li><li><strong>Εξωτερικό περιεχόμενο:</strong> ο χάρτης της Google φορτώνει μόνο αφού το επιτρέψετε. Μπορείτε να αλλάξετε την επιλογή σας οποιαδήποτε στιγμή από τις «Ρυθμίσεις cookies» στο κάτω μέρος κάθε σελίδας.</li></ul>",
+          "en": "<p>The website uses no tracking or advertising cookies.</p><ul><li><strong>Language:</strong> the language is chosen by the page address (/en/ for English), with no cookie.</li><li><strong>Your cookie choice:</strong> it is kept in your browser's local storage and is strictly necessary.</li><li><strong>Cloudflare:</strong> it may set strictly necessary security cookies.</li><li><strong>External content:</strong> the Google Map loads only after you allow it. You can change your choice at any time from \"Cookie settings\" at the bottom of every page.</li></ul>"
+        }
+      },
+      {
+        "title": {
+          "type": "text",
+          "el": "Instagram, Facebook και χάρτες",
+          "en": "Instagram, Facebook and maps"
+        },
+        "body": {
+          "type": "richText",
+          "el": "<p>Οι αναρτήσεις και οι εικόνες του Instagram εμφανίζονται μέσω του δικού μας διακομιστή, χωρίς να φορτώνεται κώδικας του Instagram στη σελίδα.</p><p>Ο χάρτης της Google εμφανίζεται μόνο αφού τον επιτρέψετε. Τότε η Google λαμβάνει δεδομένα σύμφωνα με τη δική της πολιτική απορρήτου.</p><p>Οι σύνδεσμοι προς Instagram, Facebook και Google Maps ανοίγουν αυτές τις υπηρεσίες, που έχουν τις δικές τους πολιτικές απορρήτου.</p>",
+          "en": "<p>Instagram posts and images are shown through our own server, with no Instagram code loaded on the page.</p><p>The Google Map is shown only after you allow it. Google then receives data under its own privacy policy.</p><p>The links to Instagram, Facebook and Google Maps open those services, which have their own privacy policies.</p>"
+        }
+      },
+      {
+        "title": {
+          "type": "text",
+          "el": "Πόσο τα κρατάμε",
+          "en": "How long we keep it"
+        },
+        "body": {
+          "type": "richText",
+          "el": "<p>Κρατάμε τα στοιχεία σας όσο χρειάζεται για την κράτηση και για τις φορολογικές και λογιστικές μας υποχρεώσεις. [Διάστημα, προς επιβεβαίωση]</p>",
+          "en": "<p>We keep your details for as long as the booking and our tax and accounting obligations require. [Period, to be confirmed]</p>"
+        }
+      },
+      {
+        "title": {
+          "type": "text",
+          "el": "Τα δικαιώματά σας",
+          "en": "Your rights"
+        },
+        "body": {
+          "type": "richText",
+          "el": "<p>Μπορείτε να ζητήσετε να δείτε, να διορθώσετε ή να διαγράψετε τα στοιχεία σας, να πάρετε αντίγραφό τους ή να περιορίσετε τη χρήση τους. Γράψτε μας στο [EMAIL].</p><p>Αν πιστεύετε ότι δεν τα χειριζόμαστε σωστά, μπορείτε να απευθυνθείτε στην Αρχή Προστασίας Δεδομένων (<a href=\"https://www.dpa.gr/\">dpa.gr</a>).</p>",
+          "en": "<p>You can ask to see, correct or delete your details, to receive a copy of them, or to restrict how we use them. Write to us at [EMAIL].</p><p>If you believe we are not handling them correctly, you can contact the Hellenic Data Protection Authority (<a href=\"https://www.dpa.gr/\">dpa.gr</a>).</p>"
+        }
+      }
+    ]
+  }
+}

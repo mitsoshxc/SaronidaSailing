@@ -1,0 +1,164 @@
+{
+  "group": "terms",
+  "version": 1,
+  "fields": {
+    "terms.seo.title": {
+      "type": "text",
+      "el": "Όροι κράτησης · Saronida Sailing",
+      "en": "Booking terms · Saronida Sailing"
+    },
+    "terms.seo.description": {
+      "type": "text",
+      "el": "Οι όροι κράτησης, πληρωμής και ακύρωσης για τις εκδρομές με το καταμαράν Lagoon 500 της Saronida Sailing.",
+      "en": "Booking, payment and cancellation terms for trips on the Saronida Sailing Lagoon 500 catamaran."
+    },
+    "terms.intro.eyebrow": {
+      "type": "text",
+      "el": "Νομικά",
+      "en": "Legal"
+    },
+    "terms.intro.title": {
+      "type": "text",
+      "el": "Όροι κράτησης",
+      "en": "Booking terms"
+    },
+    "terms.intro.updated": {
+      "type": "text",
+      "el": "Τελευταία ενημέρωση: [ΗΜΕΡΟΜΗΝΙΑ]",
+      "en": "Last updated: [DATE]"
+    },
+    "terms.summary.title": {
+      "type": "text",
+      "el": "Με λίγα λόγια",
+      "en": "In brief"
+    },
+    "terms.contact.lead": {
+      "type": "text",
+      "el": "Κάτι δεν είναι σαφές;",
+      "en": "Something unclear?"
+    },
+    "terms.contact.label": {
+      "type": "text",
+      "el": "Επικοινωνήστε μαζί μας",
+      "en": "Contact us"
+    }
+  },
+  "lists": {
+    "terms.summary-items": [
+      {
+        "text": {
+          "type": "text",
+          "el": "Κλείνετε online μέσω των συνεργατών μας ή στο τηλέφωνο.",
+          "en": "You book online through our partners or by phone."
+        }
+      },
+      {
+        "text": {
+          "type": "text",
+          "el": "Αν ο καιρός ακυρώσει μια ημερήσια κρουαζιέρα και δεν βρούμε άλλη μέρα, επιστρέφουμε όλο το ποσό.",
+          "en": "If the weather cancels a day cruise and we cannot find another day, we refund the full amount."
+        }
+      },
+      {
+        "text": {
+          "type": "text",
+          "el": "Για ναυλώσεις πολλών ημερών: 40% προκαταβολή, το υπόλοιπο δύο εβδομάδες πριν.",
+          "en": "For multi-day charters: a 40% deposit, the rest two weeks before."
+        }
+      },
+      {
+        "text": {
+          "type": "text",
+          "el": "Για την ασφάλεια, τον τελικό λόγο τον έχει ο σκίπερ.",
+          "en": "On safety, the skipper has the final say."
+        }
+      }
+    ],
+    "terms.sections": [
+      {
+        "title": {
+          "type": "text",
+          "el": "Κρατήσεις",
+          "en": "Bookings"
+        },
+        "body": {
+          "type": "richText",
+          "el": "<p>Μπορείτε να κλείσετε μέσω των πλατφορμών κρατήσεων με τις οποίες συνεργαζόμαστε ή τηλεφωνικά. Η κράτηση ισχύει όταν λάβετε επιβεβαίωση.</p><p>Όταν κλείνετε μέσω πλατφόρμας, ισχύουν επίσης οι όροι της πλατφόρμας.</p>",
+          "en": "<p>You can book through the booking platforms we work with, or by phone. A booking is valid once you receive a confirmation.</p><p>When you book through a platform, the platform's own terms also apply.</p>"
+        }
+      },
+      {
+        "title": {
+          "type": "text",
+          "el": "Πληρωμή",
+          "en": "Payment"
+        },
+        "body": {
+          "type": "richText",
+          "el": "<p>Ναυλώσεις πολλών ημερών: προκαταβολή 40% για να κλειδώσει η κράτηση. Το υπόλοιπο 60% πληρώνεται δύο εβδομάδες πριν την επιβίβαση.</p><p>Ημερήσιες κρουαζιέρες: [όροι πληρωμής, προς επιβεβαίωση].</p>",
+          "en": "<p>Multi-day charters: a 40% deposit secures the booking. The remaining 60% is paid two weeks before boarding.</p><p>Day cruises: [payment terms, to be confirmed].</p>"
+        }
+      },
+      {
+        "title": {
+          "type": "text",
+          "el": "Ακυρώσεις",
+          "en": "Cancellations"
+        },
+        "body": {
+          "type": "richText",
+          "el": "<p><strong>Ημερήσιες κρουαζιέρες:</strong> Αν ο καιρός δεν επιτρέπει την εκδρομή και δεν βρεθεί άλλη ημερομηνία, επιστρέφουμε όλο το ποσό.</p><p><strong>Ναυλώσεις πολλών ημερών:</strong> Έως 46 ημέρες πριν: χρέωση 50% της ναύλωσης. Λιγότερο από 45 ημέρες: χωρίς επιστροφή. Μη εμφάνιση: δεν επιστρέφεται κανένα ποσό. [Προς επιβεβαίωση]</p>",
+          "en": "<p><strong>Day cruises:</strong> If the weather does not allow the trip and no other date can be found, we refund the full amount.</p><p><strong>Multi-day charters:</strong> Up to 46 days before: a charge of 50% of the charter. Less than 45 days: no refund. No-show: no amount is refunded. [To be confirmed]</p>"
+        }
+      },
+      {
+        "title": {
+          "type": "text",
+          "el": "Καιρός και ασφάλεια",
+          "en": "Weather and safety"
+        },
+        "body": {
+          "type": "richText",
+          "el": "<p>Ο σκίπερ αποφασίζει για την αναχώρηση, τη διαδρομή και τις στάσεις, με βάση τον καιρό και την ασφάλεια όλων. Αν χρειαστεί, προτείνουμε άλλη διαδρομή ή άλλη ημερομηνία.</p>",
+          "en": "<p>The skipper decides on departure, route and stops, based on the weather and everyone's safety. If needed, we suggest another route or another date.</p>"
+        }
+      },
+      {
+        "title": {
+          "type": "text",
+          "el": "Εγγύηση και έξτρα",
+          "en": "Deposit and extras"
+        },
+        "body": {
+          "type": "richText",
+          "el": "<p>Στις ναυλώσεις πολλών ημερών ζητείται εγγύηση [AMOUNT], που επιστρέφεται στην αποβίβαση. Το πακέτο ναύλωσης ([PRICE]) καλύπτει σεντόνια, γκάζι, λέμβο και τελικό καθαρισμό.</p>",
+          "en": "<p>Multi-day charters require a security deposit of [AMOUNT], refunded on disembarking. The charter package ([PRICE]) covers linen, gas, dinghy and final cleaning.</p>"
+        }
+      },
+      {
+        "title": {
+          "type": "text",
+          "el": "Στο σκάφος",
+          "en": "On board"
+        },
+        "body": {
+          "type": "richText",
+          "el": "<p>Ακολουθείτε τις οδηγίες του σκίπερ για την ασφάλεια στο σκάφος και στο νερό. [Επιπλέον κανόνες, π.χ. κάπνισμα, κατοικίδια, παιδιά, προς συμπλήρωση]</p>",
+          "en": "<p>Follow the skipper's instructions for safety on the boat and in the water. [Further rules, e.g. smoking, pets, children, to be added]</p>"
+        }
+      },
+      {
+        "title": {
+          "type": "text",
+          "el": "Ασφάλιση και ευθύνη",
+          "en": "Insurance and liability"
+        },
+        "body": {
+          "type": "richText",
+          "el": "<p>[Όροι ασφάλισης και ευθύνης, προς συμπλήρωση από τον ιδιοκτήτη]</p>",
+          "en": "<p>[Insurance and liability terms, to be completed by the owner]</p>"
+        }
+      }
+    ]
+  }
+}

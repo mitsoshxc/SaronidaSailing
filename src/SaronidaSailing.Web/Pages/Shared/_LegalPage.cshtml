@@ -1,0 +1,58 @@
+@using SaronidaSailing.Web.Localization
+@using SaronidaSailing.Web.Models
+@model LegalPageViewModel
+@{
+    var page = Model.PageKey;
+}
+
+<section class="section section--soft legal-intro" cms-section="@($"{page}.intro")" cms-section-label="Intro">
+    <div class="wrap">
+        <p class="eyebrow" cms="@($"{page}.intro.eyebrow")"></p>
+        <h1 cms="@($"{page}.intro.title")"></h1>
+        <p class="legal-intro__updated" cms="@($"{page}.intro.updated")"></p>
+    </div>
+</section>
+
+<div class="wrap legal-layout">
+    <aside class="legal-aside">
+        @if (Model.Toc.Count > 0)
+        {
+            <nav class="legal-toc" aria-label="@UiText.OnThisPage.Current">
+                <p class="legal-toc__title" aria-hidden="true">@UiText.OnThisPage.Current</p>
+                <ol class="legal-toc__list">
+                    @foreach (var item in Model.Toc)
+                    {
+                        <li><a class="legal-toc__link" href="@item.Href">@item.Title</a></li>
+                    }
+                </ol>
+            </nav>
+        }
+        @if (Model.SeeAlso is { } seeAlso)
+        {
+            <a class="legal-also" href="@seeAlso.Path">
+                <span class="legal-also__text"><span class="legal-also__label">@UiText.SeeAlso.Current</span><strong>@seeAlso.Name</strong></span>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 17L17 7M9 7h8v8"></path></svg>
+            </a>
+        }
+    </aside>
+    <article class="legal-article">
+        <section class="legal-summary" cms-section="@($"{page}.summary")" cms-section-label="Summary">
+            <h2 cms="@($"{page}.summary.title")"></h2>
+            <ul class="check-list legal-summary__list">
+                <li cms-list="@($"{page}.summary-items")" cms-add-label="Add summary point"><span cms-field="text"></span></li>
+            </ul>
+        </section>
+        <div class="legal-body" cms-section="@($"{page}.body")" cms-section-label="Sections">
+            <section class="legal-section" cms-list="@LegalPageViewModel.SectionsKey(page)" cms-add-label="Add section" cms-item-id-prefix="@LegalPageViewModel.SectionIdPrefix">
+                <h2 cms-field="title"></h2>
+                <div class="legal-rich" cms-field="body" cms-rich></div>
+            </section>
+        </div>
+        <div cms-section="@($"{page}.contact")" cms-section-label="Contact card">
+            <a class="legal-contact" href="@Model.ContactPath">
+                <span class="legal-contact__text"><span class="legal-contact__lead" cms="@($"{page}.contact.lead")"></span><strong cms="@($"{page}.contact.label")"></strong></span>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 17L17 7M9 7h8v8"></path></svg>
+            </a>
+        </div>
+    </article>
+</div>

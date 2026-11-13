@@ -131,6 +131,10 @@ public static class UiText
         "Σχέδιο καταμαράν Lagoon με πανιά στο ηλιοβασίλεμα",
         "Drawing of a Lagoon catamaran under sail at sunset");
 
+    public static UiString OnThisPage { get; } = new("Σε αυτή τη σελίδα", "On this page");
+
+    public static UiString SeeAlso { get; } = new("Δείτε επίσης", "See also");
+
     public static IReadOnlyList<(string Name, UiString Text)> All { get; } =
     [
         (nameof(Home), Home),
@@ -186,6 +190,8 @@ public static class UiText
         (nameof(TripIslandsShort), TripIslandsShort),
         (nameof(TripWeekLong), TripWeekLong),
         (nameof(TripWeekShort), TripWeekShort),
+        (nameof(OnThisPage), OnThisPage),
+        (nameof(SeeAlso), SeeAlso),
     ];
 
     public static UiString MenuName(string pageKey) => pageKey switch

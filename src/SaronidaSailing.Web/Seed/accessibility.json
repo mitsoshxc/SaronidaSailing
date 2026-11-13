@@ -1,0 +1,152 @@
+{
+  "group": "accessibility",
+  "version": 1,
+  "fields": {
+    "accessibility.seo.title": {
+      "type": "text",
+      "el": "Δήλωση προσβασιμότητας · Saronida Sailing",
+      "en": "Accessibility statement · Saronida Sailing"
+    },
+    "accessibility.seo.description": {
+      "type": "text",
+      "el": "Η δήλωση προσβασιμότητας της Saronida Sailing: στόχος WCAG 2.2 επίπεδο AA και πώς να επικοινωνήσετε μαζί μας.",
+      "en": "The Saronida Sailing accessibility statement: our WCAG 2.2 level AA goal and how to contact us."
+    },
+    "accessibility.intro.eyebrow": {
+      "type": "text",
+      "el": "Νομικά",
+      "en": "Legal"
+    },
+    "accessibility.intro.title": {
+      "type": "text",
+      "el": "Δήλωση προσβασιμότητας",
+      "en": "Accessibility statement"
+    },
+    "accessibility.intro.updated": {
+      "type": "text",
+      "el": "Τελευταία ενημέρωση: [ΗΜΕΡΟΜΗΝΙΑ]",
+      "en": "Last updated: [DATE]"
+    },
+    "accessibility.summary.title": {
+      "type": "text",
+      "el": "Με λίγα λόγια",
+      "en": "In brief"
+    },
+    "accessibility.contact.lead": {
+      "type": "text",
+      "el": "Χρειάζεστε βοήθεια;",
+      "en": "Need help?"
+    },
+    "accessibility.contact.label": {
+      "type": "text",
+      "el": "Επικοινωνήστε μαζί μας",
+      "en": "Contact us"
+    }
+  },
+  "lists": {
+    "accessibility.summary-items": [
+      {
+        "text": {
+          "type": "text",
+          "el": "Στόχος μας είναι το πρότυπο WCAG 2.2, επίπεδο AA.",
+          "en": "Our goal is the WCAG 2.2 standard, level AA."
+        }
+      },
+      {
+        "text": {
+          "type": "text",
+          "el": "Λειτουργεί με πληκτρολόγιο και αναγνώστες οθόνης.",
+          "en": "It works with a keyboard and screen readers."
+        }
+      },
+      {
+        "text": {
+          "type": "text",
+          "el": "Ευανάγνωστο στο κινητό και με μεγέθυνση κειμένου.",
+          "en": "Easy to read on a phone and with enlarged text."
+        }
+      },
+      {
+        "text": {
+          "type": "text",
+          "el": "Δυσκολεύεστε; Καλέστε μας και κλείνουμε την εκδρομή μαζί.",
+          "en": "Having trouble? Call us and we will book the trip together."
+        }
+      }
+    ],
+    "accessibility.sections": [
+      {
+        "title": {
+          "type": "text",
+          "el": "Η δέσμευσή μας",
+          "en": "Our commitment"
+        },
+        "body": {
+          "type": "richText",
+          "el": "<p>Θέλουμε όλοι να μπορούν να βρουν πληροφορίες και να κλείσουν μια εκδρομή, από οποιαδήποτε συσκευή. Στόχος μας είναι η συμμόρφωση με τις Οδηγίες WCAG 2.2, επίπεδο AA.</p>",
+          "en": "<p>We want everyone to be able to find information and book a trip, from any device. Our goal is to meet the WCAG 2.2 guidelines, level AA.</p>"
+        }
+      },
+      {
+        "title": {
+          "type": "text",
+          "el": "Τι έχουμε κάνει",
+          "en": "What we have done"
+        },
+        "body": {
+          "type": "richText",
+          "el": "<ul><li>Επαρκής αντίθεση χρωμάτων σε όλα τα κείμενα</li><li>Πλήρης χρήση με πληκτρολόγιο, με ορατή ένδειξη εστίασης</li><li>Μεγάλα κουμπιά και σύνδεσμοι, εύκολα στο άγγιγμα</li><li>Περιγραφές σε εικόνες και εικονίδια</li><li>Σωστή σήμανση γλώσσας για ελληνικά και αγγλικά</li><li>Λειτουργεί με μεγέθυνση κειμένου και σε κάθε μέγεθος οθόνης</li><li>Χωρίς περιεχόμενο που κινείται ή αλλάζει μόνο του</li></ul>",
+          "en": "<ul><li>Enough colour contrast in all text</li><li>Fully usable with a keyboard, with a visible focus indicator</li><li>Large buttons and links, easy to tap</li><li>Descriptions for images and icons</li><li>Correct language markup for Greek and English</li><li>Works with enlarged text and on any screen size</li><li>No content that moves or changes by itself</li></ul>"
+        }
+      },
+      {
+        "title": {
+          "type": "text",
+          "el": "Κατάσταση συμμόρφωσης",
+          "en": "Conformance status"
+        },
+        "body": {
+          "type": "richText",
+          "el": "<p>[Πλήρης ή μερική συμμόρφωση: θα συμπληρωθεί μετά τον έλεγχο του ιστότοπου, πριν τη δημοσίευση.]</p>",
+          "en": "<p>[Full or partial conformance: to be completed after the site has been checked, before publication.]</p>"
+        }
+      },
+      {
+        "title": {
+          "type": "text",
+          "el": "Περιεχόμενο τρίτων",
+          "en": "Third-party content"
+        },
+        "body": {
+          "type": "richText",
+          "el": "<p>Οι πλατφόρμες κρατήσεων, το Instagram και οι Χάρτες Google είναι εξωτερικές υπηρεσίες και δεν ελέγχουμε την προσβασιμότητά τους. Αν δυσκολευτείτε εκεί, κλείστε μαζί μας στο τηλέφωνο.</p>",
+          "en": "<p>The booking platforms, Instagram and Google Maps are external services and we do not control their accessibility. If you have difficulty there, book with us by phone.</p>"
+        }
+      },
+      {
+        "title": {
+          "type": "text",
+          "el": "Πείτε μας",
+          "en": "Tell us"
+        },
+        "body": {
+          "type": "richText",
+          "el": "<p>Αν κάτι δεν λειτουργεί για εσάς, καλέστε μας στο <a href=\"tel:+306940057799\">+30 694 005 7799</a> ή γράψτε μας στο [EMAIL]. Θα σας εξυπηρετήσουμε και θα το διορθώσουμε.</p>",
+          "en": "<p>If something does not work for you, call us on <a href=\"tel:+306940057799\">+30 694 005 7799</a> or write to us at [EMAIL]. We will help you and fix it.</p>"
+        }
+      },
+      {
+        "title": {
+          "type": "text",
+          "el": "Σχετικά με τη δήλωση",
+          "en": "About this statement"
+        },
+        "body": {
+          "type": "richText",
+          "el": "<p>Η δήλωση συντάχθηκε στις [ΗΜΕΡΟΜΗΝΙΑ] και επανεξετάζεται κάθε χρόνο ή όταν αλλάζει σημαντικά ο ιστότοπος.</p>",
+          "en": "<p>This statement was prepared on [DATE] and is reviewed every year or when the site changes significantly.</p>"
+        }
+      }
+    ]
+  }
+}

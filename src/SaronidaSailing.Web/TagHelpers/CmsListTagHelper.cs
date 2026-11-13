@@ -14,6 +14,9 @@ public sealed class CmsListTagHelper(IPageContentAccessor accessor, ICmsEditCont
     [HtmlAttributeName("cms-add-label")]
     public string? AddLabel { get; set; }
 
+    [HtmlAttributeName("cms-item-id-prefix")]
+    public string? ItemIdPrefix { get; set; }
+
     public override async Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
     {
         var key = CmsFieldResolver.RequireListKey(Key, "cms-list");
@@ -43,7 +46,7 @@ public sealed class CmsListTagHelper(IPageContentAccessor accessor, ICmsEditCont
         {
             foreach (var entry in entries)
             {
-                copies.AppendHtml(await RenderCopyAsync(context, output, attributes, key, entry, editor));
+                copies.AppendHtml(await RenderCopyAsync(context, output, attributes, key, entry, editor, ItemIdPrefix));
             }
 
             if (editor)
@@ -54,7 +57,7 @@ public sealed class CmsListTagHelper(IPageContentAccessor accessor, ICmsEditCont
                 copies.AppendHtml("\" data-cms-add-label=\"");
                 copies.Append(addLabel);
                 copies.AppendHtml("\">");
-                copies.AppendHtml(await RenderCopyAsync(context, output, attributes, key, empty, editor));
+                copies.AppendHtml(await RenderCopyAsync(context, output, attributes, key, empty, editor, ItemIdPrefix));
                 copies.AppendHtml("</template>");
             }
         }
@@ -74,12 +77,18 @@ public sealed class CmsListTagHelper(IPageContentAccessor accessor, ICmsEditCont
         TagHelperAttributeList attributes,
         string key,
         ContentListEntry entry,
-        bool editor)
+        bool editor,
+        string? itemIdPrefix)
     {
         CmsFieldResolver.EnterListItem(context, key, entry);
         var children = await output.GetChildContentAsync(useCachedResult: false);
 
         var copyAttributes = new TagHelperAttributeList(attributes);
+        if (!string.IsNullOrEmpty(itemIdPrefix) && entry.Id != Guid.Empty)
+        {
+            copyAttributes.SetAttribute("id", itemIdPrefix + entry.Id);
+        }
+
         if (editor)
         {
             copyAttributes.SetAttribute("data-cms-list", key);

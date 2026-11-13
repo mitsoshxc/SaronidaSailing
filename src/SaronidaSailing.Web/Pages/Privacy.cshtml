@@ -2,12 +2,7 @@
 @using SaronidaSailing.Web.Localization
 @model PrivacyModel
 @{
-    var title = UiText.PageTitle("privacy").Current;
-    ViewData["Title"] = title;
+    ViewData["Title"] = UiText.PageTitle("privacy").Current;
 }
 
-<section class="section">
-    <div class="wrap">
-        <h1>@title</h1>
-    </div>
-</section>
+<partial name="_LegalPage" model="Model.Legal" />
