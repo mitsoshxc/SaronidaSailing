@@ -150,15 +150,34 @@ Approved design (2026-11-13): **Instagram API with Instagram Login** (Business/C
 
 ## Phase 7 — Public Pages
 
-- [ ] Layout: header (logo, menu, language switch, Book button), footer — shared content
-- [ ] Site CSS from the design canvas; self-hosted Commissioner font
-- [ ] Pages: Home, Trips (tabs remember the chosen trip), Boat, Contact, Terms, Privacy, Accessibility
-- [ ] Cookie consent banner (client-side, `localStorage`), footer "Cookie settings", Google Map loaded only after consent with static-image fallback
-- [ ] Seed initial content from the design (Greek) + drafted English translations for owner review; add the `/health` check "at least one Greek `home` `ContentItem` exists"
-- [ ] Routes with fixed slugs (`/ekdromes`, `/skafos`, `/epikoinonia`, `/oroi`, `/aporrito`, `/prosvasimotita`; `/en/trips`, `/en/boat`, `/en/contact`, `/en/terms`, `/en/privacy`, `/en/accessibility`) — add pages to `SitePages`; test that cross-language slugs (`/en/skafos`, `/boat`) return 404
-- [ ] `sitemap.xml`, `robots.txt`, canonical + `hreflang`, 404 / 500 pages
-- [ ] JSON-LD `LocalBusiness` from content
-- [ ] Old-site 301 redirect table (see `docs/architecture.md` → SEO) + canonical-host redirect
+Decided by the developer (2026-11-13):
+
+- **Seed at startup when empty**, not a CLI command. Tech-lead detail: emptiness is checked **per page** (a page key with no `ContentItem` rows gets its seed), so pages added later in the phase still seed on an existing dev database; seeding never touches a page that has content. It writes through `IContentService.ApplyChangesAsync` (sanitizer, validation, history). Two pods starting together: the seed runs under Hangfire's PostgreSQL distributed lock (no new raw SQL) and re-checks emptiness inside the lock.
+- **Header "Instagram" item** = external link to the Instagram profile (new tab, says so), not `/#instagram`.
+- **Trip tabs** = query string `?trip=day|islands|week`: Home's trip cards link to `/ekdromes?trip=islands`, the server renders that tab selected (works without JS), the output cache varies by `trip` only (the `CmsPage` policy keeps ignoring every other query key), canonical stays `/ekdromes`; switching tabs client-side updates the URL with `history.replaceState`.
+- **Boat gallery "All photos"** = native `<dialog>` lightbox (previous / next, Escape closes, focus returns), plain JS module, CSP-safe.
+
+Tech-lead defaults approved by the developer (2026-11-13):
+
+- **Menu labels** (Trips, The boat, Contact, Book, page names in the footer) are fixed UI text in code (`UiText`), like the fixed slugs. Footer tagline, phones, address, social links and copyright line are `shared.*` content.
+- **Hero** is one `<cms-image>` for now; a video only if the owner provides one.
+- **Unknown values** (prices, max guests, email, contact hours, season, booking platforms) are seeded as visible bracketed placeholders (`[ΤΙΜΗ]` / `[PRICE]`, …) so gaps show on the preview; booking links seed a placeholder `https://` URL until the platforms are chosen.
+- **Map:** `contact.map.embed-url` is a `Text` field, validated in `ContentBatch` (like `home.instagram.post-count`) to start with `https://www.google.com/maps/embed`; the static map shown without consent is a normal `<cms-image>`.
+- **404 / 500 pages** use fixed text in both languages and no database read.
+- **Redirects:** the old-site table is app middleware, off in the Preview environment. The canonical-host redirect (no-www / `http` → `https://www.saronidasailing.gr`) stays in nginx (`docs/deployment.md`) and moves to Phase 8.
+
+Build order (one `/dev` brief each):
+
+- [x] Site CSS from the design canvas (tokens, type, buttons, cards, focus); self-hosted Commissioner font. Done 2026-11-13: variable Commissioner v24 woff2 (weights 400–800) for the greek, latin and latin-ext subsets in `wwwroot/fonts/commissioner/` with `OFL.txt` and `README.md`; `@font-face` with Google's `unicode-range`; greek and latin preloaded in `_Layout` with **literal `/fonts/...` hrefs** (a `~/` href is fingerprinted by `MapStaticAssets` and no longer matches the URL `site.css` asks for, so the font downloaded twice). `site.css`: design tokens on `:root` (colors, radii 12/16/20/24/pill, spacing 4–96, `--gutter`, `--section-pad`), base type (h1 36→42→48, `.h1--hero` 38→48→62, h2 26→30→36, h3 19→21), focus ring, `.skip-link`, `.wrap`, `.eyebrow`, `.lead`, `.section(--soft|--dark)`, `.btn(--cta|--dark|--outline|--light|--block)`, `.card`, `.chip`, `.icon-badge(--lg)`, `.stat`, `.check-list`, `.accordion` (details), `.media-placeholder`, reduced motion. Contrast: canvas `#8FA6B3` on white (2.54) is for icons only; CTA orange text on the CTA tint (4.24) is not used for text. Admin toolbar styling checked unchanged in the pane
+- [ ] Layout: header (logo, menu, language switch, Book button), footer — shared content; canonical + `hreflang`; the six remaining page shells so every route exists. Routes with fixed slugs (`/ekdromes`, `/skafos`, `/epikoinonia`, `/oroi`, `/aporrito`, `/prosvasimotita`; `/en/trips`, `/en/boat`, `/en/contact`, `/en/terms`, `/en/privacy`, `/en/accessibility`) are already in `SitePages`; test that cross-language slugs (`/en/skafos`, `/boat`) return 404
+- [ ] Seed mechanism (startup, per page, distributed lock) + the `/health` check "at least one Greek `home` `ContentItem` exists"
+- [ ] Home page + its seed (Greek from the design, drafted English for owner review); Instagram feed restyled
+- [ ] Trips page (tabs with `?trip=`, useful info, booking box) + seed
+- [ ] Boat page (gallery + lightbox, specs, life on board, included, charter details) + seed
+- [ ] Contact page + cookie consent banner (client-side, `localStorage`), footer "Cookie settings", Google Map loaded only after consent with static-image fallback + seed
+- [ ] Terms, Privacy, Accessibility pages + seed
+- [ ] `sitemap.xml`, `robots.txt`, 404 / 500 pages; JSON-LD `LocalBusiness` from content
+- [ ] Old-site 301 redirect table (see `docs/architecture.md` → SEO)
 - [ ] Accessibility: axe-core checks via Playwright on every page in both languages; manual keyboard pass
 
 ## Phase 8 — Preview & Production
