@@ -1,0 +1,21 @@
+{
+  "group": "shared.prices",
+  "version": 1,
+  "fields": {
+    "shared.prices.day": {
+      "type": "text",
+      "el": "[ΤΙΜΗ]",
+      "en": "[PRICE]"
+    },
+    "shared.prices.islands": {
+      "type": "text",
+      "el": "[ΤΙΜΗ]",
+      "en": "[PRICE]"
+    },
+    "shared.prices.week": {
+      "type": "text",
+      "el": "[ΤΙΜΗ] / εβδ.",
+      "en": "[PRICE] / week"
+    }
+  }
+}

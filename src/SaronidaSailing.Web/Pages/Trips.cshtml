@@ -1,13 +1,138 @@
 @page
+@using System.Globalization
 @using SaronidaSailing.Web.Localization
+@using SaronidaSailing.Web.Models
 @model TripsModel
+@inject ILocalizedUrlService UrlService
 @{
     var title = UiText.PageTitle("trips").Current;
     ViewData["Title"] = title;
+    var locale = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == SiteCultures.English
+        ? SiteCultures.English
+        : SiteCultures.Greek;
+    var tripsPath = UrlService.GetPath("trips", locale);
+    string? HiddenUnlessSelected(string id) => id == Model.SelectedTrip ? null : "hidden";
 }
 
-<section class="section">
+<section class="section trips-intro" cms-section="trips.intro" cms-section-label="Intro">
     <div class="wrap">
-        <h1>@title</h1>
+        <p class="eyebrow" cms="trips.intro.eyebrow"></p>
+        <h1 cms="trips.intro.title"></h1>
+        <p class="lead trips-intro__lead" cms="trips.intro.lead"></p>
     </div>
 </section>
+
+<div class="wrap trips-layout">
+    @if (Model.Tabs.Count > 0)
+    {
+        <nav class="trip-tabs" aria-label="@UiText.TripType.Current" data-trip-tabs>
+            @foreach (var tab in Model.Tabs)
+            {
+                var href = $"{tripsPath}?{TripTabs.QueryKey}={tab.Id}";
+                <a class="trip-tab" id="trip-tab-@tab.Id" href="@href" aria-current="@(tab.Id == Model.SelectedTrip ? "page" : null)" data-trip-tab="@tab.Id"><span class="trip-tab__long">@tab.Long.Current</span><span class="trip-tab__short" aria-hidden="true">@tab.Short.Current</span></a>
+            }
+        </nav>
+    }
+
+    <section class="trip-panel" id="trip-panel-day" data-trip-panel="day" hidden="@HiddenUnlessSelected("day")" cms-section="trips.day" cms-section-label="Day cruise">
+        <div class="trip-panel__head">
+            <h2 cms="trips.day.title"></h2>
+            <p class="trip-panel__text" cms="trips.day.text"></p>
+        </div>
+        <ul class="trip-slots">
+            <li class="trip-slot" cms-list="trips.day-slots" cms-add-label="Add time slot">
+                <span class="icon-badge" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg></span>
+                <span class="trip-slot__body"><strong class="trip-slot__title" cms-field="title"></strong><span class="trip-slot__time" cms-field="time"></span></span>
+            </li>
+        </ul>
+        <div class="trip-lists">
+            <div class="trip-lists__col">
+                <h3 cms="trips.day.included-title"></h3>
+                <ul class="check-list">
+                    <li cms-list="trips.day-included" cms-add-label="Add included item"><span cms-field="text"></span></li>
+                </ul>
+            </div>
+            <div class="trip-lists__col">
+                <h3 cms="trips.day.excluded-title"></h3>
+                <ul class="trip-plain-list">
+                    <li cms-list="trips.day-excluded" cms-add-label="Add not-included item"><span cms-field="text"></span></li>
+                </ul>
+            </div>
+        </div>
+        <div class="trip-panel__foot">
+            <span class="trip-panel__capacity" cms="trips.day.capacity"></span>
+            <span class="trip-panel__price">@UiText.From.Current <strong cms="shared.prices.day"></strong></span>
+        </div>
+    </section>
+
+    <section class="trip-panel" id="trip-panel-islands" data-trip-panel="islands" hidden="@HiddenUnlessSelected("islands")" cms-section="trips.islands" cms-section-label="Islands">
+        <div class="trip-panel__head">
+            <h2 cms="trips.islands.title"></h2>
+            <p class="trip-panel__text" cms="trips.islands.text"></p>
+        </div>
+        <ul class="trip-routes">
+            <li class="trip-route" cms-list="trips.islands-routes" cms-add-label="Add route"><strong class="trip-route__title" cms-field="title"></strong><span class="trip-route__places" cms-field="places"></span></li>
+        </ul>
+        <div class="trip-lists">
+            <div class="trip-lists__col">
+                <h3 cms="trips.islands.pack-title"></h3>
+                <ul class="trip-plain-list">
+                    <li cms-list="trips.islands-pack" cms-add-label="Add packing tip"><span cms-field="text"></span></li>
+                </ul>
+            </div>
+        </div>
+        <div class="trip-panel__foot">
+            <span class="trip-panel__capacity" cms="trips.islands.capacity"></span>
+            <span class="trip-panel__price">@UiText.From.Current <strong cms="shared.prices.islands"></strong></span>
+        </div>
+    </section>
+
+    <section class="trip-panel" id="trip-panel-week" data-trip-panel="week" hidden="@HiddenUnlessSelected("week")" cms-section="trips.week" cms-section-label="Weekly charter">
+        <div class="trip-panel__head">
+            <h2 cms="trips.week.title"></h2>
+            <p class="trip-panel__text" cms="trips.week.text"></p>
+        </div>
+        <ul class="trip-prices">
+            <li class="trip-price-line" cms-list="trips.week-prices" cms-add-label="Add price line"><span class="trip-price-line__label" cms-field="label"></span><strong class="trip-price-line__value" cms-field="value"></strong></li>
+        </ul>
+        <p class="trip-panel__note" cms="trips.week.note"></p>
+    </section>
+
+    <section class="trip-booking" id="booking" aria-labelledby="trip-booking-title" cms-section="trips.booking" cms-section-label="Booking box">
+        <h2 class="trip-booking__title" id="trip-booking-title" cms="trips.booking.title"></h2>
+        <div class="trip-booking__summary">
+            @foreach (var tab in TripTabs.All)
+            {
+                <p class="trip-booking__price" data-trip-price="@tab.Id" hidden="@HiddenUnlessSelected(tab.Id)"><span class="trip-booking__label" cms="@($"trips.booking.{tab.Id}-label")"></span><strong cms="@($"shared.prices.{tab.Id}")"></strong></p>
+            }
+            <span class="trip-booking__capacity" cms="trips.booking.capacity"></span>
+        </div>
+        <p class="trip-booking__text" cms="trips.booking.text"></p>
+        <ul class="trip-booking__platforms">
+            <li cms-list="trips.booking-platforms" cms-add-label="Add booking platform"><a class="btn btn--cta btn--block" cms-link-field="link" cms-keep-content><span cms-link-label></span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a></li>
+        </ul>
+        <p class="trip-booking__note" cms="trips.booking.new-tab-note"></p>
+        <div class="trip-booking__questions">
+            <span cms="trips.booking.questions"></span>
+            <a class="trip-booking__phone" cms-link="shared.contact.phone" cms-keep-content><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a1 1 0 0 1-1 1A16 16 0 0 1 4 5a1 1 0 0 1 1-1z"></path></svg><span cms-link-label></span></a>
+        </div>
+    </section>
+
+    <section class="trips-info" cms-section="trips.info" cms-section-label="Useful info">
+        <h2 cms="trips.info.title"></h2>
+        <details class="accordion" cms-list="trips.info-items" cms-add-label="Add question">
+            <summary><span cms-field="question"></span></summary>
+            <div class="accordion__body" cms-field="answer" cms-rich></div>
+        </details>
+    </section>
+</div>
+
+<div class="sticky-book" cms-section="trips.sticky" cms-section-label="Sticky booking bar">
+    <div class="sticky-book__price">
+        @foreach (var tab in TripTabs.All)
+        {
+            <span class="sticky-book__group" data-trip-price="@tab.Id" hidden="@HiddenUnlessSelected(tab.Id)"><span class="sticky-book__label" cms="@($"trips.booking.{tab.Id}-label")"></span><strong cms="@($"shared.prices.{tab.Id}")"></strong></span>
+        }
+    </div>
+    <a class="btn btn--cta" href="#booking">@UiText.Book.Current</a>
+</div>

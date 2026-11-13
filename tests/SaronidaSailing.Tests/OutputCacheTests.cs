@@ -41,7 +41,7 @@ public class CmsPageCachePolicyTests
         var attribute = model.GetCustomAttribute<OutputCacheAttribute>();
 
         Assert.NotNull(attribute);
-        Assert.Equal("CmsPage", attribute.PolicyName);
+        Assert.Equal(page.Key == "trips" ? "CmsPageTrips" : "CmsPage", attribute.PolicyName);
         Assert.Equal([CacheTags.Page(page.Key)], attribute.Tags!);
     }
 
@@ -151,6 +151,99 @@ public class OutputCacheWebHostTests : IClassFixture<TempDatabaseWebApplicationF
 
         Assert.Contains("<title>Qfirst A</title>", await Get(client, "/"));
         Assert.Contains("<title>Qfirst A</title>", await Get(client, "/?y=2"));
+    }
+
+    private static bool Selected(string html, string trip) =>
+        html.Contains($"data-trip-tab=\"{trip}\"", StringComparison.Ordinal)
+        && System.Text.RegularExpressions.Regex.IsMatch(
+            html, $"<a [^>]*aria-current=\"page\"[^>]*data-trip-tab=\"{trip}\"");
+
+    [Fact]
+    public async Task Trips_VaryByTrip_AndIgnoreEveryOtherQueryKey()
+    {
+        var client = NewClient();
+        await WriteThroughService(TitleKey("trips"), "Trips A");
+
+        var islands = await Get(client, "/ekdromes?trip=islands");
+        Assert.Contains("<title>Trips A</title>", islands);
+        Assert.True(Selected(islands, "islands"));
+
+        await WriteBypassingService("trips", "Trips B");
+
+        Assert.Contains("<title>Trips A</title>", await Get(client, "/ekdromes?trip=islands&x=1"));
+        Assert.Contains("<title>Trips A</title>", await Get(client, "/ekdromes?x=2&trip=islands"));
+        Assert.Contains("<title>Trips A</title>", await Get(client, "/ekdromes?trip=ISLANDS"));
+
+        var day = await Get(client, "/ekdromes?trip=day");
+        Assert.Contains("<title>Trips B</title>", day);
+        Assert.True(Selected(day, "day"));
+        Assert.NotEqual(islands, day);
+
+        var week = await Get(client, "/ekdromes?trip=week");
+        Assert.Contains("<title>Trips B</title>", week);
+        Assert.True(Selected(week, "week"));
+    }
+
+    [Fact]
+    public async Task Trips_PlainUrl_UnknownValuesAndOtherKeysShareTheDayEntry()
+    {
+        var client = NewClient();
+        await WriteThroughService(TitleKey("trips"), "Day A");
+        var plain = await Get(client, "/ekdromes");
+        Assert.True(Selected(plain, "day"));
+
+        await WriteBypassingService("trips", "Day B");
+
+        Assert.Equal(plain, await Get(client, "/ekdromes?x=1"));
+        Assert.Equal(plain, await Get(client, "/ekdromes?trip=day"));
+        Assert.Equal(plain, await Get(client, "/ekdromes?trip=bogus"));
+        Assert.Equal(plain, await Get(client, "/ekdromes?trip="));
+        Assert.Contains("<title>Day A</title>", plain);
+    }
+
+    [Fact]
+    public async Task Trips_PrimedByAnotherKeyFirst_IsReusedByThePlainUrl()
+    {
+        var client = NewClient();
+        await WriteThroughService(TitleKey("trips"), "Prime A");
+        Assert.Contains("<title>Prime A</title>", await Get(client, "/ekdromes?x=1"));
+
+        await WriteBypassingService("trips", "Prime B");
+
+        Assert.Contains("<title>Prime A</title>", await Get(client, "/ekdromes"));
+        Assert.Contains("<title>Prime A</title>", await Get(client, "/ekdromes?y=2"));
+    }
+
+    [Fact]
+    public async Task Trips_EnglishAndGreek_AreSeparateEntries()
+    {
+        var client = NewClient();
+        await WriteThroughService(TitleKey("trips"), "Lang A");
+        Assert.Contains("og:locale\" content=\"el_GR\"", await Get(client, "/ekdromes?trip=week"));
+
+        await WriteBypassingService("trips", "Lang B");
+
+        var english = await Get(client, "/en/trips?trip=week");
+        Assert.Contains("<title>Lang B</title>", english);
+        Assert.Contains("og:locale\" content=\"en_GB\"", english);
+    }
+
+    [Fact]
+    public async Task SharedPriceWrite_EvictsEveryTripEntry()
+    {
+        var client = NewClient();
+        await WriteThroughService(TitleKey("trips"), "Price A");
+        Assert.Contains("<title>Price A</title>", await Get(client, "/ekdromes?trip=islands"));
+        Assert.Contains("<title>Price A</title>", await Get(client, "/ekdromes?trip=week"));
+
+        await WriteBypassingService("trips", "Price B");
+        Assert.Contains("<title>Price A</title>", await Get(client, "/ekdromes?trip=islands"));
+
+        await WriteThroughService("shared.prices.day", "99");
+
+        Assert.Contains("<title>Price B</title>", await Get(client, "/ekdromes?trip=islands"));
+        Assert.Contains("<title>Price B</title>", await Get(client, "/ekdromes?trip=week"));
+        Assert.Contains("<strong>99</strong>", await Get(client, "/ekdromes?trip=day"));
     }
 
     [Fact]

@@ -1,3 +1,5 @@
+import { initTripTabs } from './trip-tabs.js';
+
 const desktop = window.matchMedia('(min-width: 960px)');
 
 const initMenu = () => {
@@ -71,3 +73,4 @@ const initBackToTop = () => {
 
 initMenu();
 initBackToTop();
+initTripTabs();

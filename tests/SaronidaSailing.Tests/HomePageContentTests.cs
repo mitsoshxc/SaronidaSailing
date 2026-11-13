@@ -159,6 +159,18 @@ public class HomePageContentTests(SeededWebApplicationFactory factory) : IClassF
         Assert.Equal(Strong(dayCard), Strong(sticky));
     }
 
+    [Theory]
+    [InlineData("/", "[ΤΙΜΗ]", "[ΤΙΜΗ] / εβδ.")]
+    [InlineData("/en/", "[PRICE]", "[PRICE] / week")]
+    public async Task Home_TripCards_ShowThePricesFromTheSharedGroup(string url, string price, string weekPrice)
+    {
+        var html = await GetAsync(url);
+
+        var cards = Regex.Matches(html, "<article class=\"trip-card\".*?</article>", RegexOptions.Singleline);
+        Assert.Equal([price, price, weekPrice], cards.Select(c => Strong(c.Value)));
+        Assert.DoesNotContain("home.trip-day.price", html);
+    }
+
     [Fact]
     public async Task Home_Lists_RenderTheSeededItems()
     {

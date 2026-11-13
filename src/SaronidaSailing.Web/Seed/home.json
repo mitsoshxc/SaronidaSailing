@@ -72,11 +72,6 @@
       "el": "Κολύμπι σε απάνεμους όρμους, σνόρκελ, paddle board και ο Ναός του Ποσειδώνα από τη θάλασσα. Στο σκάφος σερβίρεται ελληνικό γεύμα με κρασί.",
       "en": "Swimming in sheltered coves, snorkelling, paddle boarding and the Temple of Poseidon seen from the sea. A Greek meal with wine is served on board."
     },
-    "home.trip-day.price": {
-      "type": "text",
-      "el": "[ΤΙΜΗ]",
-      "en": "[PRICE]"
-    },
     "home.trip-islands.duration": {
       "type": "text",
       "el": "2–3 ημέρες",
@@ -97,11 +92,6 @@
       "el": "Αίγινα, Πόρος, Ύδρα και Σπέτσες, ή πιο μακριά, Κέα, Κύθνος και Σέριφος. Κάθε βράδυ σε άλλο όρμο, με φίλους ή με την οικογένεια.",
       "en": "Aegina, Poros, Hydra and Spetses, or further afield, Kea, Kythnos and Serifos. A different cove every night, with friends or family."
     },
-    "home.trip-islands.price": {
-      "type": "text",
-      "el": "[ΤΙΜΗ]",
-      "en": "[PRICE]"
-    },
     "home.trip-week.duration": {
       "type": "text",
       "el": "1 εβδομάδα +",
@@ -121,11 +111,6 @@
       "type": "text",
       "el": "Όλο το σκάφος για την παρέα σας. Σχεδιάστε τη διαδρομή με τον σκίπερ, που ξέρει τους όρμους, τις ταβέρνες και τους ανέμους.",
       "en": "The whole boat for your party. Plan the route with the skipper, who knows the coves, the tavernas and the winds."
-    },
-    "home.trip-week.price": {
-      "type": "text",
-      "el": "[ΤΙΜΗ] / εβδ.",
-      "en": "[PRICE] / week"
     },
     "home.boat.eyebrow": {
       "type": "text",

@@ -67,6 +67,20 @@ public static class UiText
 
     public static UiString AllTrips { get; } = new("Όλες οι εκδρομές", "All trips");
 
+    public static UiString TripType { get; } = new("Τύπος εκδρομής", "Trip type");
+
+    public static UiString TripDayLong { get; } = new("Ημερήσια κρουαζιέρα", "Day cruise");
+
+    public static UiString TripDayShort { get; } = new("Ημερήσια", "Day");
+
+    public static UiString TripIslandsLong { get; } = new("Νησιά 2–3 ημερών", "Islands, 2–3 days");
+
+    public static UiString TripIslandsShort { get; } = new("Νησιά", "Islands");
+
+    public static UiString TripWeekLong { get; } = new("Εβδομαδιαία ναύλωση", "Weekly charter");
+
+    public static UiString TripWeekShort { get; } = new("Εβδομαδιαία", "Week");
+
     public static UiString HeroIllustration { get; } = new(
         "Σχέδιο καταμαράν Lagoon με πανιά στο ηλιοβασίλεμα",
         "Drawing of a Lagoon catamaran under sail at sunset");
@@ -99,6 +113,13 @@ public static class UiText
         (nameof(FollowOnInstagram), FollowOnInstagram),
         (nameof(AllTrips), AllTrips),
         (nameof(HeroIllustration), HeroIllustration),
+        (nameof(TripType), TripType),
+        (nameof(TripDayLong), TripDayLong),
+        (nameof(TripDayShort), TripDayShort),
+        (nameof(TripIslandsLong), TripIslandsLong),
+        (nameof(TripIslandsShort), TripIslandsShort),
+        (nameof(TripWeekLong), TripWeekLong),
+        (nameof(TripWeekShort), TripWeekShort),
     ];
 
     public static UiString MenuName(string pageKey) => pageKey switch

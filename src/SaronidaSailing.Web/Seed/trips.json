@@ -1,0 +1,412 @@
+{
+  "group": "trips",
+  "version": 1,
+  "fields": {
+    "trips.seo.title": {
+      "type": "text",
+      "el": "Εκδρομές με καταμαράν και κράτηση · Saronida Sailing",
+      "en": "Catamaran trips and booking · Saronida Sailing"
+    },
+    "trips.seo.description": {
+      "type": "text",
+      "el": "Ημερήσια κρουαζιέρα στο Σούνιο, νησιά του Σαρωνικού σε 2–3 ημέρες ή εβδομαδιαία ναύλωση με σκίπερ. Δείτε τι περιλαμβάνεται και κλείστε ημερομηνία.",
+      "en": "A day cruise to Sounion, the Saronic islands in 2–3 days or a weekly charter with skipper. See what's included and book a date."
+    },
+    "trips.intro.eyebrow": {
+      "type": "text",
+      "el": "Εκδρομές",
+      "en": "Trips"
+    },
+    "trips.intro.title": {
+      "type": "text",
+      "el": "Διαλέξτε την εκδρομή σας",
+      "en": "Choose your trip"
+    },
+    "trips.intro.lead": {
+      "type": "text",
+      "el": "Όλες οι εκδρομές είναι ιδιωτικές, με σκίπερ στο σκάφος. Διαλέξτε μία και κλείστε ημερομηνία στον ιστότοπο του συνεργάτη μας.",
+      "en": "Every trip is private, with a skipper on board. Pick one and book a date on our partner's website."
+    },
+    "trips.day.title": {
+      "type": "text",
+      "el": "Ημερήσια κρουαζιέρα στο Σούνιο",
+      "en": "Day cruise to Sounion"
+    },
+    "trips.day.text": {
+      "type": "text",
+      "el": "6 ώρες στην Αθηναϊκή Ριβιέρα: απομονωμένοι όρμοι, κολύμπι, σνόρκελ και ο Ναός του Ποσειδώνα από τη θάλασσα.",
+      "en": "6 hours on the Athens Riviera: secluded coves, swimming, snorkelling and the Temple of Poseidon seen from the sea."
+    },
+    "trips.day.included-title": {
+      "type": "text",
+      "el": "Περιλαμβάνονται",
+      "en": "Included"
+    },
+    "trips.day.excluded-title": {
+      "type": "text",
+      "el": "Δεν περιλαμβάνονται",
+      "en": "Not included"
+    },
+    "trips.day.capacity": {
+      "type": "text",
+      "el": "Ιδιωτικό σκάφος, έως [ΑΡ. ΑΤΟΜΩΝ] άτομα",
+      "en": "Private boat, up to [MAX] people"
+    },
+    "trips.islands.title": {
+      "type": "text",
+      "el": "Νησιά σε 2–3 ημέρες",
+      "en": "Islands in 2–3 days"
+    },
+    "trips.islands.text": {
+      "type": "text",
+      "el": "Κοιμηθείτε στο σκάφος και ξυπνήστε σε καινούργιο όρμο. Διαλέξτε διαδρομή και ο σκίπερ την προσαρμόζει στον καιρό.",
+      "en": "Sleep on board and wake up in a new cove. Choose a route and the skipper adapts it to the weather."
+    },
+    "trips.islands.pack-title": {
+      "type": "text",
+      "el": "Ταξιδέψτε ελαφριά",
+      "en": "Travel light"
+    },
+    "trips.islands.capacity": {
+      "type": "text",
+      "el": "Έως [ΑΡ. ΑΤΟΜΩΝ] άτομα",
+      "en": "Up to [MAX] people"
+    },
+    "trips.week.title": {
+      "type": "text",
+      "el": "Εβδομαδιαία ναύλωση με σκίπερ",
+      "en": "Weekly charter with skipper"
+    },
+    "trips.week.text": {
+      "type": "text",
+      "el": "Όλο το Lagoon 500 για μία εβδομάδα ή περισσότερο. Σχεδιάστε τα νησιά με τον σκίπερ πριν έρθετε ή αποφασίστε μέρα με τη μέρα.",
+      "en": "The whole Lagoon 500 for a week or longer. Plan the islands with the skipper before you arrive, or decide day by day."
+    },
+    "trips.week.note": {
+      "type": "text",
+      "el": "Επιβίβαση Σάββατο 10:00, αποβίβαση 17:00 στον Άγιο Νικόλαο. [Ημέρες προς επιβεβαίωση]",
+      "en": "Boarding Saturday 10:00, disembarking 17:00 at Agios Nikolaos. [Days to be confirmed]"
+    },
+    "trips.booking.title": {
+      "type": "text",
+      "el": "Κλείστε ημερομηνία",
+      "en": "Book a date"
+    },
+    "trips.booking.day-label": {
+      "type": "text",
+      "el": "Ημερήσια κρουαζιέρα από",
+      "en": "Day cruise from"
+    },
+    "trips.booking.islands-label": {
+      "type": "text",
+      "el": "Εκδρομή 2–3 ημερών από",
+      "en": "2–3 day trip from"
+    },
+    "trips.booking.week-label": {
+      "type": "text",
+      "el": "Εβδομαδιαία ναύλωση από",
+      "en": "Weekly charter from"
+    },
+    "trips.booking.capacity": {
+      "type": "text",
+      "el": "Ιδιωτικό σκάφος, έως [ΑΡ. ΑΤΟΜΩΝ] άτομα",
+      "en": "Private boat, up to [MAX] people"
+    },
+    "trips.booking.text": {
+      "type": "text",
+      "el": "Τη διαθεσιμότητα και την ασφαλή πληρωμή τις αναλαμβάνουν οι συνεργάτες κρατήσεων. Διαλέξτε όποιον χρησιμοποιείτε ήδη.",
+      "en": "Our booking partners handle availability and secure payment. Choose whichever you already use."
+    },
+    "trips.booking.new-tab-note": {
+      "type": "text",
+      "el": "Ο ιστότοπος κρατήσεων ανοίγει σε νέα καρτέλα",
+      "en": "The booking site opens in a new tab"
+    },
+    "trips.booking.questions": {
+      "type": "text",
+      "el": "Ερωτήσεις; Καλέστε στο",
+      "en": "Questions? Call"
+    },
+    "trips.info.title": {
+      "type": "text",
+      "el": "Χρήσιμες πληροφορίες",
+      "en": "Useful information"
+    }
+  },
+  "lists": {
+    "trips.day-slots": [
+      {
+        "title": {
+          "type": "text",
+          "el": "Πρωινή κρουαζιέρα με μεσημεριανό",
+          "en": "Morning cruise with lunch"
+        },
+        "time": {
+          "type": "text",
+          "el": "10:00 έως 16:00",
+          "en": "10:00 to 16:00"
+        }
+      },
+      {
+        "title": {
+          "type": "text",
+          "el": "Κρουαζιέρα ηλιοβασιλέματος με δείπνο",
+          "en": "Sunset cruise with dinner"
+        },
+        "time": {
+          "type": "text",
+          "el": "14:00 έως 20:00 περίπου",
+          "en": "About 14:00 to 20:00"
+        }
+      }
+    ],
+    "trips.day-included": [
+      {
+        "text": {
+          "type": "text",
+          "el": "Σκίπερ",
+          "en": "Skipper"
+        }
+      },
+      {
+        "text": {
+          "type": "text",
+          "el": "Καύσιμα",
+          "en": "Fuel"
+        }
+      },
+      {
+        "text": {
+          "type": "text",
+          "el": "Ελληνικό γεύμα",
+          "en": "Greek meal"
+        }
+      },
+      {
+        "text": {
+          "type": "text",
+          "el": "Φρούτα",
+          "en": "Fruit"
+        }
+      },
+      {
+        "text": {
+          "type": "text",
+          "el": "Κρασί και αναψυκτικά",
+          "en": "Wine and soft drinks"
+        }
+      },
+      {
+        "text": {
+          "type": "text",
+          "el": "Νερό",
+          "en": "Water"
+        }
+      },
+      {
+        "text": {
+          "type": "text",
+          "el": "Εξοπλισμός σνόρκελ",
+          "en": "Snorkelling gear"
+        }
+      },
+      {
+        "text": {
+          "type": "text",
+          "el": "Paddle board",
+          "en": "Paddle board"
+        }
+      },
+      {
+        "text": {
+          "type": "text",
+          "el": "Δωρεάν Wi-Fi",
+          "en": "Free Wi-Fi"
+        }
+      }
+    ],
+    "trips.day-excluded": [
+      {
+        "text": {
+          "type": "text",
+          "el": "Είσοδος σε αρχαιολογικούς χώρους",
+          "en": "Entry to archaeological sites"
+        }
+      },
+      {
+        "text": {
+          "type": "text",
+          "el": "Μεταφορά από την Αθήνα (κατόπιν αιτήματος)",
+          "en": "Transfer from Athens (on request)"
+        }
+      }
+    ],
+    "trips.islands-routes": [
+      {
+        "title": {
+          "type": "text",
+          "el": "Σαρωνικός",
+          "en": "Saronic Gulf"
+        },
+        "places": {
+          "type": "text",
+          "el": "Αίγινα · Πόρος · Ύδρα · Σπέτσες",
+          "en": "Aegina · Poros · Hydra · Spetses"
+        }
+      },
+      {
+        "title": {
+          "type": "text",
+          "el": "Δυτικές Κυκλάδες",
+          "en": "Western Cyclades"
+        },
+        "places": {
+          "type": "text",
+          "el": "Κέα · Κύθνος · Σέριφος",
+          "en": "Kea · Kythnos · Serifos"
+        }
+      }
+    ],
+    "trips.islands-pack": [
+      {
+        "text": {
+          "type": "text",
+          "el": "Μαλακή τσάντα αντί για βαλίτσα",
+          "en": "A soft bag instead of a suitcase"
+        }
+      },
+      {
+        "text": {
+          "type": "text",
+          "el": "Παπούτσια με μαλακή σόλα για το κατάστρωμα",
+          "en": "Soft-soled shoes for the deck"
+        }
+      },
+      {
+        "text": {
+          "type": "text",
+          "el": "Καπέλο, πετσέτα, αντηλιακό και ένα ελαφρύ αδιάβροχο",
+          "en": "A hat, towel, sunscreen and a light waterproof jacket"
+        }
+      }
+    ],
+    "trips.week-prices": [
+      {
+        "label": {
+          "type": "text",
+          "el": "Σκάφος και σκίπερ, ανά εβδομάδα",
+          "en": "Boat and skipper, per week"
+        },
+        "value": {
+          "type": "text",
+          "el": "[ΤΙΜΗ]",
+          "en": "[PRICE]"
+        }
+      },
+      {
+        "label": {
+          "type": "text",
+          "el": "Πακέτο ναύλωσης (σεντόνια, γκάζι, λέμβος, καθαρισμός)",
+          "en": "Charter package (linen, gas, dinghy, cleaning)"
+        },
+        "value": {
+          "type": "text",
+          "el": "[ΤΙΜΗ]",
+          "en": "[PRICE]"
+        }
+      },
+      {
+        "label": {
+          "type": "text",
+          "el": "Εγγύηση",
+          "en": "Security deposit"
+        },
+        "value": {
+          "type": "text",
+          "el": "[ΠΟΣΟ]",
+          "en": "[AMOUNT]"
+        }
+      }
+    ],
+    "trips.booking-platforms": [
+      {
+        "link": {
+          "type": "link",
+          "url": "https://example.com/",
+          "el": "Κράτηση στο [Πλατφόρμα Α]",
+          "en": "Book on [Platform A]"
+        }
+      },
+      {
+        "link": {
+          "type": "link",
+          "url": "https://example.com/",
+          "el": "Κράτηση στο [Πλατφόρμα Β]",
+          "en": "Book on [Platform B]"
+        }
+      }
+    ],
+    "trips.info-items": [
+      {
+        "question": {
+          "type": "text",
+          "el": "Κακοκαιρία",
+          "en": "Bad weather"
+        },
+        "answer": {
+          "type": "richText",
+          "el": "<p>Αν ο καιρός ακυρώσει μια ημερήσια κρουαζιέρα και δεν βρούμε άλλη ημερομηνία, σας επιστρέφουμε όλο το ποσό.</p>",
+          "en": "<p>If the weather cancels a day cruise and we cannot find another date, we refund the full amount.</p>"
+        }
+      },
+      {
+        "question": {
+          "type": "text",
+          "el": "Ακυρώσεις",
+          "en": "Cancellations"
+        },
+        "answer": {
+          "type": "richText",
+          "el": "<p>[Όροι ακύρωσης ανά τύπο εκδρομής, προς επιβεβαίωση με τον ιδιοκτήτη και τις πλατφόρμες κρατήσεων.]</p>",
+          "en": "<p>[Cancellation terms for each trip type, to be confirmed with the owner and the booking platforms.]</p>"
+        }
+      },
+      {
+        "question": {
+          "type": "text",
+          "el": "Τι να φέρετε",
+          "en": "What to bring"
+        },
+        "answer": {
+          "type": "richText",
+          "el": "<p>Καπέλο, πετσέτα, αντηλιακό και μαγιό. Παπούτσια με μαλακή σόλα, αν έχετε.</p>",
+          "en": "<p>A hat, towel, sunscreen and swimwear. Soft-soled shoes, if you have them.</p>"
+        }
+      },
+      {
+        "question": {
+          "type": "text",
+          "el": "Σημείο συνάντησης",
+          "en": "Meeting point"
+        },
+        "answer": {
+          "type": "richText",
+          "el": "<p>Λιμάνι Αγίου Νικολάου, Ανάβυσσος. Σας στέλνουμε την ακριβή τοποθεσία με την κράτηση.</p>",
+          "en": "<p>Agios Nikolaos harbour, Anavyssos. We send you the exact location with your booking.</p>"
+        }
+      },
+      {
+        "question": {
+          "type": "text",
+          "el": "Γλώσσες στο σκάφος",
+          "en": "Languages on board"
+        },
+        "answer": {
+          "type": "richText",
+          "el": "<p>Ελληνικά και αγγλικά.</p>",
+          "en": "<p>Greek and English.</p>"
+        }
+      }
+    ]
+  }
+}

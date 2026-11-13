@@ -80,10 +80,18 @@ try
     builder.Services.AddScoped<IInstagramWarningService, InstagramWarningService>();
     builder.Services.AddScoped<ISectionActivationHandler, InstagramSectionHandler>();
     builder.Services.AddSingleton<InstagramOAuthState>();
-    builder.Services.AddOutputCache(options => options.AddPolicy(CacheTags.PolicyName, policy => policy
-        .Expire(TimeSpan.FromHours(1))
-        .Tag(CacheTags.AllPages)
-        .SetVaryByQuery([])));
+    builder.Services.AddOutputCache(options =>
+    {
+        options.AddPolicy(CacheTags.PolicyName, policy => policy
+            .Expire(TimeSpan.FromHours(1))
+            .Tag(CacheTags.AllPages)
+            .SetVaryByQuery([]));
+        options.AddPolicy(CacheTags.TripsPolicyName, policy => policy
+            .Expire(TimeSpan.FromHours(1))
+            .Tag(CacheTags.AllPages)
+            .SetVaryByQuery([])
+            .AddPolicy<TripsVaryByPolicy>());
+    });
     builder.Services.AddScoped<IContentService, ContentService>();
     builder.Services.AddSingleton<IContentSeedSource, EmbeddedContentSeedSource>();
     builder.Services.AddScoped<IContentSeeder, ContentSeeder>();

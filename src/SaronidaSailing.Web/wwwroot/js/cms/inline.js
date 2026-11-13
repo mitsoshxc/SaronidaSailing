@@ -66,7 +66,16 @@ export const createInline = ({ fields, editMode }) => {
             return;
         }
         const editable = event.target.closest('[data-cms-key]');
-        if (editable?.closest('a')) {
+        if (editable?.closest('a') || editable?.closest('summary')) {
+            event.preventDefault();
+        }
+    }, true);
+
+    // Chromium and Firefox toggle a <details> from a Space keyup inside its <summary>; the character
+    // is already inserted on keydown, so cancelling only the keyup keeps typing intact.
+    document.addEventListener('keyup', (event) => {
+        if (event.key === ' ' && editMode.isEditing() && event.target instanceof Element
+            && event.target.closest('[data-cms-key]')?.closest('summary')) {
             event.preventDefault();
         }
     }, true);

@@ -1071,4 +1071,8 @@ html:not(.cms-view) .visually-hidden[data-cms-key] {
         position: static;
         display: flex;
     }
+
+    .trip-booking {
+        top: calc(var(--space-5) + var(--cms-toolbar-height, 0px));
+    }
 }
