@@ -14,6 +14,7 @@ using SaronidaSailing.Infrastructure.Data;
 using SaronidaSailing.Core.Interfaces;
 using SaronidaSailing.Infrastructure.Logging;
 using SaronidaSailing.Infrastructure.Instagram;
+using SaronidaSailing.Infrastructure.Jobs;
 using SaronidaSailing.Infrastructure.Media;
 using SaronidaSailing.Infrastructure.Repositories;
 
@@ -61,6 +62,9 @@ public static class DependencyInjection
         services.AddScoped<IInstagramPostRepository, InstagramPostRepository>();
         services.AddScoped<IIntegrationSettingRepository, IntegrationSettingRepository>();
         services.AddInstagram(configuration);
+        services.AddSingleton<IInstagramJobQueue, InstagramJobQueue>();
+        services.AddScoped<InstagramFetchJob>();
+        services.AddScoped<InstagramTokenRefreshJob>();
         services.AddSingleton<MediaProcessingGate>();
         services.AddScoped<IMediaService, MediaService>();
 

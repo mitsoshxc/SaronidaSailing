@@ -42,6 +42,27 @@
     }
 </form>
 
+@if (status.State == InstagramConnectionState.Connected)
+{
+    <form method="post" asp-page-handler="Fetch">
+        <button type="submit" class="admin-button">Fetch now</button>
+    </form>
+}
+
+@if (Model.Activity.HasAnything)
+{
+    <h2>Status</h2>
+    <p>Posts stored: @Model.Activity.PostCount.</p>
+    @if (Model.LastFetchText is { } fetchText)
+    {
+        <p>Last fetch: @fetchText</p>
+    }
+    @if (Model.LastRefreshText is { } refreshText)
+    {
+        <p>Last access renewal: @refreshText</p>
+    }
+}
+
 @if (connected)
 {
     <form method="post" asp-page-handler="Disconnect" class="instagram-disconnect" data-instagram-disconnect>

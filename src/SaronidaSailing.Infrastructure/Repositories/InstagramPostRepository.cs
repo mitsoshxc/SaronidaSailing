@@ -20,5 +20,7 @@ public sealed class InstagramPostRepository(AppDbContext db) : IInstagramPostRep
 
     public void Add(InstagramPost post) => db.Set<InstagramPost>().Add(post);
 
+    public Task<int> CountAsync(CancellationToken ct = default) => db.Set<InstagramPost>().CountAsync(ct);
+
     public void Remove(InstagramPost post) => db.Set<InstagramPost>().Remove(post);
 }

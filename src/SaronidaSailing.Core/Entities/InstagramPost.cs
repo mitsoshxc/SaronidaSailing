@@ -8,15 +8,27 @@ public class InstagramPost : BaseEntity
 
     public required string InstagramId { get; init; }
 
-    public required string Permalink { get; init; }
+    public string Permalink { get; private set; } = "";
 
-    public string? Caption { get; init; }
+    public string? Caption { get; private set; }
 
     public required string MediaType { get; init; }
 
     public required Guid MediaAssetId { get; init; }
 
     public required DateTime PostedAt { get; init; }
+
+    public bool Update(string? caption, string permalink)
+    {
+        if (Caption == caption && Permalink == permalink)
+        {
+            return false;
+        }
+
+        Caption = caption;
+        Permalink = permalink;
+        return true;
+    }
 
     public static InstagramPost Create(
         string instagramId,

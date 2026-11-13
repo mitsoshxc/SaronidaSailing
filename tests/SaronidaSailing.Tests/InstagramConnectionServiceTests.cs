@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using SaronidaSailing.Core.Entities;
 using SaronidaSailing.Core.Interfaces;
@@ -20,7 +21,8 @@ public sealed class InstagramConnectionServiceTests : IAsyncLifetime
     private string _connectionString = "";
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 11, 13, 10, 0, 0, TimeSpan.Zero));
     private readonly DataProtectionSecretProtector _protector = new(new EphemeralDataProtectionProvider());
-    private readonly RecordingAuditLog _audit = new();
+    private readonly InstagramAuditLog _audit = new();
+    private readonly FakeInstagramJobQueue _queue = new();
     private readonly FakeClient _client = new();
 
     public async Task InitializeAsync() => _connectionString = await PostgresTestServer.CreateDatabaseAsync();
@@ -41,7 +43,8 @@ public sealed class InstagramConnectionServiceTests : IAsyncLifetime
         Assert.Equal(
             [
                 InstagramSettingKeys.AccessToken, InstagramSettingKeys.ConnectedAt, InstagramSettingKeys.ConnectedBy,
-                InstagramSettingKeys.TokenExpiresAt, InstagramSettingKeys.UserId, InstagramSettingKeys.Username,
+                InstagramSettingKeys.TokenExpiresAt, InstagramSettingKeys.TokenIssuedAt, InstagramSettingKeys.UserId,
+                InstagramSettingKeys.Username,
             ],
             rows.Keys.Order().ToArray());
         Assert.NotEqual(LongToken, rows[InstagramSettingKeys.AccessToken]);
@@ -50,6 +53,8 @@ public sealed class InstagramConnectionServiceTests : IAsyncLifetime
         Assert.Equal(LongToken, plain);
         Assert.Equal("2026-11-13T10:00:00.0000000Z", rows[InstagramSettingKeys.ConnectedAt]);
         Assert.Equal("2027-01-12T10:00:00.0000000Z", rows[InstagramSettingKeys.TokenExpiresAt]);
+        Assert.Equal("2026-11-13T10:00:00.0000000Z", rows[InstagramSettingKeys.TokenIssuedAt]);
+        Assert.Equal(1, _queue.FetchCount);
         Assert.Equal("17841400000000001", rows[InstagramSettingKeys.UserId]);
         Assert.Equal("saronida", rows[InstagramSettingKeys.Username]);
         Assert.Equal(Admin, rows[InstagramSettingKeys.ConnectedBy]);
@@ -71,6 +76,7 @@ public sealed class InstagramConnectionServiceTests : IAsyncLifetime
 
         Assert.False(result.Succeeded);
         Assert.Equal(kind, result.ErrorKind);
+        Assert.Equal(0, _queue.FetchCount);
         Assert.Empty(await Rows());
         var entry = Assert.Single(_audit.Entries);
         Assert.Equal(("instagram-connect-failed", Admin, "10.0.0.1", expectedDetails), entry);
@@ -170,6 +176,130 @@ public sealed class InstagramConnectionServiceTests : IAsyncLifetime
         Assert.Equal(("instagram-disconnected", Admin, "10.0.0.2", (string?)null), Assert.Single(_audit.Entries));
     }
 
+    [Fact]
+    public async Task Refresh_WhenNotConnected_IsSkipped_WithoutACall_AndWritesTheStatus()
+    {
+        var result = await Service(out _).RefreshTokenAsync();
+
+        Assert.Equal("skipped:not-connected", result.Code);
+        Assert.Equal(0, _client.RefreshCalls);
+        await AssertLastRefreshAsync("skipped:not-connected");
+    }
+
+    [Fact]
+    public async Task Refresh_WhenDisconnected_IsSkipped_WithoutACall()
+    {
+        await Connect();
+        await Run(s => s.SetAsync(InstagramSettingKeys.TokenInvalidAt, "2026-11-13T11:00:00.0000000Z"), save: true);
+
+        var result = await Service(out _).RefreshTokenAsync();
+
+        Assert.Equal("skipped:not-connected", result.Code);
+        Assert.Equal(0, _client.RefreshCalls);
+    }
+
+    [Fact]
+    public async Task Refresh_WhenIssuedLessThan24HoursAgo_IsTooRecent_WithoutACall()
+    {
+        await Connect();
+        _time.Advance(TimeSpan.FromHours(23));
+
+        var result = await Service(out _).RefreshTokenAsync();
+
+        Assert.Equal("skipped:too-recent", result.Code);
+        Assert.Equal(0, _client.RefreshCalls);
+        await AssertLastRefreshAsync("skipped:too-recent");
+    }
+
+    [Fact]
+    public async Task Refresh_Ok_StoresTheNewProtectedTokenExpiryAndIssuedAt()
+    {
+        await Connect();
+        _time.Advance(TimeSpan.FromDays(7));
+        _client.Renewed = new InstagramLongLivedToken("RENEWED-TOKEN-789", _time.GetUtcNow().UtcDateTime.AddDays(60));
+
+        var result = await Service(out _).RefreshTokenAsync();
+
+        Assert.Equal("ok", result.Code);
+        Assert.Equal([LongToken], _client.RefreshedTokens);
+        var rows = await Rows();
+        Assert.DoesNotContain("RENEWED-TOKEN-789", rows[InstagramSettingKeys.AccessToken]);
+        Assert.True(_protector.TryUnprotect(rows[InstagramSettingKeys.AccessToken], out var plain));
+        Assert.Equal("RENEWED-TOKEN-789", plain);
+        Assert.Equal("2027-01-19T10:00:00.0000000Z", rows[InstagramSettingKeys.TokenExpiresAt]);
+        Assert.Equal("2026-11-20T10:00:00.0000000Z", rows[InstagramSettingKeys.TokenIssuedAt]);
+        Assert.Equal(InstagramConnectionState.Connected, (await Service(out _).GetStatusAsync()).State);
+        await AssertLastRefreshAsync("ok");
+    }
+
+    [Fact]
+    public async Task Refresh_TokenInvalid_DisconnectsTheConnection()
+    {
+        await Connect();
+        _time.Advance(TimeSpan.FromDays(7));
+        _client.RefreshFailure = new InstagramApiException(InstagramApiErrorKind.TokenInvalid, "revoked", 190);
+
+        var result = await Service(out _).RefreshTokenAsync();
+
+        Assert.Equal("failed:TokenInvalid", result.Code);
+        Assert.Equal(InstagramConnectionState.Disconnected, (await Service(out _).GetStatusAsync()).State);
+        await AssertLastRefreshAsync("failed:TokenInvalid");
+    }
+
+    [Theory]
+    [InlineData(InstagramApiErrorKind.Transient)]
+    [InlineData(InstagramApiErrorKind.Other)]
+    public async Task Refresh_OtherFailures_KeepTheConnection(InstagramApiErrorKind kind)
+    {
+        await Connect();
+        _time.Advance(TimeSpan.FromDays(7));
+        _client.RefreshFailure = new InstagramApiException(kind, "boom");
+
+        var result = await Service(out _).RefreshTokenAsync();
+
+        Assert.Equal($"failed:{kind}", result.Code);
+        Assert.Equal(InstagramConnectionState.Connected, (await Service(out _).GetStatusAsync()).State);
+        await AssertLastRefreshAsync($"failed:{kind}");
+    }
+
+    [Fact]
+    public async Task MarkTokenInvalid_MakesTheStatusDisconnected()
+    {
+        await Connect();
+
+        await Service(out _).MarkTokenInvalidAsync();
+
+        Assert.Equal(InstagramConnectionState.Disconnected, (await Service(out _).GetStatusAsync()).State);
+        Assert.Contains(InstagramSettingKeys.TokenInvalidAt, (await Rows()).Keys);
+    }
+
+    [Fact]
+    public async Task Disconnect_KeepsTheLastRunStatusKeys()
+    {
+        await Connect();
+        _time.Advance(TimeSpan.FromDays(7));
+        _client.RefreshFailure = new InstagramApiException(InstagramApiErrorKind.Transient, "boom");
+        await Service(out _).RefreshTokenAsync();
+        await Run(s => s.SetAsync(InstagramSettingKeys.LastFetchResult, "ok:3"), save: true);
+
+        await Service(out _).DisconnectAsync(Admin, null);
+
+        Assert.Equal(
+            [
+                InstagramSettingKeys.LastFetchResult, InstagramSettingKeys.LastRefreshAt, InstagramSettingKeys.LastRefreshResult,
+            ],
+            (await Rows()).Keys.Order().ToArray());
+    }
+
+    private async Task AssertLastRefreshAsync(string expected)
+    {
+        var rows = await Rows();
+        Assert.Equal(expected, rows[InstagramSettingKeys.LastRefreshResult]);
+        Assert.Equal(
+            _time.GetUtcNow().UtcDateTime.ToString("O", System.Globalization.CultureInfo.InvariantCulture),
+            rows[InstagramSettingKeys.LastRefreshAt]);
+    }
+
     private async Task Connect()
     {
         _client.ExpiresAt = _time.GetUtcNow().UtcDateTime.AddDays(60);
@@ -181,7 +311,7 @@ public sealed class InstagramConnectionServiceTests : IAsyncLifetime
     {
         context = CreateContext();
         return new InstagramConnectionService(
-            _client, new IntegrationSettingRepository(context), new UnitOfWork(context), _protector, _audit, _time);
+            _client, new IntegrationSettingRepository(context), new UnitOfWork(context), _protector, _audit, _queue, NullLogger<InstagramConnectionService>.Instance, _time);
     }
 
     private async Task Run(Func<IIntegrationSettingRepository, Task> action, bool save)
@@ -211,6 +341,14 @@ public sealed class InstagramConnectionServiceTests : IAsyncLifetime
 
         public InstagramApiException? Failure { get; set; }
 
+        public InstagramApiException? RefreshFailure { get; set; }
+
+        public InstagramLongLivedToken? Renewed { get; set; }
+
+        public int RefreshCalls { get; private set; }
+
+        public List<string> RefreshedTokens { get; } = [];
+
         public string? ReceivedCode { get; private set; }
 
         public string? ReceivedRedirect { get; private set; }
@@ -229,8 +367,14 @@ public sealed class InstagramConnectionServiceTests : IAsyncLifetime
         public Task<InstagramLongLivedToken> ExchangeForLongLivedAsync(string shortLivedToken, CancellationToken ct = default) =>
             Task.FromResult(new InstagramLongLivedToken(LongToken, ExpiresAt));
 
-        public Task<InstagramLongLivedToken> RefreshAsync(string longLivedToken, CancellationToken ct = default) =>
-            throw new NotSupportedException();
+        public Task<InstagramLongLivedToken> RefreshAsync(string longLivedToken, CancellationToken ct = default)
+        {
+            RefreshCalls++;
+            RefreshedTokens.Add(longLivedToken);
+            return RefreshFailure is not null
+                ? Task.FromException<InstagramLongLivedToken>(RefreshFailure)
+                : Task.FromResult(Renewed ?? throw new InvalidOperationException("Renewed token not set."));
+        }
 
         public Task<InstagramProfile> GetProfileAsync(string token, CancellationToken ct = default) =>
             Task.FromResult(new InstagramProfile("17841400000000001", "saronida"));
@@ -241,11 +385,4 @@ public sealed class InstagramConnectionServiceTests : IAsyncLifetime
         public Task<Stream> DownloadImageAsync(string url, CancellationToken ct = default) => throw new NotSupportedException();
     }
 
-    private sealed class RecordingAuditLog : IAuditLog
-    {
-        public List<(string Event, string? User, string? Ip, string? Details)> Entries { get; } = [];
-
-        public void Record(string eventName, string? userName, string? ipAddress, string? details = null) =>
-            Entries.Add((eventName, userName, ipAddress, details));
-    }
 }

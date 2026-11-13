@@ -15,6 +15,8 @@ public sealed record InstagramStatus(
     DateTime? ConnectedAt,
     string? ConnectedBy);
 
+public sealed record InstagramRefreshResult(string Code);
+
 public sealed record InstagramConnectResult(bool Succeeded, string? Username, InstagramApiErrorKind? ErrorKind);
 
 public interface IInstagramConnectionService
@@ -27,4 +29,8 @@ public interface IInstagramConnectionService
         string code, string redirectUri, string adminEmail, string? ipAddress, CancellationToken ct = default);
 
     Task DisconnectAsync(string adminEmail, string? ipAddress, CancellationToken ct = default);
+
+    Task MarkTokenInvalidAsync(CancellationToken ct = default);
+
+    Task<InstagramRefreshResult> RefreshTokenAsync(CancellationToken ct = default);
 }

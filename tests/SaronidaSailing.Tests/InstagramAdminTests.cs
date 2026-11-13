@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Time.Testing;
 using SaronidaSailing.Core.Interfaces;
 using SaronidaSailing.Core.Services;
+using SaronidaSailing.Infrastructure.Jobs;
 using static SaronidaSailing.Tests.AdminTestHelpers;
 
 namespace SaronidaSailing.Tests;
@@ -18,6 +19,8 @@ public sealed class InstagramWebApplicationFactory : TempDatabaseWebApplicationF
 
     public FakeInstagramClient Instagram { get; } = new();
 
+    public FakeInstagramJobQueue JobQueue { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         base.ConfigureWebHost(builder);
@@ -27,6 +30,8 @@ public sealed class InstagramWebApplicationFactory : TempDatabaseWebApplicationF
             services.AddSingleton<TimeProvider>(Time);
             services.RemoveAll<IInstagramApiClient>();
             services.AddSingleton<IInstagramApiClient>(Instagram);
+            services.RemoveAll<IInstagramJobQueue>();
+            services.AddSingleton<IInstagramJobQueue>(JobQueue);
         });
     }
 }
@@ -104,6 +109,7 @@ public class InstagramAdminTests(InstagramWebApplicationFactory factory) : IClas
         Assert.Contains("Not connected.", html);
         Assert.Contains("Connect Instagram", html);
         Assert.DoesNotContain("Disconnect", html);
+        Assert.DoesNotContain("Fetch now", html);
         Assert.Contains("no-store", response.Headers.CacheControl!.ToString());
     }
 
@@ -324,6 +330,180 @@ public class InstagramAdminTests(InstagramWebApplicationFactory factory) : IClas
         Assert.Equal("/admin/instagram", Location(response));
         await AssertNotConnectedAsync();
         Assert.Contains(ReadLogLines(factory.LogsPath, "audit"), l => l.Contains($"|instagram-disconnected|user={admin.Email}|"));
+    }
+
+    [Fact]
+    public async Task Page_Connected_ShowsFetchNow_AndDisconnected_DoesNot()
+    {
+        await ResetAsync();
+        var admin = await AdminWithClientAsync("ig-fetchbutton@example.com");
+        Assert.DoesNotContain("Fetch now", await (await admin.Client.GetAsync(Page)).Content.ReadAsStringAsync());
+        var (state, nonce) = await StartAsync(admin.Client);
+        await CallbackAsync(NewClient(factory), $"code=C&state={Uri.EscapeDataString(state)}", nonce);
+
+        var connected = await (await admin.Client.GetAsync(Page)).Content.ReadAsStringAsync();
+        await SetSettingsAsync((InstagramSettingKeys.TokenInvalidAt, "2026-11-13T11:00:00.0000000Z"));
+        var expired = await (await admin.Client.GetAsync(Page)).Content.ReadAsStringAsync();
+
+        Assert.Contains("Fetch now", connected);
+        Assert.Contains("handler=Fetch", connected);
+        Assert.DoesNotContain("Fetch now", expired);
+    }
+
+    [Fact]
+    public async Task Fetch_WithoutAntiforgery_IsRejected()
+    {
+        var client = await LoggedInClientAsync("ig-fetch-csrf@example.com");
+
+        var response = await client.PostAsync(Page + "?handler=Fetch", new FormUrlEncodedContent(new Dictionary<string, string>()));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Fetch_Anonymous_IsRedirectedToLogin()
+    {
+        var response = await NewClient(factory).PostAsync(Page + "?handler=Fetch", new FormUrlEncodedContent(new Dictionary<string, string>()));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Contains("/admin/login", Location(response));
+    }
+
+    [Fact]
+    public async Task Fetch_WhenConnected_Enqueues_Audits_AndShowsTheBanner()
+    {
+        await ResetAsync();
+        var admin = await AdminWithClientAsync("ig-fetch@example.com");
+        var (state, nonce) = await StartAsync(admin.Client);
+        factory.JobQueue.Reset();
+        await CallbackAsync(NewClient(factory), $"code=C&state={Uri.EscapeDataString(state)}", nonce);
+        Assert.Equal(1, factory.JobQueue.FetchCount);
+        factory.JobQueue.Reset();
+
+        var response = await PostHandlerAsync(admin.Client, "Fetch");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/admin/instagram?result=fetch-queued", Location(response));
+        Assert.Equal(1, factory.JobQueue.FetchCount);
+        Assert.Contains(ReadLogLines(factory.LogsPath, "audit"), l => l.Contains($"|instagram-fetch-requested|user={admin.Email}|"));
+        var html = await (await admin.Client.GetAsync(Location(response))).Content.ReadAsStringAsync();
+        Assert.Contains("role=\"status\"", html);
+        Assert.Contains("Fetching the latest posts. Reload this page in a minute to see the result.", html);
+    }
+
+    [Fact]
+    public async Task Fetch_WhenNotConnected_EnqueuesNothing()
+    {
+        await ResetAsync();
+        var client = await LoggedInClientAsync("ig-fetch-notconnected@example.com");
+        factory.JobQueue.Reset();
+
+        var response = await PostHandlerAsync(client, "Fetch");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/admin/instagram", Location(response));
+        Assert.Equal(0, factory.JobQueue.FetchCount);
+    }
+
+    [Theory]
+    [InlineData("ok:7", "Last fetch: 13 Nov 2026, 12:00 — 7 posts")]
+    [InlineData("ok:1", "Last fetch: 13 Nov 2026, 12:00 — 1 post<")]
+    [InlineData("failed:TokenInvalid", "Instagram rejected the access, please reconnect")]
+    [InlineData("failed:Transient", "Instagram was not reachable, will retry at the next scheduled fetch")]
+    [InlineData("failed:Other", "Instagram returned an error")]
+    [InlineData("skipped:not-connected", "skipped, not connected")]
+    [InlineData("skipped:no-posts", "Instagram returned no posts; the last posts were kept")]
+    public async Task Status_ShowsTheLastFetchWithAMappedText(string result, string expected)
+    {
+        await ResetAsync();
+        var client = await LoggedInClientAsync($"ig-status-{Guid.NewGuid():N}@example.com");
+        await SetSettingsAsync(
+            (InstagramSettingKeys.LastFetchAt, "2026-11-13T10:00:00.0000000Z"),
+            (InstagramSettingKeys.LastFetchResult, result));
+        try
+        {
+            var html = await (await client.GetAsync(Page)).Content.ReadAsStringAsync();
+
+            Assert.Contains("<h2>Status</h2>", html);
+            Assert.Contains("Posts stored: 0.", html);
+            Assert.Contains(expected, html);
+            Assert.DoesNotContain("Last access renewal", html);
+        }
+        finally
+        {
+            await RemoveSettingsAsync(InstagramSettingKeys.LastFetchAt, InstagramSettingKeys.LastFetchResult);
+        }
+    }
+
+    [Theory]
+    [InlineData("ok", "renewed")]
+    [InlineData("skipped:too-recent", "not needed yet")]
+    [InlineData("failed:TokenInvalid", "Instagram rejected the access, please reconnect")]
+    [InlineData("skipped:not-connected", "skipped, not connected")]
+    public async Task Status_ShowsTheLastRenewalWithAMappedText(string result, string text)
+    {
+        await ResetAsync();
+        var client = await LoggedInClientAsync($"ig-renewal-{Guid.NewGuid():N}@example.com");
+        await SetSettingsAsync(
+            (InstagramSettingKeys.LastRefreshAt, "2026-07-13T10:00:00.0000000Z"),
+            (InstagramSettingKeys.LastRefreshResult, result));
+        try
+        {
+            var html = await (await client.GetAsync(Page)).Content.ReadAsStringAsync();
+
+            Assert.Contains($"Last access renewal: 13 Jul 2026, 13:00 — {text}", html);
+            Assert.DoesNotContain("Last fetch", html);
+        }
+        finally
+        {
+            await RemoveSettingsAsync(InstagramSettingKeys.LastRefreshAt, InstagramSettingKeys.LastRefreshResult);
+        }
+    }
+
+    [Fact]
+    public async Task Status_IsHidden_WhenNothingHasHappened()
+    {
+        await ResetAsync();
+        var client = await LoggedInClientAsync("ig-nostatus@example.com");
+
+        var html = await (await client.GetAsync(Page)).Content.ReadAsStringAsync();
+
+        Assert.DoesNotContain("<h2>Status</h2>", html);
+        Assert.DoesNotContain("Posts stored", html);
+    }
+
+    [Fact]
+    public async Task JobClasses_AreResolvableFromTheContainer()
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+
+        Assert.NotNull(scope.ServiceProvider.GetRequiredService<InstagramFetchJob>());
+        Assert.NotNull(scope.ServiceProvider.GetRequiredService<InstagramTokenRefreshJob>());
+        Assert.NotNull(scope.ServiceProvider.GetRequiredService<IInstagramFeedService>());
+    }
+
+    private async Task SetSettingsAsync(params (string Key, string Value)[] values)
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var settings = scope.ServiceProvider.GetRequiredService<IIntegrationSettingRepository>();
+        foreach (var (key, value) in values)
+        {
+            await settings.SetAsync(key, value);
+        }
+
+        await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync();
+    }
+
+    private async Task RemoveSettingsAsync(params string[] keys)
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var settings = scope.ServiceProvider.GetRequiredService<IIntegrationSettingRepository>();
+        foreach (var key in keys)
+        {
+            await settings.RemoveAsync(key);
+        }
+
+        await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync();
     }
 
     private async Task ResetAsync()

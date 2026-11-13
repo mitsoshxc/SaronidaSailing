@@ -1,4 +1,4 @@
-using System.Globalization;
+using Microsoft.Extensions.Logging;
 using SaronidaSailing.Core.Interfaces;
 
 namespace SaronidaSailing.Core.Services;
@@ -9,8 +9,12 @@ public sealed class InstagramConnectionService(
     IUnitOfWork unitOfWork,
     ISecretProtector protector,
     IAuditLog audit,
+    IInstagramJobQueue jobQueue,
+    ILogger<InstagramConnectionService> logger,
     TimeProvider time) : IInstagramConnectionService
 {
+    private static readonly TimeSpan MinimumTokenAge = TimeSpan.FromHours(24);
+
     public async Task<InstagramStatus> GetStatusAsync(CancellationToken ct = default) =>
         (await ReadAsync(ct)).Status;
 
@@ -27,15 +31,17 @@ public sealed class InstagramConnectionService(
             var profile = await client.GetProfileAsync(longLived.AccessToken, ct);
 
             await settings.SetAsync(InstagramSettingKeys.AccessToken, protector.Protect(longLived.AccessToken), ct);
-            await settings.SetAsync(InstagramSettingKeys.TokenExpiresAt, Format(longLived.ExpiresAt), ct);
+            await settings.SetAsync(InstagramSettingKeys.TokenExpiresAt, InstagramTimestamps.Format(longLived.ExpiresAt), ct);
+            await settings.SetAsync(InstagramSettingKeys.TokenIssuedAt, InstagramTimestamps.Format(time.GetUtcNow().UtcDateTime), ct);
             await settings.SetAsync(InstagramSettingKeys.UserId, profile.Id, ct);
             await settings.SetAsync(InstagramSettingKeys.Username, profile.Username, ct);
-            await settings.SetAsync(InstagramSettingKeys.ConnectedAt, Format(time.GetUtcNow().UtcDateTime), ct);
+            await settings.SetAsync(InstagramSettingKeys.ConnectedAt, InstagramTimestamps.Format(time.GetUtcNow().UtcDateTime), ct);
             await settings.SetAsync(InstagramSettingKeys.ConnectedBy, adminEmail, ct);
             await settings.RemoveAsync(InstagramSettingKeys.TokenInvalidAt, ct);
             await unitOfWork.SaveChangesAsync(ct);
 
             audit.Record("instagram-connected", adminEmail, ipAddress, $"username=@{profile.Username}");
+            jobQueue.EnqueueFetch();
             return new InstagramConnectResult(true, profile.Username, null);
         }
         catch (InstagramApiException ex)
@@ -57,6 +63,59 @@ public sealed class InstagramConnectionService(
         audit.Record("instagram-disconnected", adminEmail, ipAddress);
     }
 
+    public async Task MarkTokenInvalidAsync(CancellationToken ct = default)
+    {
+        await StageTokenInvalidAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
+    }
+
+    public async Task<InstagramRefreshResult> RefreshTokenAsync(CancellationToken ct = default)
+    {
+        var token = await GetAccessTokenAsync(ct);
+        if (token is null)
+        {
+            return await FinishRefreshAsync("skipped:not-connected", ct);
+        }
+
+        var issuedAt = InstagramTimestamps.Parse(await settings.GetAsync(InstagramSettingKeys.TokenIssuedAt, ct));
+        if (issuedAt is { } issued && time.GetUtcNow().UtcDateTime - issued < MinimumTokenAge)
+        {
+            return await FinishRefreshAsync("skipped:too-recent", ct);
+        }
+
+        try
+        {
+            var renewed = await client.RefreshAsync(token, ct);
+            var now = time.GetUtcNow().UtcDateTime;
+            await settings.SetAsync(InstagramSettingKeys.AccessToken, protector.Protect(renewed.AccessToken), ct);
+            await settings.SetAsync(InstagramSettingKeys.TokenExpiresAt, InstagramTimestamps.Format(renewed.ExpiresAt), ct);
+            await settings.SetAsync(InstagramSettingKeys.TokenIssuedAt, InstagramTimestamps.Format(now), ct);
+            logger.LogInformation("Instagram access token renewed, valid until {ExpiresAt:O}.", renewed.ExpiresAt);
+            return await FinishRefreshAsync("ok", ct);
+        }
+        catch (InstagramApiException ex)
+        {
+            logger.LogWarning("Instagram token renewal failed: kind={Kind} code={Code}.", ex.Kind, ex.ErrorCode);
+            if (ex.Kind == InstagramApiErrorKind.TokenInvalid)
+            {
+                await StageTokenInvalidAsync(ct);
+            }
+
+            return await FinishRefreshAsync($"failed:{ex.Kind}", ct);
+        }
+    }
+
+    private async Task StageTokenInvalidAsync(CancellationToken ct) =>
+        await settings.SetAsync(InstagramSettingKeys.TokenInvalidAt, InstagramTimestamps.Format(time.GetUtcNow().UtcDateTime), ct);
+
+    private async Task<InstagramRefreshResult> FinishRefreshAsync(string code, CancellationToken ct)
+    {
+        await settings.SetAsync(InstagramSettingKeys.LastRefreshAt, InstagramTimestamps.Format(time.GetUtcNow().UtcDateTime), ct);
+        await settings.SetAsync(InstagramSettingKeys.LastRefreshResult, code, ct);
+        await unitOfWork.SaveChangesAsync(ct);
+        return new InstagramRefreshResult(code);
+    }
+
     private async Task<(InstagramStatus Status, string? Token)> ReadAsync(CancellationToken ct)
     {
         var canConnect = client.IsConfigured;
@@ -67,8 +126,8 @@ public sealed class InstagramConnectionService(
         }
 
         var username = await settings.GetAsync(InstagramSettingKeys.Username, ct);
-        var expiresAt = Parse(await settings.GetAsync(InstagramSettingKeys.TokenExpiresAt, ct));
-        var connectedAt = Parse(await settings.GetAsync(InstagramSettingKeys.ConnectedAt, ct));
+        var expiresAt = InstagramTimestamps.Parse(await settings.GetAsync(InstagramSettingKeys.TokenExpiresAt, ct));
+        var connectedAt = InstagramTimestamps.Parse(await settings.GetAsync(InstagramSettingKeys.ConnectedAt, ct));
         var connectedBy = await settings.GetAsync(InstagramSettingKeys.ConnectedBy, ct);
         var invalidAt = await settings.GetAsync(InstagramSettingKeys.TokenInvalidAt, ct);
 
@@ -80,11 +139,4 @@ public sealed class InstagramConnectionService(
 
         return (new InstagramStatus(state, canConnect, username, expiresAt, connectedAt, connectedBy), usable ? token : null);
     }
-
-    private static string Format(DateTime utc) => utc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
-
-    private static DateTime? Parse(string? value) =>
-        value is not null && DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsed)
-            ? parsed.ToUniversalTime()
-            : null;
 }

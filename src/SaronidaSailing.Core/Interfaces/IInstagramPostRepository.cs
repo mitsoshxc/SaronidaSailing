@@ -10,5 +10,7 @@ public interface IInstagramPostRepository
 
     void Add(InstagramPost post);
 
+    Task<int> CountAsync(CancellationToken ct = default);
+
     void Remove(InstagramPost post);
 }
