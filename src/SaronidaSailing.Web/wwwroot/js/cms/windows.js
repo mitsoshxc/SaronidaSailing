@@ -7,7 +7,7 @@ import { openSettingsWindow } from './settings-window.js';
 
 export const createWindows = ({ config, fields, pending, toolbar }) => ({
     openRich: (element, returnFocus) => openRichWindow({ element, fields, loadQuill, returnFocus }),
-    openLink: (element, returnFocus) => openLinkWindow({ element, fields, returnFocus }),
+    openLink: (element, returnFocus) => openLinkWindow({ element, fields, config, returnFocus }),
     openImage: (element, returnFocus) => openImageWindow({ element, fields, config, returnFocus }),
     openHistory: (element, returnFocus) => openHistoryWindow({
         element, fields, pending, config, setStatus: toolbar.setStatus, returnFocus

@@ -15,6 +15,8 @@ public sealed record CmsSeoAlt(string Value, string Greek);
 public sealed record CmsSeoConfig(
     string PageKey, CmsSeoValue Title, CmsSeoValue Description, CmsSeoImage Image, CmsSeoAlt ImageAlt);
 
+public sealed record CmsSitePage(string Key, string Path, string El, string En);
+
 public sealed record CmsEditorConfig(
     string PageKey,
     string Locale,
@@ -23,7 +25,8 @@ public sealed record CmsEditorConfig(
     string SavesUrl,
     string AntiforgeryToken,
     string OpensInNewTab,
-    CmsSeoConfig? Seo)
+    CmsSeoConfig? Seo,
+    IReadOnlyList<CmsSitePage> Pages)
 {
     private const int PreviewWidth = 960;
 
@@ -44,7 +47,12 @@ public sealed record CmsEditorConfig(
                 ReadSeo(content, $"{page.Key}.seo.title"),
                 ReadSeo(content, $"{page.Key}.seo.description"),
                 ReadImage(content, $"{page.Key}.seo.image"),
-                ReadAlt(content, $"{page.Key}.seo.image-alt")));
+                ReadAlt(content, $"{page.Key}.seo.image-alt")),
+        [.. SitePages.All.Select(p => new CmsSitePage(
+            p.Key,
+            LocalizedUrlService.PathFor(p.Key, content.Locale),
+            UiText.PageTitle(p.Key).Greek,
+            UiText.PageTitle(p.Key).English))]);
 
     public string ToJson() => JsonSerializer.Serialize(this, JsonOptions);
 

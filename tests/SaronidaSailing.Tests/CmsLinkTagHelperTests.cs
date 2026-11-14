@@ -10,9 +10,9 @@ namespace SaronidaSailing.Tests;
 
 public sealed class CmsLinkTagHelperTests
 {
-    private static async Task<string> Render(PageContent content, string key = "home.hero.cta")
+    private static async Task<string> Render(PageContent content, string key = "home.hero.cta", string? currentPage = null)
     {
-        var helper = new CmsLinkTagHelper(new FakePageContentAccessor(content), Visitor, NullLogger<CmsLinkTagHelper>.Instance)
+        var helper = new CmsLinkTagHelper(new FakePageContentAccessor(content), Visitor, new FakeUrlService(currentPage), NullLogger<CmsLinkTagHelper>.Instance)
         {
             Key = key,
         };
@@ -58,6 +58,46 @@ public sealed class CmsLinkTagHelperTests
         Assert.Equal($"<a class=\"btn\" href=\"{url.Replace("+", "&#x2B;")}\">Call</a>", html);
     }
 
+    [Fact]
+    public async Task SitePage_Greek_UsesGreekPath_SameTab_NoNotice()
+    {
+        var html = await Render(With("""{"url":"page:boat","label":"Σκάφος"}"""));
+
+        Assert.Equal("<a class=\"btn\" href=\"/skafos\">Σκάφος</a>", html);
+    }
+
+    [Fact]
+    public async Task SitePage_English_UsesEnglishPath()
+    {
+        var html = await Render(With("""{"url":"page:trips","label":"Trips"}""", "en"));
+
+        Assert.Equal("<a class=\"btn\" href=\"/en/trips\">Trips</a>", html);
+    }
+
+    [Fact]
+    public async Task SitePage_Home_IsTheLanguageRoot()
+    {
+        Assert.Contains("href=\"/\"", await Render(With("""{"url":"page:home","label":"H"}""")));
+        Assert.Contains("href=\"/en/\"", await Render(With("""{"url":"page:home","label":"H"}""", "en")));
+    }
+
+    [Fact]
+    public async Task SitePage_CurrentPage_GetsAriaCurrent()
+    {
+        var value = With("""{"url":"page:boat","label":"Boat"}""", "en");
+
+        Assert.Equal(
+            "<a class=\"btn\" href=\"/en/boat\" aria-current=\"page\">Boat</a>",
+            await Render(value, currentPage: "boat"));
+        Assert.DoesNotContain("aria-current", await Render(value, currentPage: "trips"));
+    }
+
+    [Fact]
+    public async Task SitePage_UnknownKey_IsSuppressed()
+    {
+        Assert.Equal("", await Render(With("""{"url":"page:nope","label":"x"}""")));
+    }
+
     [Theory]
     [InlineData("""{"url":"http://example.com","label":"x"}""")]
     [InlineData("""{"url":"javascript:alert(1)","label":"x"}""")]
@@ -88,7 +128,7 @@ public sealed class CmsLinkTagHelperTests
     [Fact]
     public async Task LinkField_OutsideList_Throws()
     {
-        var helper = new CmsLinkTagHelper(new FakePageContentAccessor(Content()), Visitor, NullLogger<CmsLinkTagHelper>.Instance)
+        var helper = new CmsLinkTagHelper(new FakePageContentAccessor(Content()), Visitor, UrlService, NullLogger<CmsLinkTagHelper>.Instance)
         {
             ItemField = "link",
         };
@@ -106,7 +146,7 @@ public sealed class CmsLinkTagHelperTests
         IDictionary<object, object>? items = null,
         string template = "<svg></svg>")
     {
-        var helper = new CmsLinkTagHelper(new FakePageContentAccessor(content), editContext, NullLogger<CmsLinkTagHelper>.Instance)
+        var helper = new CmsLinkTagHelper(new FakePageContentAccessor(content), editContext, UrlService, NullLogger<CmsLinkTagHelper>.Instance)
         {
             Key = key,
             ItemField = itemField,

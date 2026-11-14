@@ -726,10 +726,23 @@ public sealed class ContentServiceTests : IAsyncLifetime
         Assert.False(result.Succeeded);
         Assert.Null(result.SaveId);
         Assert.Equal(
-            ["Invalid link for 'home.hero.cta' (el): URL must be https:, mailto: or tel: and label is required."],
+            ["Invalid link for 'home.hero.cta' (el): URL must be https:, mailto:, tel: or a site page (page:key) and label is required."],
             result.Errors);
         Assert.Empty(await HistoryRows());
         Assert.Null((await Read("home", "el")).GetField("home.hero.title"));
+    }
+
+    [Fact]
+    public async Task UnknownSitePageLink_IsRejected_AndKnownOneSaved()
+    {
+        var bad = await Apply(LinkField("home.hero.cta", """{"url":"page:nope","label":"Go"}"""));
+
+        Assert.False(bad.Succeeded);
+        Assert.Equal(["Invalid link for 'home.hero.cta' (el): 'nope' is not a site page."], bad.Errors);
+
+        var good = await Apply(LinkField("home.hero.cta", """{"url":"page:boat","label":"Go"}"""));
+
+        Assert.True(good.Succeeded);
     }
 
     [Theory]

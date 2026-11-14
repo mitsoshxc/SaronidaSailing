@@ -11,6 +11,7 @@ namespace SaronidaSailing.Web.TagHelpers;
 public sealed class CmsLinkTagHelper(
     IPageContentAccessor accessor,
     ICmsEditContext editContext,
+    ILocalizedUrlService urlService,
     ILogger<CmsLinkTagHelper> logger) : TagHelper
 {
     [HtmlAttributeName("cms-link")]
@@ -93,7 +94,22 @@ public sealed class CmsLinkTagHelper(
             return;
         }
 
-        output.Attributes.SetAttribute("href", link.Url);
+        var locale = (await accessor.GetAsync()).Locale;
+        var isPage = SitePageKeys.TryGetKey(link.Url, out var pageKey);
+        output.Attributes.RemoveAll("aria-current");
+        if (isPage)
+        {
+            output.Attributes.SetAttribute("href", urlService.GetPath(pageKey, locale));
+            if (urlService.GetCurrentPage()?.Key == pageKey)
+            {
+                output.Attributes.SetAttribute("aria-current", "page");
+            }
+        }
+        else
+        {
+            output.Attributes.SetAttribute("href", link.Url);
+        }
+
         if (keepContent)
         {
             await FillSlotsAsync(context, output, link.Label);
@@ -105,7 +121,6 @@ public sealed class CmsLinkTagHelper(
 
         if (link.Url.StartsWith("https:", StringComparison.OrdinalIgnoreCase))
         {
-            var locale = (await accessor.GetAsync()).Locale;
             output.Attributes.SetAttribute("target", "_blank");
             output.Attributes.SetAttribute("rel", "noopener");
             output.Content.AppendHtml(keepContent && editor

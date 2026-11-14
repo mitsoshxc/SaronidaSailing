@@ -16,8 +16,20 @@ const focusItem = (item) => {
     target?.focus();
 };
 
+const linkLabel = (item) => {
+    const link = item.querySelector('[data-cms-type="link"]');
+    if (!link) {
+        return '';
+    }
+    const slot = link.querySelector('[data-cms-link-label]');
+    if (slot) {
+        return slot.textContent;
+    }
+    return [...link.childNodes].filter((node) => node.nodeType === Node.TEXT_NODE).map((node) => node.textContent).join('');
+};
+
 const itemName = (item, index) => {
-    const text = normalize(item.querySelector('[data-cms-type="text"]')?.textContent ?? '');
+    const text = normalize(item.querySelector('[data-cms-type="text"]')?.textContent ?? '') || normalize(linkLabel(item));
     return text === '' ? `item ${index + 1}` : shorten(text, 40);
 };
 

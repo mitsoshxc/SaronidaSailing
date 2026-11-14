@@ -12,9 +12,22 @@ internal sealed class FakePageContentAccessor(PageContent content) : IPageConten
     public Task<PageContent> GetAsync() => Task.FromResult(content);
 }
 
+internal sealed class FakeUrlService(string? currentKey = null) : SaronidaSailing.Web.Localization.ILocalizedUrlService
+{
+    public string GetPath(string pageKey, string culture) =>
+        SaronidaSailing.Web.Localization.LocalizedUrlService.PathFor(pageKey, culture);
+
+    public SaronidaSailing.Web.Localization.SitePage? GetCurrentPage() =>
+        currentKey is null ? null : SaronidaSailing.Web.Localization.SitePages.FindByKey(currentKey);
+
+    public string? GetAlternatePath() => null;
+}
+
 internal static class TagHelperTestSupport
 {
     private static readonly HtmlEncoder Encoder = HtmlEncoder.Create(UnicodeRanges.All);
+
+    public static readonly SaronidaSailing.Web.Localization.ILocalizedUrlService UrlService = new FakeUrlService();
 
     public static readonly ICmsEditContext Visitor = new FakeEditContext(false);
 

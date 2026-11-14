@@ -40,7 +40,7 @@ public sealed class CmsEditorTagHelperTests
         var attributes = new TagHelperAttributeList { { "class", "b" }, { "href", "#template" }, { "target", "_blank" } };
         var output = NewOutput("a", attributes);
         await new CmsLinkTagHelper(
-                new FakePageContentAccessor(content), edit, logger ?? NullLogger<CmsLinkTagHelper>.Instance)
+                new FakePageContentAccessor(content), edit, UrlService, logger ?? NullLogger<CmsLinkTagHelper>.Instance)
             { Key = "home.hero.cta" }.ProcessAsync(NewContext("a", attributes), output);
         return Render(output);
     }

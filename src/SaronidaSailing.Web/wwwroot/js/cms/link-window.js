@@ -6,7 +6,8 @@ let counter = 0;
 const types = [
     { id: 'web', label: 'Web page', field: 'Web address', inputType: 'url', inputMode: 'url', autocomplete: 'url', placeholder: 'www.example.com' },
     { id: 'email', label: 'Email', field: 'Email address', inputType: 'email', inputMode: 'email', autocomplete: 'email', placeholder: 'name@example.com' },
-    { id: 'phone', label: 'Phone', field: 'Phone number', inputType: 'tel', inputMode: 'tel', autocomplete: 'tel', placeholder: '+30 210 000 0000' }
+    { id: 'phone', label: 'Phone', field: 'Phone number', inputType: 'tel', inputMode: 'tel', autocomplete: 'tel', placeholder: '+30 210 000 0000' },
+    { id: 'page', label: 'Site page', field: 'Page' }
 ];
 
 const typeById = (id) => types.find((type) => type.id === id);
@@ -15,6 +16,9 @@ const splitUrl = (url) => {
     const lower = url.toLowerCase();
     if (lower.startsWith('https:')) {
         return { type: 'web', address: url.replace(/^https:\/\//i, '').replace(/^https:/i, '') };
+    }
+    if (lower.startsWith('page:')) {
+        return { type: 'page', address: url.slice('page:'.length) };
     }
     if (lower.startsWith('mailto:')) {
         return { type: 'email', address: url.slice('mailto:'.length) };
@@ -34,6 +38,9 @@ const webAddressError = 'Enter a valid web address, for example www.example.com'
 
 export const buildUrl = (type, rawAddress) => {
     const address = rawAddress.trim();
+    if (type === 'page') {
+        return address === '' ? { error: 'Choose a page' } : { url: `page:${address}` };
+    }
     if (type === 'web') {
         if (/^[a-z][a-z0-9+.-]*:\/\//i.test(address) && !/^https:\/\//i.test(address)) {
             return { error: 'Use an https:// address' };
@@ -86,13 +93,16 @@ const addField = (parent, labelText, input) => {
                 input.removeAttribute('aria-invalid');
             }
         },
+        setHidden(hidden) {
+            wrapper.hidden = hidden;
+        },
         setLabel(text) {
             label.textContent = text;
         }
     };
 };
 
-export const openLinkWindow = ({ element, fields, returnFocus }) => {
+export const openLinkWindow = ({ element, fields, config, returnFocus }) => {
     const win = openDialog({
         title: 'Edit link',
         subtitle: `${fieldName(element)} · ${fields.fieldOf(element).key}`,
@@ -132,14 +142,33 @@ export const openLinkWindow = ({ element, fields, returnFocus }) => {
     form.append(group);
 
     const addressInput = el('input', 'cms-input');
-    addressInput.value = initial.address;
+    addressInput.value = initial.type === 'page' ? '' : initial.address;
     addressInput.required = true;
     const addressField = addField(form, 'Web address', addressInput);
 
+    const pageSelect = el('select', 'cms-input');
+    pageSelect.required = true;
+    pageSelect.append(new Option('Choose a page', ''));
+    for (const page of config.pages) {
+        pageSelect.append(new Option(config.locale === 'en' ? page.en : page.el, page.key));
+    }
+    pageSelect.value = initial.type === 'page' ? initial.address : '';
+    const pageField = addField(form, 'Page', pageSelect);
+
     const selectedType = () => radios.find((radio) => radio.checked).value;
+
+    const addressValue = () => (selectedType() === 'page' ? pageSelect.value : addressInput.value);
 
     const applyType = () => {
         const type = typeById(selectedType());
+        const isPage = type.id === 'page';
+        addressField.setHidden(isPage);
+        pageField.setHidden(!isPage);
+        pageField.setError(null);
+        if (isPage) {
+            addressField.setError(null);
+            return;
+        }
         addressField.setLabel(type.field);
         addressInput.type = type.inputType;
         addressInput.inputMode = type.inputMode;
@@ -154,24 +183,27 @@ export const openLinkWindow = ({ element, fields, returnFocus }) => {
 
     labelInput.addEventListener('input', () => labelField.setError(null));
     addressInput.addEventListener('input', () => addressField.setError(null));
+    pageSelect.addEventListener('change', () => pageField.setError(null));
 
     win.body.append(form);
     win.isDirty = () =>
         labelInput.value !== initial.label
         || selectedType() !== initial.type
-        || addressInput.value !== initial.address;
+        || addressValue() !== initial.address;
 
     const apply = () => {
         const label = labelInput.value.trim();
-        const built = buildUrl(selectedType(), addressInput.value);
+        const built = buildUrl(selectedType(), addressValue());
+        const addressTarget = selectedType() === 'page' ? pageField : addressField;
+        const focusTarget = selectedType() === 'page' ? pageSelect : addressInput;
         labelField.setError(label === '' ? 'Enter a label' : null);
-        addressField.setError(built.error ?? null);
+        addressTarget.setError(built.error ?? null);
         if (label === '') {
             labelInput.focus();
             return;
         }
         if (built.error) {
-            addressInput.focus();
+            focusTarget.focus();
             return;
         }
         const existing = parseLink(current);

@@ -1,0 +1,12 @@
+{
+  "group": "shared.menu-header",
+  "version": 1,
+  "lists": {
+    "shared.menu-header": [
+      { "link": { "type": "link", "url": "page:trips", "el": "Εκδρομές", "en": "Trips" } },
+      { "link": { "type": "link", "url": "page:boat", "el": "Το σκάφος", "en": "The boat" } },
+      { "link": { "type": "link", "url": "https://www.instagram.com/saronidasailing/", "el": "Instagram", "en": "Instagram" } },
+      { "link": { "type": "link", "url": "page:contact", "el": "Επικοινωνία", "en": "Contact" } }
+    ]
+  }
+}

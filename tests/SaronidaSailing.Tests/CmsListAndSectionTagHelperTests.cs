@@ -165,7 +165,7 @@ public sealed class CmsListAndSectionTagHelperTests
         {
             var childAttributes = new TagHelperAttributeList();
             var childOutput = NewOutput("a", childAttributes);
-            await new CmsLinkTagHelper(accessor, Visitor, NullLogger<CmsLinkTagHelper>.Instance) { ItemField = "link" }
+            await new CmsLinkTagHelper(accessor, Visitor, UrlService, NullLogger<CmsLinkTagHelper>.Instance) { ItemField = "link" }
                 .ProcessAsync(NewContext("a", childAttributes, new Dictionary<object, object>(context.Items)), childOutput);
             return Html(Render(childOutput));
         });

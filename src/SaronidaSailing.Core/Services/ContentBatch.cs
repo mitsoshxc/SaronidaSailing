@@ -263,8 +263,10 @@ internal sealed class ContentBatch(
         }
         else if (change.Type == ContentType.Link && value.Length > 0 && !ContentLink.TryParse(value, out _))
         {
-            _errors.Add(
-                $"Invalid link for '{change.Key}' ({change.Locale}): URL must be https:, mailto: or tel: and label is required.");
+            var unknownPage = ContentLink.FindUnknownPageKey(value);
+            _errors.Add(unknownPage is not null
+                ? $"Invalid link for '{change.Key}' ({change.Locale}): '{unknownPage}' is not a site page."
+                : $"Invalid link for '{change.Key}' ({change.Locale}): URL must be https:, mailto:, tel: or a site page (page:key) and label is required.");
             return;
         }
         else if (change.Type == ContentType.Image)

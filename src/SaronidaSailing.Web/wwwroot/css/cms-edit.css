@@ -1127,3 +1127,32 @@ html.cms-view .contact-map__edit {
     height: 16rem;
     border: 0;
 }
+
+.site-header [data-cms-item] > .cms-itembar {
+    inset-block-start: 50%;
+    inset-block-end: auto;
+    z-index: 900;
+    transform: translateY(-50%);
+}
+
+@media (min-width: 960px) {
+    .site-header [data-cms-item] > .cms-itembar {
+        inset-block-start: 100%;
+        transform: none;
+    }
+}
+
+@media (min-width: 960px) {
+    .site-menu__book-wrap {
+        position: relative;
+    }
+
+    .site-menu__book-wrap > .cms-sectionbar {
+        position: absolute;
+        z-index: 900;
+        inset-block-start: 100%;
+        inset-inline-end: 0;
+        margin: 0;
+        white-space: nowrap;
+    }
+}

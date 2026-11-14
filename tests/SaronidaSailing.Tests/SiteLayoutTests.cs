@@ -127,7 +127,7 @@ public class SiteRoutesTests(TempDatabaseWebApplicationFactory factory) : IClass
 }
 
 [Collection(WebHostCollection.Name)]
-public class SiteHeaderTests(TempDatabaseWebApplicationFactory factory) : IClassFixture<TempDatabaseWebApplicationFactory>
+public class SiteHeaderTests(SeededWebApplicationFactory factory) : IClassFixture<SeededWebApplicationFactory>
 {
     private Task<string> Get(string path) => AdminTestHelpers.NewClient(factory).GetStringAsync(path);
 
@@ -222,9 +222,6 @@ public class SiteFooterTests(TempDatabaseWebApplicationFactory factory) : IClass
         Assert.DoesNotContain("site-footer__social-link", empty);
         Assert.DoesNotContain("href=\"tel:", empty);
         Assert.DoesNotMatch("<a[^>]*></a>", empty);
-        Assert.Contains("<a href=\"/ekdromes\">Εκδρομές &amp; κράτηση</a>", empty);
-        Assert.Contains("<a href=\"/epikoinonia\" aria-current=\"page\">Επικοινωνία</a>", empty);
-        Assert.Contains("<a href=\"/prosvasimotita\">Προσβασιμότητα</a>", empty);
         Assert.DoesNotContain("Cookie", empty);
 
         await Save(
@@ -245,8 +242,5 @@ public class SiteFooterTests(TempDatabaseWebApplicationFactory factory) : IClass
         Assert.Contains("<p>© 2026 Test</p>", footer);
         Assert.DoesNotContain("cms-", html);
         Assert.DoesNotContain("data-cms-", html);
-        Assert.Matches(
-            "<a class=\"site-nav__link\" href=\"https://www\\.instagram\\.com/saronidasailing/\" target=\"_blank\" rel=\"noopener\">Instagram",
-            html);
     }
 }

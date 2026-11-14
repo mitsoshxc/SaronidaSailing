@@ -52,6 +52,14 @@ export const createFieldBar = ({ editMode, windows }) => {
         }
         top = Math.max(toolbarBottom + margin, Math.min(top, window.innerHeight - height - margin));
         const left = Math.max(margin, Math.min(rect.left, window.innerWidth - width - margin));
+        const itemBar = current.closest('[data-cms-item]')?.querySelector(':scope > .cms-itembar');
+        if (itemBar && getComputedStyle(itemBar).display !== 'none') {
+            const barRect = itemBar.getBoundingClientRect();
+            const sideBySide = left + width <= barRect.left || left >= barRect.right;
+            if (!sideBySide && top < barRect.bottom + gap && top + height > barRect.top - gap) {
+                top = Math.min(barRect.bottom + gap, window.innerHeight - height - margin);
+            }
+        }
         bar.style.top = `${top}px`;
         bar.style.left = `${left}px`;
     };

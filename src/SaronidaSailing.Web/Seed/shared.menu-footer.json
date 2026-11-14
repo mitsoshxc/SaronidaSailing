@@ -1,0 +1,14 @@
+{
+  "group": "shared.menu-footer",
+  "version": 1,
+  "lists": {
+    "shared.menu-footer": [
+      { "link": { "type": "link", "url": "page:trips", "el": "Εκδρομές & κράτηση", "en": "Trips & booking" } },
+      { "link": { "type": "link", "url": "page:boat", "el": "Το σκάφος", "en": "The boat" } },
+      { "link": { "type": "link", "url": "page:contact", "el": "Επικοινωνία", "en": "Contact" } },
+      { "link": { "type": "link", "url": "page:terms", "el": "Όροι", "en": "Terms" } },
+      { "link": { "type": "link", "url": "page:privacy", "el": "Πολιτική απορρήτου", "en": "Privacy policy" } },
+      { "link": { "type": "link", "url": "page:accessibility", "el": "Προσβασιμότητα", "en": "Accessibility" } }
+    ]
+  }
+}

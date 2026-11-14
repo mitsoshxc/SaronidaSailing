@@ -33,8 +33,6 @@ public static class UiText
 
     public static UiString Accessibility { get; } = new("Προσβασιμότητα", "Accessibility");
 
-    public static UiString InstagramMenu { get; } = new("Instagram", "Instagram");
-
     public static UiString Book { get; } = new("Κράτηση", "Book");
 
     public static UiString SkipLink { get; } = new("Μετάβαση στο περιεχόμενο", "Skip to content");
@@ -157,7 +155,6 @@ public static class UiText
         (nameof(Terms), Terms),
         (nameof(Privacy), Privacy),
         (nameof(Accessibility), Accessibility),
-        (nameof(InstagramMenu), InstagramMenu),
         (nameof(Book), Book),
         (nameof(SkipLink), SkipLink),
         (nameof(MainNavigation), MainNavigation),

@@ -1,6 +1,6 @@
 import { createImageElement, createPlaceholder, layoutClassOf, recordImage } from './image-data.js';
 import { cleanFragment, cleanHtml } from './rich-html.js';
-import { normalize, parseLink } from './values.js';
+import { isPageUrl, normalize, parseLink } from './values.js';
 
 const itemOf = (element) => element.closest('[data-cms-item]')?.dataset.cmsItem ?? null;
 
@@ -51,11 +51,31 @@ export const createFields = ({ pending, config }) => {
         element.replaceChildren(cleanFragment(value));
     };
 
+    const resolveLink = (link) => {
+        if (!link) {
+            return null;
+        }
+        if (!isPageUrl(link.url)) {
+            return { ...link, href: link.url };
+        }
+        const page = config.pages.find((candidate) => `page:${candidate.key}` === link.url);
+        return page ? { ...link, href: page.path, pageKey: page.key } : null;
+    };
+
+    const markCurrent = (element, link) => {
+        if (link?.pageKey && link.href === location.pathname) {
+            element.setAttribute('aria-current', 'page');
+        } else {
+            element.removeAttribute('aria-current');
+        }
+    };
+
     const previewKeptLink = (element, link) => {
         element.removeAttribute('target');
         element.removeAttribute('rel');
+        markCurrent(element, link);
         if (link) {
-            element.setAttribute('href', link.url);
+            element.setAttribute('href', link.href);
         } else {
             element.removeAttribute('href');
         }
@@ -78,18 +98,19 @@ export const createFields = ({ pending, config }) => {
     };
 
     const previewLink = (element, value) => {
-        const link = parseLink(value);
+        const link = resolveLink(parseLink(value));
         if (element.hasAttribute('data-cms-keep-content')) {
             return previewKeptLink(element, link);
         }
         element.replaceChildren();
         element.removeAttribute('target');
         element.removeAttribute('rel');
+        markCurrent(element, link);
         if (!link) {
             element.removeAttribute('href');
             return false;
         }
-        element.setAttribute('href', link.url);
+        element.setAttribute('href', link.href);
         element.append(document.createTextNode(link.label));
         if (/^https:/i.test(link.url)) {
             element.setAttribute('target', '_blank');

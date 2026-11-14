@@ -18,7 +18,7 @@ public sealed class EmbeddedContentSeedSourceTests : IAsyncLifetime
     {
         var groups = new EmbeddedContentSeedSource().GetGroups();
 
-        Assert.Equal(["accessibility", "boat", "contact", "home", "privacy", "shared.charter-costs", "shared.contact", "shared.cookies", "shared.footer", "shared.prices", "shared.social", "terms", "trips"], groups.Select(g => g.Name));
+        Assert.Equal(["accessibility", "boat", "contact", "home", "privacy", "shared.charter-costs", "shared.contact", "shared.cookies", "shared.footer", "shared.menu-footer", "shared.menu-header", "shared.prices", "shared.social", "terms", "trips"], groups.Select(g => g.Name));
         Assert.All(groups, g => Assert.True(g.Version >= 1));
     }
 
@@ -132,6 +132,29 @@ public sealed class EmbeddedContentSeedSourceTests : IAsyncLifetime
             """);
 
         Assert.Equal("shared.charter-costs", Assert.Single(group.Lists).ListKey);
+    }
+
+    [Fact]
+    public void MenuGroups_HoldTheTodayMenuItems_AsSitePageOrWebLinks()
+    {
+        var groups = new EmbeddedContentSeedSource().GetGroups().ToDictionary(g => g.Name);
+
+        var header = Assert.Single(groups["shared.menu-header"].Lists);
+        var footer = Assert.Single(groups["shared.menu-footer"].Lists);
+
+        Assert.Equal("shared.menu-header", header.ListKey);
+        Assert.Equal("shared.menu-footer", footer.ListKey);
+        Assert.Equal(4, header.Items.Count);
+        Assert.Equal(6, footer.Items.Count);
+        foreach (var item in header.Items.Concat(footer.Items))
+        {
+            var field = Assert.Single(item.Fields);
+            Assert.Equal("link", field.Key);
+            foreach (var value in field.Values.Values)
+            {
+                Assert.True(ContentLink.TryParse(value, out _), value);
+            }
+        }
     }
 
     [Fact]

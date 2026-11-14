@@ -4,6 +4,12 @@ export const normalize = (text) => text.replace(/\s+/g, ' ').trim();
 
 export const isAllowedUrl = (url) => allowedLinkScheme.test(url.trim());
 
+const pageLinkUrl = /^page:[a-z0-9-]+$/;
+
+export const isPageUrl = (url) => pageLinkUrl.test(url.trim());
+
+export const isLinkFieldUrl = (url) => isAllowedUrl(url) || isPageUrl(url);
+
 export const parseLink = (value) => {
     if (!value) {
         return null;
@@ -11,7 +17,7 @@ export const parseLink = (value) => {
     try {
         const parsed = JSON.parse(value);
         if (parsed && typeof parsed.url === 'string' && typeof parsed.label === 'string'
-            && parsed.label.trim() !== '' && isAllowedUrl(parsed.url)) {
+            && parsed.label.trim() !== '' && isLinkFieldUrl(parsed.url)) {
             return { url: parsed.url.trim(), label: parsed.label };
         }
     } catch {

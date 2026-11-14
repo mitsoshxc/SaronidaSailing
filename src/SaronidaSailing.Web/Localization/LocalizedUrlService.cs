@@ -4,7 +4,9 @@ namespace SaronidaSailing.Web.Localization;
 
 public sealed class LocalizedUrlService(IHttpContextAccessor httpContextAccessor) : ILocalizedUrlService
 {
-    public string GetPath(string pageKey, string culture)
+    public string GetPath(string pageKey, string culture) => PathFor(pageKey, culture);
+
+    public static string PathFor(string pageKey, string culture)
     {
         var page = SitePages.FindByKey(pageKey)
             ?? throw new ArgumentException($"Unknown page key '{pageKey}'.", nameof(pageKey));

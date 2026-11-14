@@ -37,7 +37,7 @@ public sealed record ContentLink(string Url, string Label)
         if (parsed is not { Url: { } url, Label: { } label }
             || string.IsNullOrWhiteSpace(url)
             || string.IsNullOrWhiteSpace(label)
-            || !IsAllowedUrl(url))
+            || !(IsAllowedUrl(url) || IsKnownPageUrl(url)))
         {
             return false;
         }
@@ -45,6 +45,27 @@ public sealed record ContentLink(string Url, string Label)
         link = parsed;
         return true;
     }
+
+    public static string? FindUnknownPageKey(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return null;
+        }
+
+        try
+        {
+            var url = JsonSerializer.Deserialize<ContentLink>(json, JsonOptions)?.Url;
+            return url is not null && SitePageKeys.TryGetKey(url, out var key) && !SitePageKeys.IsKnown(key) ? key : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    public static bool IsKnownPageUrl(string url) =>
+        SitePageKeys.TryGetKey(url, out var key) && SitePageKeys.IsKnown(key);
 
     public string ToJson() => JsonSerializer.Serialize(this, WriteOptions);
 

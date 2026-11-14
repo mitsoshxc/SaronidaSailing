@@ -6,9 +6,7 @@
     var locale = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == SiteCultures.English
         ? SiteCultures.English
         : SiteCultures.Greek;
-    var current = UrlService.GetCurrentPage();
     var logo = new SiteLogoViewModel("footer", true, UrlService.GetPath("home", locale), UiText.LogoLink.For(locale));
-    var pages = new[] { "trips", "boat", "contact", "terms", "privacy", "accessibility" };
 }
 <footer class="site-footer">
     <div class="wrap site-footer__inner">
@@ -20,10 +18,7 @@
             <nav class="site-footer__col" aria-label="@UiText.FooterPages.For(locale)">
                 <h2 class="site-footer__heading">@UiText.FooterPages.For(locale)</h2>
                 <ul class="site-footer__pages">
-                    @foreach (var key in pages)
-                    {
-                        <li><a href="@UrlService.GetPath(key, locale)" aria-current="@(current?.Key == key ? "page" : null)">@UiText.PageTitle(key).For(locale)</a></li>
-                    }
+                    <li cms-list="shared.menu-footer" cms-add-label="Add footer link"><a cms-link-field="link"></a></li>
                     <li><button type="button" class="site-footer__cookies" data-consent-open hidden>@UiText.CookieSettings.For(locale)</button></li>
                 </ul>
             </nav>
