@@ -64,6 +64,24 @@ export const initConsent = () => {
         switchButton.setAttribute('aria-checked', String(on));
     };
 
+    const html = document.documentElement;
+
+    const syncOffset = () => {
+        if (root.hidden) {
+            html.classList.remove('consent-open');
+            html.style.removeProperty('--consent-offset');
+            return;
+        }
+        const covered = window.innerHeight - root.getBoundingClientRect().top;
+        html.classList.add('consent-open');
+        html.style.setProperty('--consent-offset', `${Math.ceil(covered) + 16}px`);
+    };
+
+    if (typeof ResizeObserver === 'function') {
+        new ResizeObserver(syncOffset).observe(root);
+    }
+    window.addEventListener('resize', syncOffset);
+
     const show = (view) => {
         current = view;
         const showDialog = view === 'banner' || view === 'settings';
@@ -75,6 +93,7 @@ export const initConsent = () => {
         if (showDialog) {
             dialog.setAttribute('aria-labelledby', view === 'settings' ? settingsTitle.id : bannerTitleId);
         }
+        syncOffset();
     };
 
     const focusOpener = () => {
