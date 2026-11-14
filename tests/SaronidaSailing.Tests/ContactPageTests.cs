@@ -49,7 +49,6 @@ public class ContactPageTests(SeededWebApplicationFactory factory) : IClassFixtu
                 "Με αυτοκίνητο",
                 "Μεταφορά",
                 "Σημείο συνάντησης",
-                "Ο χάρτης της Google φορτώνει μόνο με τη συναίνεσή σας.",
                 "Χρήσιμα στοιχεία",
                 "Ώρες επικοινωνίας",
                 "[ΩΡΕΣ]",
@@ -76,7 +75,6 @@ public class ContactPageTests(SeededWebApplicationFactory factory) : IClassFixtu
                 "By car",
                 "Transfer",
                 "Meeting point",
-                "The Google map loads only with your consent.",
                 "Useful details",
                 "Contact hours",
                 "[HOURS]",
@@ -190,13 +188,65 @@ public class ContactPageTests(SeededWebApplicationFactory factory) : IClassFixtu
         }
     }
 
-    [Fact]
-    public async Task MapButton_StartsHidden_UntilScriptRuns()
-    {
-        var html = await GetAsync("/epikoinonia");
+    private const string GreekNotice = "Ο χάρτης της Google φορτώνει μόνο με τη συναίνεσή σας.";
 
-        Assert.True(IsHidden(Tag(html, "data-map-settings")));
-        Assert.Contains("Ρυθμίσεις cookies</button>", html);
+    private const string EnglishNotice = "The Google map loads only with your consent.";
+
+    private async Task WithEmbedUrlAsync(string url, Func<Task> act)
+    {
+        using var scope = factory.Services.CreateScope();
+        var content = scope.ServiceProvider.GetRequiredService<IContentService>();
+        Assert.True((await content.ApplyChangesAsync(
+            [new SetField(ContactMap.EmbedUrlKey, "el", ContentType.Text, url)], Editor)).Succeeded);
+        try
+        {
+            await act();
+        }
+        finally
+        {
+            Assert.True((await content.ApplyChangesAsync(
+                [new SetField(ContactMap.EmbedUrlKey, "el", ContentType.Text, "")], Editor)).Succeeded);
+        }
+    }
+
+    [Theory]
+    [InlineData("/epikoinonia", GreekNotice)]
+    [InlineData("/en/contact", EnglishNotice)]
+    public async Task Visitor_WithoutMapUrl_GetsNoNoticeAndNoButton(string path, string notice)
+    {
+        var html = await GetAsync(path);
+
+        Assert.DoesNotContain(notice, html);
+        Assert.DoesNotContain("data-map-settings", html);
+        Assert.DoesNotContain("contact-map__notice", html);
+    }
+
+    [Theory]
+    [InlineData("/epikoinonia", GreekNotice, "Ρυθμίσεις cookies</button>")]
+    [InlineData("/en/contact", EnglishNotice, "Cookie settings</button>")]
+    public async Task Visitor_WithMapUrl_GetsNoticeAndHiddenButton_AndNoIframe(string path, string notice, string button)
+    {
+        await WithEmbedUrlAsync("https://www.google.com/maps/embed?pb=!1m18!1m12", async () =>
+        {
+            var html = await GetAsync(path);
+
+            Assert.Contains(notice, html);
+            Assert.True(IsHidden(Tag(html, "data-map-settings")));
+            Assert.Contains(button, html);
+            Assert.DoesNotContain("<iframe", html, StringComparison.OrdinalIgnoreCase);
+        });
+    }
+
+    [Fact]
+    public async Task Editor_WithoutMapUrl_StillGetsTheEditableNotice()
+    {
+        var client = NewClient(factory);
+        await LoginWithTotpAsync(client, await AddTwoFactorAdminAsync(factory, "contact-editor@example.com"));
+
+        var html = await client.GetStringAsync("/epikoinonia");
+
+        Assert.Contains(GreekNotice, html);
+        Assert.Contains("data-map-settings", html);
     }
 
     public static TheoryData<string, string, string> ConsentPages() => new()

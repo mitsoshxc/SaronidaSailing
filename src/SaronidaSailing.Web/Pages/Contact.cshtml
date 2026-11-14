@@ -53,10 +53,13 @@
         <div class="contact-where__map">
             <div class="contact-map media-placeholder media-frame" tabindex="-1" data-contact-map data-map-title="@UiText.MapTitle.Current">
                 <cms-image key="contact.map.image" label="Static map" sizes="(min-width: 960px) 50vw, 100vw" class="media-frame__img" />
-                <div class="contact-map__notice">
-                    <p cms="contact.map.notice"></p>
-                    <button type="button" class="btn btn--dark contact-map__button" data-map-settings hidden>@UiText.CookieSettings.Current</button>
-                </div>
+                @if (Model.ShowMapNotice)
+                {
+                    <div class="contact-map__notice">
+                        <p cms="contact.map.notice"></p>
+                        <button type="button" class="btn btn--dark contact-map__button" data-map-settings hidden>@UiText.CookieSettings.Current</button>
+                    </div>
+                }
             </div>
             <div class="contact-map__embed">
                 <span class="contact-map__embed-label">Map embed URL</span>
