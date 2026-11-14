@@ -25,6 +25,7 @@ using SaronidaSailing.Web.Health;
 using SaronidaSailing.Web.Identity;
 using SaronidaSailing.Web.Instagram;
 using SaronidaSailing.Web.Localization;
+using SaronidaSailing.Web.Redirects;
 
 var isAdminCommand = AdminCommandRunner.IsAdminCommand(args);
 var isMigrateCommand = MigrateCommand.IsMigrateCommand(args);
@@ -222,6 +223,11 @@ try
             context.Features.Get<IStatusCodePagesFeature>()?.Enabled = false;
         }
     });
+
+    if (!app.Environment.IsPreview())
+    {
+        app.UseOldSiteRedirects();
+    }
 
     app.UseRequestLocalization(options =>
     {
