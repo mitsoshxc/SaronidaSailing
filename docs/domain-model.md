@@ -19,6 +19,30 @@ Every editable spot has a key: `{page}.{section}.{field}` — lowercase, kebab-c
 
 Page key `shared` is reserved for content on every page (header, footer). Writing to it evicts the cache of all pages.
 
+### Public page content keys
+
+Phase 7 keys, as seeded (`src/SaronidaSailing.Web/Seed/{group}.json`) and rendered. Every page also has `{page}.seo.title` and `{page}.seo.description` (and the optional `{page}.seo.image` / `image-alt`). Lists are written `list` (items in brackets). Images are never seeded (their `-alt` texts are, where noted); image keys are listed separately.
+
+| Page / group | Keys |
+|---|---|
+| `home` | `hero.eyebrow`, `hero.title`, `hero.lead`, `hero.image`, `hero.cta-trips`, `hero.cta-boat` · `glance.title`; list `home.glance-stats` [`value`, `label`] · `trips.eyebrow`, `trips.title` · cards `trip-day`, `trip-islands`, `trip-week`: `image`, `duration`, `when`, `title`, `text` · `boat.eyebrow`, `boat.title`, `boat.image`, `boat.text`, `boat.cta`; list `home.boat-specs` [`value`, `label`] · `why.eyebrow`, `why.title`; list `home.why-items` [`title`, `text`] · `instagram.title`, `instagram.text`, `instagram.post-count` · `departure.text` (rich), `departure.cta` · `sticky.label` |
+| `trips` | `intro.eyebrow`, `intro.title`, `intro.lead` · `day.title`, `day.text`, `day.included-title`, `day.excluded-title`, `day.capacity`; lists `trips.day-slots`, `trips.day-included`, `trips.day-excluded` · `islands.title`, `islands.text`, `islands.pack-title`, `islands.capacity`; lists `trips.islands-routes`, `trips.islands-pack` · `week.title`, `week.text`, `week.price-label`, `week.note` · `booking.title`, `booking.day-label`, `booking.islands-label`, `booking.week-label`, `booking.capacity`, `booking.text`, `booking.new-tab-note`, `booking.questions`; list `trips.booking-platforms` (Link fields) · `info.title`; list `trips.info-items` [question text → `<summary>`, answer RichText] |
+| `boat` | `gallery.cover` (image) + `gallery.cover-alt`; list `boat.gallery-photos` [`image`, `image-alt`] · `intro.eyebrow`, `intro.title`, `intro.subtitle`, `intro.lead` · `specs.title`, `specs.note`; list `boat.specs-items` · `life.title`, `life.plan` (image) + `life.plan-alt`; list `boat.life-items` · `included.title`; list `boat.included-items` · `charter.title`, `charter.note`; list `boat.charter-times` · `booking.title`, `booking.week-label`, `booking.cta`, `booking.day-label`, `booking.questions`; list `boat.booking-points` |
+| `contact` | `intro.eyebrow`, `intro.title`, `intro.lead`, `intro.phone-label`, `intro.phone-2-label`, `intro.email-label`, `intro.instagram-label`, `intro.instagram` (Link → `ig.me`) · `where.eyebrow`, `where.title`, `where.text`, `where.directions` (Link); list `contact.where-items` · `map.image` (image) + `map.image-alt`, `map.notice`, `map.embed-url` · `details.title`; list `contact.details-items` · `cta.title`, `cta.text`, `cta.button` |
+| `terms`, `privacy`, `accessibility` | Identical shape per page: `intro.eyebrow`, `intro.title`, `intro.updated` · `summary.title`; list `{page}.summary-items` · list `{page}.sections` [`title` Text, `body` RichText] · `contact.lead`, `contact.label` |
+| `shared.footer` | `tagline`, `copyright` |
+| `shared.contact` | `phone`, `phone-2` (Link, `tel:`), `email` (Link, `mailto:`), `address` (Text) |
+| `shared.social` | `instagram`, `facebook` (Link, `https:`) |
+| `shared.prices` | `day`, `islands`, `week` (Text): the only place a trip price is stored |
+| `shared.charter-costs` | A list (the key is the list key, no field segment) [`label`, `value`] |
+| `shared.cookies` | `title`, `text`, `settings-title`, `necessary-title`, `necessary-text`, `external-title`, `external-text` (the banner and settings texts) |
+
+The exact field type of each key is in its seed file and in the template that renders it (`Web/Pages/*.cshtml`); a template and a stored type must agree. Rows left in the database after a seed version dropped a key (for example `trips.week-prices`, replaced by `shared.prices.week`) are never rendered and are harmless.
+
+**`contact.map.embed-url`** is a `Text` field, **Greek only** (a save in another locale is rejected: "The map location is shared by both languages; set it in Greek."), validated on save by `ContactMap.IsValidEmbedUrl`: empty, or `https://www.google.com/maps/embed` followed by the end, `?` or `/`, with no whitespace. It is not seeded.
+
+**Seed markers.** `IntegrationSettings` rows with the key `seed.{group}` (for example `seed.home`) hold the applied seed version of a group (`ContentSeeder.MarkerKey`); see `docs/architecture.md` → Content seeding. They are not content and not removed by anything.
+
 Parsing and validation live in `Core/Services/ContentKeys.cs`: each segment matches `[a-z0-9]+(-[a-z0-9]+)*` and is at most 100 characters; a field key has exactly 3 segments, a list key or section key exactly 2. Locales are `el` and `en` (`Core/Services/ContentLocales.cs`).
 
 ## Entities

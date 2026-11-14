@@ -95,7 +95,7 @@ The database is PostgreSQL (Npgsql provider). The data layer stays provider-neut
 
 ## Output Caching
 
-- Every public page model uses `[OutputCache(PolicyName = CacheTags.PolicyName, Tags = [CacheTags.HomePage])]` — the policy `CmsPage` plus its own tag `page:{pageKey}` (add a constant or use `CacheTags.Page(pageKey)` for other pages). A guard test fails if a built site page lacks either.
+- Every public page model uses `[OutputCache(PolicyName = CacheTags.PolicyName, Tags = [CacheTags.HomePage])]` — the policy `CmsPage` plus its own tag `page:{pageKey}` (a constant in `CacheTags` per page, or `CacheTags.Page(pageKey)`). The one exception is Trips, which uses `CmsPageTrips` (varies by the normalised `?trip=`). A guard test fails if a site page lacks its policy or tag. The query string is ignored by default; a page that needs a query key gets its own named policy that varies by a **normalised** value, never the raw one.
 - Every content write — field save, list item add/delete/reorder/activate — evicts `page:{pageKey}`; writes to page key `shared` evict `pages:all`. A write without eviction is a bug.
 - `UseOutputCache()` comes after `UseAuthentication()` and `UseAuthorization()`.
 - Evict only through `IPageCacheInvalidator` (content writers) or `ICacheTagEvictor` (the listener): the invalidator evicts locally and publishes to the other pods. Never call `IOutputCacheStore` directly to evict, or the other pod keeps serving the old page.
@@ -129,7 +129,8 @@ The database is PostgreSQL (Npgsql provider). The data layer stays provider-neut
 - Tests that count log lines match the exact level and event, not the logger name alone: `LifecycleLoggingTests` counts only `|INFO|Lifecycle|(Started|Stopping|Stopped) ` lines (a bare `|Lifecycle|` match would also count any other line of that logger) and prints the whole log when the count is wrong.
 - Tag helpers are unit-tested without a host through `TagHelperTestSupport` (builds a `PageContent` snapshot and a `FakePageContentAccessor`); `PageContentAccessorWebHostTests` uses the web host.
 - The save API is tested against the real host in `ContentApiTests` (antiforgery header, 256 KB limit, 400/401/403/413, history endpoints); `RichTextSanitizerTests` and `ContentServiceTests` cover sanitizing and save ids; `CmsAdminRenderingTests` and `CmsEditorTagHelperTests` cover the `data-cms-*` output; `AdminRootRedirectTests` covers the `/admin` redirect.
-- **No Playwright in Phase 4.** The editing UI (JS and CSS) has no automated tests; it is verified by driving the built-in Claude browser against `/dev/cms-sandbox`. Playwright + axe-core stays planned for the public pages.
+- **No Playwright.** The editing UI and the public JS and CSS have no automated browser tests; they are verified by driving the built-in Claude browser (the editing UI on `/dev/cms-sandbox`, the public pages as a logged-out visitor). Accessibility is checked with axe-core injected into each page there (see `docs/architecture.md` → Accessibility): on every public page in both languages and the interactive states, repeated on the Phase 8 preview before go-live, not automatically on later changes.
+- Phase 7 test classes: `SiteLayoutTests`, `HomePageContentTests`, `TripsPageTests` / `TripTabsTests`, `BoatPageTests`, `ContactPageTests`, `LegalPagesTests`, `SeoAndErrorPagesTests` (Production and Preview factories; a throwing content service proves the error pages read no content), `OldSiteRedirectTests`, `HomeContentHealthTests`; seeding in `ContentSeederTests`, `EmbeddedContentSeedSourceTests`, `ContentSeedHostTests` (`ContentSeedTestSupport`); `CmsLinkTagHelperTests`. The test host defaults `Content:SeedAtStartup` to false; a test that needs seeded content overrides `SeedAtStartup` in its factory subclass (`ContentSeedHostTests`).
 - A fake clock (`FakeTimeProvider`) controls `CreatedAt`/`UpdatedAt` only. `BaseEntity.Id` is `Guid.CreateVersion7()` from the real clock, so it does not follow the fake clock. History reads sort by `CreatedAt` descending, then `Id` descending (`ContentHistoryRepository`); a test that needs a deterministic tie-break passes explicit ids built with `Guid.CreateVersion7(timestamp)` (see `ContentPersistenceTests.HistoryReads_AreNewestFirst`).
 - Tests that only need the `DbContext` (e.g. `BaseEntityTimestampTests`, `ContentPersistenceTests`) take a database from `PostgresTestServer` directly and use a fake `TimeProvider`.
 
@@ -176,7 +177,22 @@ The database is PostgreSQL (Npgsql provider). The data layer stays provider-neut
 - Link URLs allowed: `https:`, `tel:`, `mailto:` only. Links to external sites (booking platforms) open in a new tab and say so.
 - Admin-only markup (`data-cms-*`, `#cms-config`, the toolbar, `cms-edit.css`, `cms-edit.js`, inactive items and the list `<template>`) is emitted only for the authenticated admin, through `ICmsEditContext`; such responses are `Cache-Control: no-store`.
 - A page used only for development (`/dev/...`) returns 404 unless the environment is Development, and its content keys live under `shared.sandbox*`.
-- Every page sets `<html lang>`, canonical URL and `hreflang` alternates.
+- Every page sets `<html lang>`, canonical URL and `hreflang` alternates (`<cms-seo>` does it; the canonical never carries the query string).
+- **An image key renders at most once per page.** The editor's image preview replaces its element, so a second copy would stay stale. Text, link and rich-text keys may appear more than once (the editor previews every copy).
+- **Internal links** (to Trips, Boat, Contact, Terms ...) have a fixed target in code and an editable `Text` label (`<a href="@path"><span cms="home.hero.cta-trips"></span></a>`, the path from `ILocalizedUrlService`); a Link field is for `https:`, `mailto:` and `tel:` only. Trip links carry `?trip=day|islands|week`.
+- **Icon or caption inside a link:** use `<a cms-link="..." cms-keep-content>` with `<span cms-link-label>` slots, instead of letting the helper replace the anchor's content.
+- **Fixed UI text vs content.** Text that belongs to the interface, not the business (menu labels, page names, tab labels, button labels, status and cookie-banner messages, map title) is a `UiString(Greek, English)` property in `Web/Localization/UiText.cs`, read with `.Current` or `.For(locale)`. Anything the owner may want to reword is content (`cms`). Never put business content in `UiText`.
+- **Error pages read no content and touch no database** (`Pages/Errors/`, own `_ErrorLayout`): they must work when the database is down. They use `UiText` only.
+- **A prices or charter-cost value is stored once** (`shared.prices.*`, `shared.charter-costs`) and rendered wherever it appears; do not add a second price field.
+- **Page section order and numbering are not typed into content:** numbered legal sections use a CSS counter, so reordering a list cannot break it.
+- **JSON-LD and placeholders:** unknown owner values in a seed are bracketed (`[ΤΙΜΗ]`, `[EMAIL]`) or use `example.com`; `<cms-json-ld />` omits exactly those values. Use the same style for a new placeholder.
+
+### Adding a page section or a page
+
+1. Add the markup to the page's `.cshtml`, wrapped in `<section cms-section="{page}.{section}" cms-section-label="...">`, with `cms` / `cms-list` / `<cms-image>` markup following the rules above (labels required, an image key once per page).
+2. Add the keys to the page's seed file `Web/Seed/{group}.json` (embedded resource: `SaronidaSailing.Web.csproj` includes `Seed\*.json` automatically; every key starts with the group name; no images, alt texts allowed) and **raise the group's `version`**, so existing databases get the new keys (fill-only-missing, never overwrites). Include Greek and a drafted English value; unknown owner values as bracketed placeholders.
+3. A new page also needs a row in `SitePages`, the page model with `[OutputCache]` and its tag constant in `CacheTags`, an entry in the sitemap (automatic: `SeoEndpoints` reads `SitePages`), a menu or footer entry in `_Header` / `_Footer` and `UiText` names.
+4. Check it in the Claude browser in both languages (and the axe run for a new page).
 
 ---
 
@@ -191,11 +207,12 @@ The database is PostgreSQL (Npgsql provider). The data layer stays provider-neut
 
 ## CSS and fonts
 
-- Custom CSS in `wwwroot/css/site.css`; no CSS framework. Colors, type and spacing follow the design canvas.
-- `site.css` starts with a base rule `:root { color-scheme: light; background: #ffffff; color: #14232b }`, so a browser that defaults to dark mode never shows a black page behind unstyled content. It is a placeholder: Phase 7 replaces the colours with the design's.
-- **Mobile-first**: defaults target small screens; enhance with `@media (min-width: …)`. No `max-width` media queries.
+- Custom CSS in `wwwroot/css/site.css`; no CSS framework. Colors, type and spacing follow the design canvas and live as tokens on `:root` (colors, radii, spacing, `--gutter`, `--section-pad`); use the tokens, do not repeat hex values. `:root` sets `color-scheme: light`, so a browser in dark mode never shows a black page.
+- **Mobile-first**: defaults target small screens; enhance with `@media (min-width: …)`. No `max-width` media queries (a `max-width` property is fine). `!important` only where the cascade cannot do it: the `prefers-reduced-motion` reset and `.consent [hidden]` are the only uses.
 - Breakpoints: `720px` (tablet) and `960px` (desktop) only, unless the tech lead approves another.
-- Fonts (Commissioner) are self-hosted `woff2` files in `wwwroot/fonts/` — never loaded from Google's CDN.
+- Colour contrast: the canvas grey `#8FA6B3` on white (2.54:1) is for icons only, never text; the CTA orange on its tint (4.24:1) is not used for text.
+- Fonts (Commissioner, variable, weights 400-800) are self-hosted `woff2` files in `wwwroot/fonts/commissioner/` (greek, latin, latin-ext, with `OFL.txt`) — never loaded from Google's CDN. `_Layout` preloads greek and latin with **literal `/fonts/...` hrefs**: a `~/` href is fingerprinted by `MapStaticAssets` and would no longer match the URL `site.css` asks for, so the font would download twice.
+- An element that must stay clear of the cookie panel or the admin toolbar uses `scroll-padding` and the variables `--consent-offset` / `--cms-toolbar-height`, not fixed offsets.
 - No inline styles where a class will do.
 
 ---

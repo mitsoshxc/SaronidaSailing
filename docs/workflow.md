@@ -62,6 +62,8 @@ Local development:
 6. `dotnet test` runs the xUnit tests (see `docs/conventions.md` -> Tests). The database tests start their own PostgreSQL through Testcontainers, so Docker must be running.
 7. To try the editing UI before real pages exist, sign in at `https://localhost:5001/admin/login` and open `/dev/cms-sandbox` (or `/en/dev/cms-sandbox`), a Development-only page (404 elsewhere). The editing UI is verified through the Claude browser there, not with Playwright (see `docs/architecture.md` -> CMS Editing Flow).
 
+8. **UI verification practice (decided 2026-11-14):** no Playwright. Public pages are checked in the built-in Claude browser as a logged-out visitor, in both languages at desktop and phone widths, with axe-core injected into each page, plus a manual keyboard pass with real key presses. Findings are fixed through Dev. The run is repeated on the Phase 8 preview before go-live and is not automatic on later changes (`docs/architecture.md` → Accessibility).
+
 ## Cloud Sessions
 
 Claude Code cloud sessions for this repo use the personal environment **"SaronidaSailing"**: Default network rules plus `saronidasailing.gr` / `www.saronidasailing.gr` (the old site, used for the redirect map). Its setup script installs the .NET 10 SDK (Ubuntu package `dotnet-sdk-10.0`). No Docker daemon is available in cloud sessions, so the database tests (Testcontainers PostgreSQL) and the local PostgreSQL run only on the developer's PC.

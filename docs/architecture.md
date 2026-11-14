@@ -1,6 +1,6 @@
 # Architecture
 
-Status: **Phases 0-6 are implemented (decisions, foundation, admin authentication, CMS core, inline editing, PostgreSQL and two-pod readiness: cross-pod cache eviction, shared logs, runtime diagnostics; media: upload pipeline, library, `<cms-image>`, image window; Instagram feed: Connect flow, encrypted token, fetch and renewal jobs, section switch, feed on the placeholder Home, toolbar warning). Open until the Phase 8 preview: the real-iPhone HEIC upload test (needs HTTPS) and every check against the real Meta app (Phase 6 is verified against stub Instagram answers only, see Instagram Feed → Not yet verified). Everything else (public pages, k3s deploy) is agreed design, not yet built.** Update as phases land.
+Status: **Phases 0-7 are implemented (decisions, foundation, admin authentication, CMS core, inline editing, PostgreSQL and two-pod readiness: cross-pod cache eviction, shared logs, runtime diagnostics; media: upload pipeline, library, `<cms-image>`, image window; Instagram feed: Connect flow, encrypted token, fetch and renewal jobs, section switch, toolbar warning; public pages: layout, all seven pages, startup content seed, cookie consent, SEO endpoints, error pages, old-site redirects, accessibility pass). Open until the Phase 8 preview: the real-iPhone HEIC upload test (needs HTTPS), every check against the real Meta app (Phase 6 is verified against stub Instagram answers only, see Instagram Feed → Not yet verified), and a repeat of the axe-core run (see Accessibility). The k3s deploy is agreed design, not yet built.** Update as phases land.
 
 ## Tech Stack
 
@@ -23,7 +23,7 @@ Status: **Phases 0-6 are implemented (decisions, foundation, admin authenticatio
 | List reordering | SortableJS (MIT), self-hosted | Drag-and-drop, plus up/down buttons |
 | HTML sanitizing | HtmlSanitizer | Rich text cleaned server-side before storage |
 | Frontend | Plain JS and custom CSS, no frameworks; self-hosted Commissioner font | Small, matches the design canvas |
-| Tests | xUnit on real PostgreSQL via Testcontainers; Playwright + axe-core for accessibility | Database tests need Docker, so they run on the developer's PC, not in cloud sessions |
+| Tests | xUnit on real PostgreSQL via Testcontainers | Database tests need Docker, so they run on the developer's PC, not in cloud sessions. No Playwright: the UI is checked in the built-in Claude browser, with axe-core 4.10.2 injected into each page (see Accessibility) |
 | Deploy | PowerShell 7 script (`deploy/deploy.ps1`): `docker save \| ssh` + `ctr images import` into k3s, `migrate` Job, rollout (agreed design, Phase 8) | No CI, no registry |
 
 **Explicitly rejected**
@@ -49,9 +49,9 @@ SaronidaSailing.slnx
 global.json, Directory.Build.props, Directory.Packages.props, nuget.config
 .config/dotnet-tools.json          dotnet-ef local tool
 src/
-  SaronidaSailing.Core/            Entities/ (BaseEntity, ApplicationUser, Content*, MediaAsset, MediaSource, InstagramPost, IntegrationSetting), Interfaces/ (repositories, IContentService, IMediaService, MediaImportResult, IRichTextSanitizer, IUnitOfWork, IPageCacheInvalidator, ICacheTagEvictor, ICacheEvictionBus, PageContent, PageImage, ISectionActivationHandler, ISecretProtector, IInstagram* services, InstagramApiException, InstagramApiModels), Services/ (ContentService, ContentBatch, ContentKeys, ContentLocales, ContentLink, MediaFileNames, MediaLimits, MediaDimensions, Slugs, Instagram* services and constants); no EF, no ASP.NET
-  SaronidaSailing.Infrastructure/  Data/ (AppDbContext, DatabaseInitializer, DatabaseSettings, UnitOfWork, Configurations/, Migrations), Caching/ (PostgresCacheEvictionBus, PostgresCacheEvictionListener, CacheEvictionChannel), Repositories/, Content/ (RichTextSanitizer), Health/, Logging/ (AuditLog), Media/ (MediaService, ImageProcessor, MediaProcessingGate, MediaOptions, MediaFolder), Instagram/ (InstagramApiClient, InstagramDtos, InstagramOptions, DataProtectionSecretProtector, InstagramServiceCollectionExtensions), Jobs/ (InstagramFetchJob, InstagramTokenRefreshJob, InstagramJobQueue, InstagramJobScheduler), DependencyInjection.cs
-  SaronidaSailing.Web/             Program.cs, SiteOptions.cs, LogInstance.cs, DevelopmentMediaFiles.cs, Caching/ (CacheTags, OutputCachePageInvalidator, OutputCacheTagEvictor), Diagnostics/ (lifecycle, crash, metrics, request and health logging), Content/ (PageContentAccessor, CmsEditContext, CmsEditorConfig), Endpoints/ (ContentEndpoints, ContentApiModels, MediaEndpoints, MediaApiModels, AdminEndpoints), TagHelpers/, ViewComponents/ (InstagramFeedViewComponent), Models/ (InstagramFeedViewModel), Instagram/ (InstagramOAuthState, InstagramPaths, AthensTime), Cli/ (admin and migrate commands), Identity/, Localization/, Health/, Pages/ (Pages/Admin/, Pages/Dev/, Pages/Shared/Components/InstagramFeed/), wwwroot (css/ (`site.css` holds the base page rules, see docs/conventions.md -> CSS and fonts), js/cms/, lib/quill/, lib/sortablejs/), appsettings*.json
+  SaronidaSailing.Core/            Entities/ (BaseEntity, ApplicationUser, Content*, MediaAsset, MediaSource, InstagramPost, IntegrationSetting), Interfaces/ (repositories, IContentService, IContentSeeder, IContentSeedSource, ContentSeed, IDistributedLock, IMediaService, MediaImportResult, IRichTextSanitizer, IUnitOfWork, IPageCacheInvalidator, ICacheTagEvictor, ICacheEvictionBus, PageContent, PageImage, ISectionActivationHandler, ISecretProtector, IInstagram* services, InstagramApiException, InstagramApiModels), Services/ (ContentService, ContentBatch, ContentSeeder, ContentKeys, ContentLocales, ContentLink, ContactMap, MediaFileNames, MediaLimits, MediaDimensions, Slugs, Instagram* services and constants); no EF, no ASP.NET
+  SaronidaSailing.Infrastructure/  Data/ (AppDbContext, DatabaseInitializer, DatabaseSettings, UnitOfWork, Configurations/, Migrations), Caching/ (PostgresCacheEvictionBus, PostgresCacheEvictionListener, CacheEvictionChannel), Repositories/, Content/ (RichTextSanitizer), Health/ (incl. HomeContentHealthCheck), Logging/ (AuditLog), Media/ (MediaService, ImageProcessor, MediaProcessingGate, MediaOptions, MediaFolder), Instagram/ (InstagramApiClient, InstagramDtos, InstagramOptions, DataProtectionSecretProtector, InstagramServiceCollectionExtensions), Jobs/ (InstagramFetchJob, InstagramTokenRefreshJob, InstagramJobQueue, InstagramJobScheduler, HangfireDistributedLock), DependencyInjection.cs
+  SaronidaSailing.Web/             Program.cs, SiteOptions.cs, LogInstance.cs, DevelopmentMediaFiles.cs, Caching/ (CacheTags, OutputCachePageInvalidator, OutputCacheTagEvictor), Diagnostics/ (lifecycle, crash, metrics, request and health logging), Content/ (PageContentAccessor, CmsEditContext, CmsEditorConfig), Endpoints/ (ContentEndpoints, ContentApiModels, MediaEndpoints, MediaApiModels, AdminEndpoints, SeoEndpoints), PreviewEnvironment.cs, ErrorPageStatus.cs, Redirects/ (OldSiteRedirects, OldSiteRedirectMiddleware), Seed/ (embedded `{group}.json` seed files) + Content/EmbeddedContentSeedSource, TagHelpers/, ViewComponents/ (InstagramFeedViewComponent), Models/ (InstagramFeedViewModel, TripTabs, BoatGallery, LegalPageViewModel, SiteLogoViewModel), Instagram/ (InstagramOAuthState, InstagramPaths, AthensTime), Cli/ (admin and migrate commands), Identity/, Localization/ (SitePages, SiteCultures, UiText, ...), Health/, Pages/ (the seven site pages, Pages/Admin/, Pages/Dev/, Pages/Errors/, Pages/Shared/ with the layout partials, Pages/Shared/Components/InstagramFeed/), wwwroot (css/ (`site.css` is the public stylesheet, see docs/conventions.md -> CSS and fonts), fonts/commissioner/, js/ (public modules, see Public Pages), js/cms/, lib/quill/, lib/sortablejs/), appsettings*.json
 tests/
   SaronidaSailing.Tests/           xUnit; one PostgreSQL Testcontainer, one database per test class (see docs/conventions.md -> Tests)
 Dockerfile, .dockerignore
@@ -87,20 +87,62 @@ Data layer (`Infrastructure/Data/`):
 
 Canvas: https://claude.ai/artifact/RcU5iMfQSTJ34rH5gFB7MC
 
-| Page | Greek URL | English URL | Sections |
+All seven pages are built (Phase 7). Section keys are `{page}.{section}`; the full key list is in `docs/domain-model.md` → Public page content keys.
+
+| Page | Greek URL | English URL | Sections (`cms-section` keys) |
 |---|---|---|---|
-| Home | `/` | `/en/` | Hero · At a glance · Trips teaser · Boat teaser · Why with a skipper · Instagram feed · Departure point |
-| Trips | `/ekdromes` | `/en/trips` | Intro · 3 trip tabs (day cruise / islands / weekly charter) · Useful info · Booking box (links to booking platforms) |
-| Boat | `/skafos` | `/en/boat` | Gallery · Intro · Specs · Life on board · Included · Charter details |
-| Contact | `/epikoinonia` | `/en/contact` | Contact tiles · Google Map (after consent; static image otherwise) + directions · Useful details · Call to action |
-| Terms | `/oroi` | `/en/terms` | Rich-text sections |
-| Privacy | `/aporrito` | `/en/privacy` | Rich-text sections |
-| Accessibility | `/prosvasimotita` | `/en/accessibility` | Rich-text sections |
-| Shared | — | — | Header (logo, menu, language switch, Book button) · Footer |
+| Home | `/` | `/en/` | `home.hero` · `home.glance` · `home.trips` with the cards `home.trip-day` / `-islands` / `-week` (each its own section) · `home.boat` · `home.why` · `home.instagram` (view component) · `home.departure` · `home.sticky` (mobile "Book" bar) |
+| Trips | `/ekdromes` | `/en/trips` | `trips.intro` · `trips.day` / `trips.islands` / `trips.week` (the three tab panels) · `trips.booking` (`id="booking"`) · `trips.info` (accordion) · `trips.sticky` |
+| Boat | `/skafos` | `/en/boat` | `boat.gallery` (cover + list, "All photos" lightbox) · `boat.intro` · `boat.specs` · `boat.life` · `boat.included` · `boat.charter` · `boat.booking` (`id="booking"`) · `boat.sticky` |
+| Contact | `/epikoinonia` | `/en/contact` | `contact.intro` (four tile links) · `contact.where` (map spot + directions) · `contact.details` · `contact.cta`. The map image, notice and embed URL are `contact.map.*` fields inside `contact.where` |
+| Terms | `/oroi` | `/en/terms` | `terms.intro` · `terms.summary` · `terms.body` (list `terms.sections`) · `terms.contact` |
+| Privacy | `/aporrito` | `/en/privacy` | the same four sections with the prefix `privacy` |
+| Accessibility | `/prosvasimotita` | `/en/accessibility` | the same four sections with the prefix `accessibility` |
+| Shared | — | — | Header (logo, menu, language switch, Book button) · Footer (tagline, pages, contact, social, copyright, "Cookie settings") · cookie banner, in `Pages/Shared/_Header`, `_Footer`, `_Logo`, `_CookieConsent` |
+| Errors | `/error/404`, `/error/410`, `/error/500` | same, language from the original path | Own layout `_ErrorLayout` (see Error pages) |
 
-Greek slugs are Latin transliterations (Greek letters get percent-encoded when URLs are shared). Slugs are **fixed in code**, not admin-editable — changing a URL later hurts search rankings.
+Greek slugs are Latin transliterations (Greek letters get percent-encoded when URLs are shared). Slugs are **fixed in code**, not admin-editable — changing a URL later hurts search rankings. A slug of the other language is a 404 (`/en/skafos`, `/boat`).
 
-The cookie-consent banner and the footer "Cookie settings" link from the design **are built** (needed for the Google Map — see Cookies & Privacy). The banner's "Statistics" category is dropped.
+The cookie-consent banner and the footer "Cookie settings" button from the design **are built** (needed for the Google Map — see Cookies & Privacy). The banner's "Statistics" category is dropped.
+
+### Public Pages
+
+How the public pages are built (`Web/Pages/`, `Web/Pages/Shared/`):
+
+| Topic | Rule |
+|---|---|
+| Legal pages | Terms, Privacy and Accessibility share one partial `_LegalPage` (`Models/LegalPageViewModel`); their page models derive from `Pages/LegalPageModel` and each keeps its own output-cache tag. Per page: `{page}.intro` (eyebrow, title = the `<h1>`, `updated`), `{page}.summary` (title, list `summary-items`), `{page}.body` with the list `{page}.sections` (`title` Text → `<h2>`, `body` RichText), `{page}.contact` (lead, label; the whole card links to Contact). Numbering is a CSS counter, so titles carry no numbers and reordering cannot break it. The "On this page" table of contents is built on the server from the same list (visitors: active items, none when the body section is hidden; admin: all) and links to `#section-{itemId}`, set by `cms-item-id-prefix` on the `cms-list`. Terms and Privacy link to each other under "See also" |
+| Header | One `#site-menu` element (nav, language link, Book) laid out inline from 960 px and as a JS-toggled panel below; without JS the panel is in flow and the menu button is hidden. Mobile: Home = logo + language link + menu button; inner pages = back link + page title + menu button. The Instagram item is an external link (`shared.social.instagram`, `cms-keep-content`) |
+| Footer | Dark; tagline, Pages nav, Contact (`shared.contact.phone`, `phone-2` as `tel:` links, `shared.contact.address`), Follow us (icon-only links `shared.social.instagram` / `facebook`), `shared.footer.copyright`, "Cookie settings" button (hidden without JS) |
+| Fixed UI text | Menu labels, page names, tab labels, button labels, cookie-banner buttons and status messages, map title and similar are `UiText` (`Web/Localization/UiText.cs`): `UiString(Greek, English)` properties with `.For(locale)` and `.Current`; a test checks both languages are filled. Everything the owner may want to reword is content instead |
+| Trip tabs | The tabs are links `?trip=day\|islands\|week` that work without JS: the server renders the selected tab (`TripTabs.Normalize` / `Resolve`: an unknown value becomes `day`, a hidden trip becomes the first active one; the admin always sees all three). `trip-tabs.js` upgrades them to ARIA tabs (`role="tab"`, automatic activation, roving tabindex) and updates the URL with `history.replaceState`. The canonical URL stays `/ekdromes`. Home's trip cards link to `/ekdromes?trip=…` |
+| Boat gallery | Cover (`boat.gallery.cover`, eager) plus list `boat.gallery-photos`; with JS only the cover and four photos show, without JS or in edit mode all. "All photos (N)" (`BoatGallery.CountPhotos`: cover + active items that really have an image) opens a native `<dialog>` lightbox; the button and dialog exist only when N > 0 |
+| Sticky bars | `home.sticky`, `trips.sticky`, `boat.sticky` are mobile-only bottom bars ("Book" / "Dates" jump to `#booking` or link to Trips); from 960 px they are static for the admin so they stay editable. The sticky booking card is offset by `--cms-toolbar-height` for the admin |
+| Back to top | `site.js`: shown after one viewport of scroll, focuses the visible header home or back link |
+
+Public JS modules (`wwwroot/js/`, plain ES modules loaded by `site.js` from `_Layout` for every visitor; the admin modules in `js/cms/` are separate):
+
+| Module | Role |
+|---|---|
+| `site.js` | Entry: header menu (Escape returns focus, click outside closes), back-to-top, then initialises the modules below |
+| `trip-tabs.js` | Upgrades the trip tab links to ARIA tabs |
+| `gallery.js` | The boat lightbox: slides are the grid's rendered `<img>`s (so no image key renders twice), `showModal`, previous / next wrap, arrow keys, swipe (`touch-action: pan-y`), Escape / Close, focus returns to "All photos", scroll lock with `html:has(dialog.lightbox[open])`. Tile clicks open it for pointer users but not in edit mode (`#cms-config` present without `html.cms-view`) |
+| `consent.js` | The cookie banner and settings (see Cookies & Privacy) |
+| `contact-map.js` | Adds and removes the Google Map `<iframe>` according to consent |
+
+Page content rules (tech lead decisions that every page follows):
+
+- **Internal links** (Trips, Boat, Contact, Terms ...) have fixed targets in code and an editable `Text` label; Link fields stay for `https:`, `mailto:` and `tel:`. Trip links carry `?trip=day|islands|week`.
+- **Prices live once**: `shared.prices.day|islands|week`, rendered on Home, Trips and Boat. The **charter costs** (package, deposit, fuel) are one shared list `shared.charter-costs`, rendered on Trips (weekly panel) and Boat (charter details). Trip types are fixed in code (`day`, `islands`, `week`).
+- **An image key renders at most once per page**: the editor's image preview replaces its element, so a second copy would not update. (A non-image field rendered twice, such as the header and footer Instagram link, is previewed in every copy.)
+- Image spots keep their aspect box with a striped placeholder behind; the Home hero shows the canvas illustration until a photo exists. The hero is one `<cms-image>` (no video).
+- Unknown business values (prices, guest numbers, email, hours, season, booking platforms) are seeded as visible bracketed placeholders (`[ΤΙΜΗ]` / `[PRICE]`, ...) so gaps show on the preview; the booking links seed a placeholder `https://` URL.
+
+### Error pages
+
+`Pages/Errors/NotFound` (`/error/404` and `/error/410`) and `ServerError` (`/error/500`) use their own layout `_ErrorLayout`: logo, fixed `UiText` in both languages, `<meta name="robots" content="noindex">`, `Cache-Control: no-store`, **no content read** (a test with a throwing content service proves it), and no header, footer, consent banner or JSON-LD. The language comes from the original path (`SiteCultures.ForPath`, base class `ErrorPageModel`), so `/en/nothing` answers an English 404 with `/en/...` links. The old `Pages/Error` is gone.
+
+The pipeline (see Request Flow) re-executes `/error/{0}` through `UseStatusCodePagesWithReExecute`, but `Web/ErrorPageStatus.cs` disables that per request unless the status is 404 or 410 **and** the path is not `/admin/api`, `/health`, `/media`, `/sitemap.xml` or `/robots.txt`, so API and file answers stay empty. `UseExceptionHandler("/error/500")` runs outside Development.
 
 ## Localization
 
@@ -110,19 +152,20 @@ The cookie-consent banner and the footer "Cookie settings" link from the design 
 - **Routing:** `Web/Localization/SitePages.cs` is the single table of the 7 pages (key, Razor page path, Greek slug, English slug). `LocalizedPageRouteConvention` replaces each listed page's routes with exactly two: the Greek slug and `/en/{english slug}`. The default `/Index`, `/Trips` ... routes are not routable. Adding a page = a row in `SitePages` plus the Razor page.
 - **Culture:** `UrlPrefixRequestCultureProvider` is the only request-culture provider (the default cookie and `Accept-Language` providers are removed): a path starting with `/en` is English, anything else Greek. Supported cultures and the prefix are constants in `SiteCultures.cs`. The layout sets `<html lang>` from the request UI culture.
 - **URL helper:** `ILocalizedUrlService` (`LocalizedUrlService`, scoped) builds the path of a page key in a given culture (`GetPath`), finds the current page from the route (`GetCurrentPage`) and returns the current page's path in the other language (`GetAlternatePath`, for the language switcher).
-- Every page emits `<html lang>`, `hreflang` alternates and a canonical URL.
+- Every site page emits `<html lang>`, `hreflang` alternates and a canonical URL (see SEO).
 - **Missing translation fallback:** if a field has no English value, English visitors see the Greek value. The admin sees a "missing EN" marker on that field in edit mode.
-- `sitemap.xml` lists every page in both languages with `hreflang` alternates; `robots.txt` points to it and disallows `/admin`.
+- `sitemap.xml` lists every page in both languages with `hreflang` alternates; `robots.txt` points to it and disallows `/admin` (see SEO).
 
 ## SEO
 
 - **Implemented (Phase 3):** `<cms-seo fallback-title="...">` (`Web/TagHelpers/CmsSeoTagHelper.cs`) in the `<head>` of `Pages/Shared/_Layout.cshtml`. On a site page (one in `SitePages`) it emits `<title>` (`{page}.seo.title`, else the fallback title), `<meta name="description">` (`{page}.seo.description`, omitted when empty), `og:title`, `og:description`, `og:type` (`website`), `og:site_name`, `og:url`, `og:locale` and `og:locale:alternate` (`el_GR` / `en_GB`). On other pages (admin, errors) it emits only `<title>`. Values are read as `Text` fields in the visitor's language (English falls back to Greek). `og:image` (Phase 5): when `{page}.seo.image` holds an existing image, the tag helper also emits `og:image` (absolute URL: `Site:BaseUrl` + the largest generated width of 1600 or less, else the smallest), `og:image:width`, `og:image:height` and, when `{page}.seo.image-alt` has text in the visitor's language (English falls back to Greek), `og:image:alt`. A stored value of the wrong type, or an id with no `MediaAsset`, logs a warning and emits no image tags.
-- **Planned:** canonical URL and `hreflang` alternates on every page, `sitemap.xml`, `robots.txt`, JSON-LD.
-- **`Site:BaseUrl`** (`Web/SiteOptions.cs`) is a required option: an absolute http(s) URL with no path, query or fragment (a trailing `/` is trimmed). It is validated on start, so a missing or invalid value fails startup. `appsettings.json` has no value; Development sets `https://localhost:5001`; preview and production must set `Site__BaseUrl` (Phase 8). It prefixes `og:url` today and all absolute URLs (canonical, sitemap, `hreflang`) later.
+- **Canonical and `hreflang` (Phase 7):** `CmsSeoTagHelper` also emits `<link rel="canonical">` (the page in the visitor's language) and `hreflang` alternates `el`, `en` and `x-default` (the Greek page), all absolute and never carrying the query string, so `/ekdromes?trip=islands` has the canonical `/ekdromes`.
+- **`robots.txt` and `sitemap.xml`** (`Web/Endpoints/SeoEndpoints.cs`, no database read, `Cache-Control: public, max-age=3600`, GET and HEAD): `robots.txt` = `Disallow: /admin` plus a `Sitemap:` line; `sitemap.xml` lists the 7 pages in both languages (14 `<loc>`, absolute), each with `xhtml:link` alternates `el`, `en`, `x-default`.
+- **`Site:BaseUrl`** (`Web/SiteOptions.cs`) is a required option: an absolute http(s) URL with no path, query or fragment (a trailing `/` is trimmed). It is validated on start, so a missing or invalid value fails startup. `appsettings.json` has no value; Development sets `https://localhost:5001`; preview and production must set `Site__BaseUrl` (Phase 8). It prefixes `og:url`, canonical, `hreflang`, the sitemap, the JSON-LD URL and the old-site redirect `Location`.
 - **Greek is not escaped in HTML output:** `WebEncoderOptions` in `Program.cs` allows `BasicLatin`, `Latin1Supplement`, `GreekandCoptic` and `GeneralPunctuation`, so Greek text is emitted as characters, not `&#x...;` entities.
-- **Preview environment** (`ASPNETCORE_ENVIRONMENT=Preview`): `robots.txt` disallows everything, no `sitemap.xml`, `X-Robots-Tag: noindex, nofollow` on every response (see `docs/deployment.md` → Preview).
-- **Structured data:** JSON-LD `LocalBusiness` on every page, built from existing content (business name, phones, email, address, season, Instagram link) — the admin keeps it current by editing the normal content.
-- **Old-site redirects (301).** The old site (Joomla, crawled 2026-11-08) serves the same pages on `saronidasailing.gr` and `www.saronidasailing.gr` under `/index.php/{el|en}/...`. Since the domain moves to the new server, the app maps old paths (any host, any query string) with a redirect table in middleware, early in the pipeline:
+- **Preview environment** (`ASPNETCORE_ENVIRONMENT=Preview`, `Web/PreviewEnvironment.cs`): enforced by the app itself, not only by nginx. `robots.txt` = `User-agent: *` / `Disallow: /`, `sitemap.xml` answers 404, and `UsePreviewNoIndex` adds `X-Robots-Tag: noindex, nofollow` to every response (see `docs/deployment.md` → Preview).
+- **Structured data (JSON-LD):** `<cms-json-ld />` (`Web/TagHelpers/CmsJsonLdTagHelper.cs`, in `_Layout`, site pages only; error and admin pages emit nothing) writes one `LocalBusiness` script: `name` (fixed "Saronida Sailing"), `url` (Home in the visitor's language), `description` (`shared.footer.tagline`), `telephone` (`shared.contact.phone` and `phone-2`, one string or an array), `email` (`shared.contact.email`), `PostalAddress` (`shared.contact.address`, `addressCountry` `GR`) and `sameAs` (`shared.social.instagram`, `facebook`). **Placeholder rule:** a value that is empty, contains a bracketed `[...]` part or contains `example.com` is left out, so the seeded `[EMAIL]` / `email@example.com` is omitted until the owner's address replaces it. The default `System.Text.Json` encoder escapes `<`, `>` and `&`, so content cannot close the script. Season and opening hours are not emitted (the season is free text on the Contact page, not shared content). The admin keeps it current by editing the normal shared content.
+- **Old-site redirects (301)** (`Web/Redirects/OldSiteRedirects.cs`, `OldSiteRedirectMiddleware`, `UseOldSiteRedirects()`). The old site (Joomla, crawled 2026-11-08) serves the same pages on `saronidasailing.gr` and `www.saronidasailing.gr` under `/index.php/{el|en}/...`. Since the domain moves to the new server, the app maps old paths with a redirect table in middleware. The table is data (path → page key + culture) resolved through `ILocalizedUrlService`, so no slug is repeated. Rules: only paths equal to `/index.php` or below it (segment match, case-insensitive, trailing `/` ignored), any host, the query string dropped, GET and HEAD only (a POST is untouched); the answer is `301` with an absolute `Location` = `Site:BaseUrl` + the new path, or an empty `410` that the not-found page renders. The middleware is registered **outside Preview only** (Preview answers 404). Its place in the pipeline: after the status-code-pages block, before request localization (see Request Flow). The 410 page is Greek for old `/index.php/en/...` paths, because the language comes from the `/en` URL prefix.
 
 | Old path | New |
 |---|---|
@@ -156,13 +199,30 @@ Visitor ─► Cloudflare ─► nginx (host) ─┬─► /media/*  → files o
 
 Cloudflare by default caches static file types (images, CSS, JS), not HTML, so HTML freshness is controlled by the app's output cache only.
 
+Middleware order in `Web/Program.cs` (after the startup work: migration check, `Content:SeedAtStartup` seed, Instagram schedule sync):
+
+| Order | Middleware | Note |
+|---|---|---|
+| 1 | `UseForwardedHeaders`, `UseRequestDiagnostics` | Real client IP first |
+| 2 | `UsePreviewNoIndex` | Preview only: `X-Robots-Tag` on every response |
+| 3 | Development media files | Development only |
+| 4 | `UseExceptionHandler("/error/500")` | Not in Development |
+| 5 | `UseStatusCodePagesWithReExecute("/error/{0}")` + the per-path rule (`ErrorPageStatus`) | Error page only for 404 / 410 outside the plain paths |
+| 6 | `UseOldSiteRedirects` | Not in Preview |
+| 7 | `UseRequestLocalization` | Culture from the URL prefix |
+| 8 | `UseRouting`, `UseRateLimiter`, `UseAuthentication`, `UseAuthorization`, `UseOutputCache` | Output cache after authentication |
+| 9 | Endpoints | Hangfire dashboard, `/health`, static assets, content / media / admin / SEO endpoints, Razor Pages |
+
+The redirects sit before localization and routing so an old URL is answered without any content or routing work, and after the status-code block so a 410 gets the not-found page.
+
 ## Output Caching
 
 Implemented in Phase 3 (`Web/Program.cs`, `Web/Caching/`).
 
 - Named policy `CmsPage` (`CacheTags.PolicyName`): expiration **1 hour**, tag `pages:all`, built on the default policy, with the query string ignored (`SetVaryByQuery([])`), so `?x=1` variants share one entry.
-- Each page declares the policy and its own tag on its page model: `[OutputCache(PolicyName = CacheTags.PolicyName, Tags = [CacheTags.HomePage])]` (tag `page:{pageKey}`, e.g. `page:home`). Only `IndexModel` is cached so far; a guard test (`OutputCacheTests`) requires every built site page to carry the policy and its page tag, so a new page without it fails the tests.
-- `IContentService.ApplyChangesAsync` calls `IPageCacheInvalidator` once per save with the touched page keys. `OutputCachePageInvalidator` (singleton) turns them into tags: `page:X` for each touched page, or `pages:all` only if `shared` is touched. It evicts them locally through `ICacheTagEvictor`, then publishes them with `ICacheEvictionBus`.
+- Each page declares the policy and its own tag on its page model: `[OutputCache(PolicyName = CacheTags.PolicyName, Tags = [CacheTags.HomePage])]` (tag `page:{pageKey}`, e.g. `page:home`; constants `HomePage`, `TripsPage`, `BoatPage`, `ContactPage`, `TermsPage`, `PrivacyPage`, `AccessibilityPage`). All seven site pages are cached; a guard test (`OutputCacheTests`) requires every site page to carry a policy and its page tag, so a new page without it fails the tests.
+- **Trips page policy `CmsPageTrips`** (`CacheTags.TripsPolicyName`, `Web/Caching/TripsVaryByPolicy.cs`): the same as `CmsPage` plus a vary-by value of the **normalised** `?trip=` (`TripTabs.Normalize`), so there are at most three entries (`day`, `islands`, `week`) and junk values cannot fill the cache. Only the Trips page uses it (the guard test expects it for `trips` only); every other query key stays ignored.
+- `IContentService.ApplyChangesAsync` calls `IPageCacheInvalidator` once per save with the touched page keys. `OutputCachePageInvalidator` (singleton) turns them into tags: `page:X` for each touched page, or `pages:all` only if `shared` is touched. Every `shared.*` content (footer, contact, social, prices, charter costs, cookie texts) is on every page, so saving any `shared.*` field or list evicts all pages. It evicts them locally through `ICacheTagEvictor`, then publishes them with `ICacheEvictionBus`.
 - A successful Instagram fetch that added, updated or removed a post evicts `page:home` (`InstagramFeedService` calls `IPageCacheInvalidator.EvictPagesAsync(["home"])`, so the other pods are told too); a fetch that changes nothing does not.
 - Authenticated requests (the admin) are neither served from nor stored in the cache — built-in default policy behaviour (and admin-rendered pages are sent with `Cache-Control: no-store`). `app.UseOutputCache()` is placed **after** `UseAuthentication()`/`UseAuthorization()`.
 - Cache is lost on restart/redeploy; pages rebuild on first request.
@@ -221,7 +281,10 @@ Razor templates mark editable spots with tag helper **attributes on real element
 | `<a cms-section-link="home.instagram">` | A menu link to a section (`CmsSectionLinkTagHelper`): omitted for visitors when that section is inactive. Accepts only a section of the current page or of `shared`; any other page key throws at render time |
 | `<section cms-section="home.instagram" cms-section-label="Instagram feed" cms-instagram-count="6" cms-instagram-empty="false">` | `CmsInstagramSectionTagHelper` (targets any element with `cms-instagram-count`; used by the Instagram feed view). Nothing for visitors. For the admin it writes `data-cms-instagram-count` (the stored post count), `data-cms-instagram-count-key` (`home.instagram.post-count`) and, when `cms-instagram-empty` is true, `data-cms-empty`. `instagram-count.js` reads these |
 | `<cms-image key="home.hero.image" label="Hero photo" sizes="..." />` | An element, not an attribute (`CmsImageTagHelper`, no end tag). Renders an `<img>` for an `Image` field; `label` is required (see Media Pipeline → `<cms-image>`) |
-| `<cms-seo fallback-title="...">` | Page `<title>`, description and Open Graph tags (see SEO) |
+| `<cms-seo fallback-title="...">` | Page `<title>`, description, canonical, `hreflang` and Open Graph tags (see SEO) |
+| `<cms-json-ld />` | The `LocalBusiness` JSON-LD script (see SEO → Structured data); an element without an end tag, in `_Layout` |
+| `<a cms-link="..." cms-keep-content>` (also `cms-link-field`) | Keep-content mode (`CmsLinkTagHelper`): the template's markup (icons, captions) stays and the label is written only into `<span cms-link-label>` slots (`CmsLinkLabelTagHelper`, zero or more per link), so icon-only social links, contact tiles and buttons with icons stay content-driven. Visitors: a blank or invalid link is suppressed; admin: the template is kept, slots empty, flagged. A `cms-link-label` outside a keep-content link throws, except inside a plain link, where it is silently dropped. Admin-only `data-cms-keep-content`, `data-cms-link-label`, `data-cms-new-tab-notice`; `fields.js` `previewKeptLink` fills the slots in the editor preview |
+| `<ul cms-list="..." cms-item-id-prefix="section-">` | Optional on `cms-list`: sets `id="{prefix}{itemId}"` on every saved item copy, not on the empty `<template>` copy (used for the legal pages' table of contents anchors) |
 
 A field with no value in either language omits its element for visitors; the admin gets an empty element flagged `data-cms-empty` to click into. An invalid key, or `cms-field` outside a `cms-list`, throws. A missing or blank `cms-add-label`, `cms-section-label` or `<cms-image label>` also throws at render time (`CmsFieldResolver.RequireLabel`), so every admin control has a distinct name (see Editing UI → Distinct controls). `Web/TagHelpers/CmsFieldResolver.cs` holds the shared key checks.
 
@@ -294,7 +357,7 @@ Both run inside `ContentService.ApplyChangesAsync` (`ContentBatch.SetFieldAsync`
 |---|---|
 | `RichText` | Passed through `IRichTextSanitizer` (`Core/Interfaces/`), implemented by `RichTextSanitizer` (`Infrastructure/Content/`, HtmlSanitizer 11.0.16, registered as a singleton). Allowed tags: `p`, `br`, `strong`, `em`, `a`, `ul`, `ol`, `li`, `h3`. The only allowed attribute is `href`; no classes, CSS or `data-` attributes. Allowed URL schemes: `https`, `mailto`, `tel`, and only on `a`. Disallowed tags are unwrapped (children kept), except `script`, `style`, `iframe`, `frame`, `frameset`, `object`, `embed`, `applet`, `noscript`, `template`, `textarea`, `title`, `svg` and `math`, which are dropped with their content. A result that is only empty paragraphs becomes `""` |
 | `Link` | An empty value clears the link. Otherwise the JSON must parse with `ContentLink.TryParse`: `https:`, `mailto:` or `tel:` URL and a non-blank label; if not, the save is rejected with an error naming the field |
-| `Text` | Stored as sent, except `home.instagram.post-count` (`ContentBatch.IsValidPostCount`): locale `el` only, type `Text`, and empty or a whole number 1-12 (`InstagramPostCount.IsValid`); an English value or another number rejects the save |
+| `Text` | Stored as sent, except `home.instagram.post-count` (`ContentBatch.IsValidPostCount`): locale `el` only, type `Text`, and empty or a whole number 1-12 (`InstagramPostCount.IsValid`); an English value or another number rejects the save. `contact.map.embed-url` (`ContactMap.IsValidEmbedUrl`, checked in `ContentBatch`): locale `el` only, type `Text`, and empty, or `https://www.google.com/maps/embed` followed by the end of the string, `?` or `/`, with no whitespace; anything else rejects the save |
 | `Image` | Checked in `ContentBatch` (`SetFieldAsync`, then `ValidateImagesAsync` once all changes are applied): see Media Pipeline → Save checks |
 
 ### History
@@ -303,6 +366,36 @@ Both run inside `ContentService.ApplyChangesAsync` (`ContentBatch.SetFieldAsync`
 - `GetFieldHistoryAsync(key, locale, listItemId)` returns a field's versions newest first; `GetSaveAsync(saveId)` returns the fields of a save with their `PreviousValue` and `CurrentValue` (computed in `ContentService` from the field's other history rows).
 - History holds **field values only**. List structure (add, delete, reorder, hide) and section toggles are not in history; a deleted list item takes its history with it.
 - **Edit history is kept forever.** The History window restores a version or undoes a whole save, both as pending changes saved with Save page.
+
+### Content seeding
+
+The site starts with its texts already in the database. Seeding is automatic at startup, not a CLI command.
+
+```
+Program.cs: Content:SeedAtStartup true? ─► IContentSeeder.SeedAsync
+   IDistributedLock "saronida:content-seed" (Hangfire PostgreSQL lock, 2 min)
+      for each group (sorted by name):
+         marker seed.{group} >= version? ─ yes ─► skip
+                │ no
+         fill only what has NO row: field (key + locale) / list with NO items
+                │
+         ContentService.ApplyChangesAsync (editor "seed") ─► marker = version
+```
+
+| Part | Rule |
+|---|---|
+| Seed groups | One group per page section set (`home`, `trips`, `boat`, `contact`, `terms`, `privacy`, `accessibility`) or shared block (`shared.footer`, `shared.contact`, `shared.social`, `shared.prices`, `shared.charter-costs`, `shared.cookies`). A group is a JSON file `Web/Seed/{group}.json`, an embedded resource read by `EmbeddedContentSeedSource` (`IContentSeedSource`, groups sorted by name). Shape: `group`, `version`, `fields` (key → `type`, per-locale values; a link field has one `url` and per-locale labels) and `lists` (list key → items of fields). Every key must equal the group name or start with `{group}.`; the file name must equal `group`; **images cannot be seeded** (alt texts can) |
+| Shipped groups and versions | `home` 1, `trips` 2, `boat` 1, `contact` 1, `terms` 1, `privacy` 1, `accessibility` 1, `shared.footer` 1, `shared.contact` 2, `shared.social` 1, `shared.prices` 1, `shared.charter-costs` 1, `shared.cookies` 1 |
+| Version marker | `IntegrationSettings` key `seed.{group}` (`ContentSeeder.MarkerKey`) holds the applied version. A group whose marker is missing or lower than its file's `version` is applied; the marker is written after the content save, in the same commit |
+| Fill-only-missing | Never overwrites. A field value (key + locale) that already has a row is skipped, whatever its value; a list is seeded only when it has **no items**, so a list the admin emptied is never re-seeded. A database that already holds some rows (the dev database) still gets every missing key. Raising a group's `version` is how new seed content ships; it adds only what is missing, so old rows that are no longer rendered stay as orphans |
+| Writing | Through `IContentService.ApplyChangesAsync`, so the sanitizer, validation, history (`ChangedBy` = `seed`), cache eviction and the audit line `content-saved user=seed` all apply. An invalid seed throws, writes nothing and stops startup |
+| Two pods | The whole run is under `IDistributedLock` (`Core/Interfaces/`, implemented by `Infrastructure/Jobs/HangfireDistributedLock`, which uses Hangfire's storage lock: no raw SQL), 2 minute timeout; the emptiness checks run inside the lock, so a second pod starting together finds the work done |
+| Setting | `Content:SeedAtStartup` (`appsettings.json` `true`; the test host defaults it to false). Seeding runs after the CLI branches (`admin`, `migrate`) and before the Instagram schedule sync |
+| Logging | The "Seeded content group" Information line is dropped by the NLog rules (Warn and above only for that logger), so the audit lines `content-saved ... user=seed` are the record |
+
+A web host started with `Database:MigrateAtStartup=false` on a database that has no Hangfire schema waits the full 2 minutes for the lock; production gets the schema from `migrate`.
+
+**Placeholders in seeds.** Unknown owner values are bracketed (`[ΤΙΜΗ]`, `[PRICE]`, `[EMAIL]`, `[HOURS]`, `[MONTHS]`) or `example.com`; the JSON-LD tag helper treats exactly these as "not set" (see SEO → Structured data), so keep that style for any new placeholder. English texts in the seeds are drafts for the owner's review.
 
 ### Admin toolbar
 
@@ -329,8 +422,8 @@ A status line (`role="status"`, `aria-live="polite"`) and an error list (`role="
 | Module | Role |
 |---|---|
 | `pending.js` | The pending model. Field changes are keyed by key + locale + list item id and dropped when the value returns to the original; list and section operations live in named **op slots** (`list:{listKey}`, `section:{sectionKey}`) that are replaced as a whole. `toBatch()` puts the ops first, then the `setField` changes |
-| `fields.js` | Reads and writes one field element: original value, preview of the new value, `data-cms-dirty` / `-empty` / `-invalid` / `-fallback` flags, hand-off to `pending` |
-| `inline.js` | Inline editing of `text` fields (`contenteditable="plaintext-only"`). Enter finishes, Escape reverts. Clicks on editable links are blocked in edit mode |
+| `fields.js` | Reads and writes one field element: original value, preview of the new value, `data-cms-dirty` / `-empty` / `-invalid` / `-fallback` flags, hand-off to `pending`. A field rendered more than once on a page (the header and footer Instagram link) is previewed in **every** copy (`findAll`) with one pending change; the "N missing in English" count uses distinct fields. `previewKeptLink` fills the `cms-link-label` slots of a keep-content link |
+| `inline.js` | Inline editing of `text` fields (`contenteditable="plaintext-only"`). Enter finishes, Escape reverts. Clicks on editable links are blocked in edit mode. Clicks and the Space key-up inside an editable field in a `<summary>` do not toggle its `<details>` (the Useful-info questions can be edited with real spaces) |
 | `toolbar.js` | Save (one `fetch` POST with the `RequestVerificationToken` header; on an antiforgery 400 it reloads the page HTML once for a fresh token and retries), Discard (through `confirmDialog`), counter, status text (also set as its `title`), More panel, `beforeunload` warning, the `--cms-toolbar-height` CSS variable, the "Saved" message after the reload, messages for 400 / 401 / 403 / 413 |
 | `edit-mode.js` | Edit mode on/off. Starts **on**; remembered per tab in `sessionStorage` (`cms-edit-mode`). Off adds the class `cms-view` to `<html>` |
 | `fieldbar.js` | The small bar next to a focused or clicked field: "History" for every field, plus "Edit text" / "Edit link" / "Edit image"; each button's accessible name adds the field name ("Edit text: title"). Clicking a rich-text block, a link or an image opens its window directly |
@@ -501,7 +594,7 @@ Linux native assets: `SkiaSharp.NativeAssets.Linux.NoDependencies` (nothing to i
 Implemented in Phase 6 and verified only against stub Instagram answers (a fake HTTP handler in the tests); the first real connection is on the Phase 8 preview (see **Not yet verified** below).
 
 - **API:** Instagram API with Instagram Login (Business or Creator account, scope `instagram_business_basic`, no Facebook Page). The old Basic Display API was shut down in December 2024. The owner's account must be Business or Creator.
-- **Placement:** the feed is a view component (`<vc:instagram-feed>`, `Web/ViewComponents/InstagramFeedViewComponent.cs`, view `Pages/Shared/Components/InstagramFeed/Default.cshtml`, view models `Web/Models/InstagramFeedViewModel.cs`) placed on the placeholder Home page (`Pages/Index.cshtml`, page key `home`). Phase 7 restyles it with the design. The dev sandbox does not show it: the sandbox loads only `shared.*` content, so the section needs the `home` page's content.
+- **Placement:** the feed is a view component (`<vc:instagram-feed>`, `Web/ViewComponents/InstagramFeedViewComponent.cs`, view `Pages/Shared/Components/InstagramFeed/Default.cshtml`, view models `Web/Models/InstagramFeedViewModel.cs`) placed on the Home page (`Pages/Index.cshtml`, page key `home`, section `home.instagram`), styled with the design in Phase 7: heading `home.instagram.title`, a `text` field, 3 / 6 column square tiles, and a "Follow us on Instagram" keep-content link to `shared.social.instagram`. The dev sandbox does not show it: the sandbox loads only `shared.*` content, so the section needs the `home` page's content.
 
 ```
 Connect (admin)                                 Hangfire: 06:00 and 18:00 Europe/Athens, or Fetch now, or right after Connect
@@ -611,8 +704,7 @@ Returns **200 "Healthy"** only if every check passes, otherwise **503 "Unhealthy
 | `hangfire` | `Infrastructure/Health/HangfireStorageHealthCheck.cs` | `GetMonitoringApi().GetStatistics()` against the Hangfire storage (schema `hangfire`) |
 | `media` | `Infrastructure/Health/MediaFolderHealthCheck.cs` | Write and delete a temp file under `Media:RootPath`, then under `Media:OriginalsPath`; unhealthy ("Media folder is not writable." / "Originals folder is not writable.") when either fails |
 | `home-page` | `Web/Health/HomePageHealthCheck.cs` | GET of `Health:HomePageUrl` through a named `HttpClient` (5 s timeout, redirects not followed); must return exactly 200 |
-
-**Planned, Phase 7:** a fifth check, "at least one Greek `ContentItem` for page `home` exists (e.g. `home.hero.title`)". It needs the seed data, so it is deferred (recorded in `PLAN.md`).
+| `home-content` | `Infrastructure/Health/HomeContentHealthCheck.cs` | At least one `ContentItem` with page key `home` and locale `el` exists (unhealthy "No Greek home content." otherwise, e.g. a database the seed never reached) |
 
 Configuration keys:
 
@@ -798,7 +890,7 @@ Code in `Web/Diagnostics/`. Goal: find out afterwards what went wrong. A pod kil
 
 `path` is the path without the query string, cut at 256 characters; `|` becomes `/` and control or whitespace characters become a space (log injection).
 
-**Health transitions** (`HealthTransitionPublisher`, an `IHealthCheckPublisher`, first run 5 s after start, then every `HealthCheckPeriodSeconds`): logs changes only, per check (`database`, `hangfire`, `media`, `home-page`) and for `overall`.
+**Health transitions** (`HealthTransitionPublisher`, an `IHealthCheckPublisher`, first run 5 s after start, then every `HealthCheckPeriodSeconds`): logs changes only, per check (`database`, `hangfire`, `media`, `home-page`, `home-content`) and for `overall`.
 
 | Line | Level |
 |---|---|
@@ -855,8 +947,22 @@ The site embeds a **Google Map** (boat location), which sends visitor data to Go
 - The choice is changeable at any time from "Cookie settings" in every footer.
 - Without consent, the map spot shows a static map image (served from our server) and a button that opens the banner settings.
 - **Fully client-side**: the banner and the map are handled by JS reading `localStorage`, so every visitor gets the same cached HTML and the output cache is unaffected.
-- Banner texts are CMS content (`shared.cookies.*`), in both languages.
-- Map location is admin-editable: an embed URL, accepted only if it starts with `https://www.google.com/maps/embed`. The basic embed is free and needs no API key.
+- Banner titles and texts are CMS content (`shared.cookies.*`), in both languages; button labels and status messages are fixed `UiText`.
+- Map location is admin-editable: an embed URL, accepted only if it starts with `https://www.google.com/maps/embed` (see Sanitizing and validation). The basic embed is free and needs no API key.
+
+**Implemented (Phase 7)**
+
+| Part | File | Behaviour |
+|---|---|---|
+| Banner markup | `Pages/Shared/_CookieConsent.cshtml` | Placed right after the skip link in `_Layout` |
+| Logic | `wwwroot/js/consent.js` | Choice stored in `localStorage` key `saronida.consent` = `{ "v": 1, "external": bool, "at": ISO time }`. A stored value with another `v` (or an unreadable one) counts as no choice, so a future category re-asks. Blocked storage: the choice applies until the page closes. Exports `hasExternalConsent`, `openConsentSettings`; fires the event `saronida:consent-change` |
+| When it shows | By itself on a visitor's **first visit to any page** until a choice is stored; afterwards only from "Cookie settings" in the footer or the map spot's button. The auto-shown banner never takes focus |
+| Views | Banner (identical Reject and Accept buttons, "Choose by category", Privacy link) and settings (Necessary "Always on"; External content as a `role="switch"`; Reject all / Save / Accept all; Back). Escape goes back to the banner or closes. After a choice a `role="status"` message with Change and Close. Settings focus their heading; focus returns to the opener (or the map) |
+| Map | `wwwroot/js/contact-map.js` | The server HTML never contains an iframe: the page has the static `contact.map.image`, `contact.map.notice` and a "Cookie settings" button. With external-content consent **and** an embed URL the script adds an `<iframe>` (title `UiText.MapTitle`, lazy) and removes it again when consent is withdrawn, without a reload. The embed URL (`contact.map.embed-url`, Greek only) is read from a `hidden` `<p>` that `cms-edit.css` shows to the admin as "Map embed URL"; it is not seeded, so the static image shows until the owner's URL is pasted |
+| Cacheability | | Everything is client-side, so every visitor gets the same cached HTML |
+| Known limit | | With a live map the admin cannot click the static image (withdraw consent to edit it) |
+
+**Focus not obscured (WCAG 2.4.11).** While the banner, settings or status is showing, `consent.js` keeps the CSS variable `--consent-offset` (viewport height − panel top + 16 px) and the class `html.consent-open` (ResizeObserver and resize), and `site.css` sets `html { scroll-padding-bottom: var(--consent-offset, 0px) }` (technique C43), so a focused element scrolls above the panel. Below 720 px `.sticky-book` and `.to-top` are `visibility: hidden` while it is open (mobile-first; restored from 720 px).
 
 The Privacy page must cover Cloudflare (hosting/CDN, analytics), Google Maps, and the server logs. Owner/lawyer review before go-live. Any new third-party embed or tracker needs its own consent category.
 
@@ -866,7 +972,15 @@ Edit mode is designed for **laptop/desktop**. On phones (under 720 px) it works 
 
 ## Accessibility
 
-Target **WCAG 2.2 AA** (per the design notes): real buttons/links, keyboard focus outline (3 px), text contrast ≥ 4.5:1, touch targets ≥ 44 px, alt text on every content image (alt text is editable content), accessibility statement page.
+Target **WCAG 2.2 AA** (per the design notes): real buttons/links, keyboard focus outline (3 px), text contrast ≥ 4.5:1, touch targets ≥ 44 px, alt text on every content image (alt text is editable content), accessibility statement page (built, `/prosvasimotita`; its conformance wording is a draft until the owner reviews it).
+
+**Audit method (Phase 7, 2026-11-14).** No Playwright. axe-core 4.10.2 (tags wcag2a/aa, 21a/aa, 22aa, best-practice) is injected into each page in the built-in Claude browser, as a logged-out visitor gets it: 18 URLs (7 pages × 2 languages, the three trip tabs, both 404 pages) at 1280 and 375 px = 36 runs, **0 violations**; 8 interactive states (banner desktop and phone, settings desktop and phone, status, phone menu open, lightbox open in el and en), **0 violations**. A manual keyboard pass with real key presses covered the focus order (skip link, consent banner, logo, menu), the 3 px ring on every stop, back-to-top, and the lightbox (swipe, Escape, focus return).
+
+**Found and fixed:** WCAG 2.4.11 Focus Not Obscured (focused content could sit behind the consent panel; fix described in Cookies & Privacy), and the lightbox photo now keeps a 16 / 24 px bottom gap.
+
+**Not covered:** a real touch device, a screen-reader pass, and the Instagram feed (the dev database has no posts). The checks are **not automatic** on later changes; the axe run is repeated on the Phase 8 preview before go-live.
+
+Code conventions that keep it so: the skip link is first, `<main id="main" tabindex="-1">`; menu and link targets are 44 px; the short trip tab labels are contained in the long names (Label in Name, tested).
 
 ## Open Items (owner-provided, not blocking development)
 
