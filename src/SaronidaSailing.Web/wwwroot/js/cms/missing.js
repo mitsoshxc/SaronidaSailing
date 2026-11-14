@@ -1,4 +1,4 @@
-const selector = '[data-cms-fallback]';
+const selector = '[data-cms-fallback]:not([hidden])';
 
 export const createMissing = () => {
     const button = document.querySelector('[data-cms-action="next-missing"]');

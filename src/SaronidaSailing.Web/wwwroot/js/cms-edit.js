@@ -9,6 +9,7 @@ import { createMissing } from './cms/missing.js';
 import { createLists } from './cms/lists.js';
 import { createSections } from './cms/sections.js';
 import { createInstagramCount } from './cms/instagram-count.js';
+import { createMapWindow } from './cms/map-window.js';
 
 const config = JSON.parse(document.getElementById('cms-config').textContent);
 const pending = createPending();
@@ -22,6 +23,7 @@ const fieldBar = createFieldBar({ editMode, windows });
 createMissing();
 createSections({ pending, toolbar });
 createInstagramCount({ pending, toolbar });
+createMapWindow({ pending, toolbar });
 createLists({ pending, inline, fieldBar, toolbar, editMode, config });
 
 const settingsButton = document.querySelector('[data-cms-action="page-settings"]');

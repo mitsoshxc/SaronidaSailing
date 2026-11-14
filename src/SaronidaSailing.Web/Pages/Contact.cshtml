@@ -53,6 +53,10 @@
         <div class="contact-where__map">
             <div class="contact-map media-placeholder media-frame" tabindex="-1" data-contact-map data-map-title="@UiText.MapTitle.Current">
                 <cms-image key="contact.map.image" label="Static map" sizes="(min-width: 960px) 50vw, 100vw" class="media-frame__img" />
+                @if (Model.IsEditor)
+                {
+                    <button type="button" class="contact-map__edit" data-cms-map-edit>Map location</button>
+                }
                 @if (Model.ShowMapNotice)
                 {
                     <div class="contact-map__notice">
@@ -61,10 +65,7 @@
                     </div>
                 }
             </div>
-            <div class="contact-map__embed">
-                <span class="contact-map__embed-label">Map embed URL</span>
-                <p class="contact-map__url" cms="contact.map.embed-url" data-map-url hidden></p>
-            </div>
+            <p class="contact-map__url" cms="contact.map.embed-url" data-map-url hidden></p>
         </div>
         <div class="contact-where__text">
             <div class="contact-where__intro">

@@ -3089,11 +3089,7 @@ html:has(dialog.lightbox[open]) {
     border: 0;
 }
 
-.contact-map--live > :not(.contact-map__frame) {
-    display: none;
-}
-
-.contact-map__embed {
+.contact-map--live > :not(.contact-map__frame, .contact-map__edit) {
     display: none;
 }
 

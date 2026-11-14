@@ -249,6 +249,33 @@ public class ContactPageTests(SeededWebApplicationFactory factory) : IClassFixtu
         Assert.Contains("data-map-settings", html);
     }
 
+    [Theory]
+    [InlineData("/epikoinonia")]
+    [InlineData("/en/contact")]
+    public async Task Visitor_GetsNoMapLocationButton_AndNoEmbedRow(string path)
+    {
+        var html = await GetAsync(path);
+
+        Assert.DoesNotContain("Map location", html);
+        Assert.DoesNotContain("data-cms-map-edit", html);
+        Assert.DoesNotContain("contact-map__embed", html);
+    }
+
+    [Theory]
+    [InlineData("/epikoinonia")]
+    [InlineData("/en/contact")]
+    public async Task Editor_GetsMapLocationButton_AndTheHiddenMapUrlElement(string path)
+    {
+        var client = NewClient(factory);
+        await LoginWithTotpAsync(client, await AddTwoFactorAdminAsync(factory, $"contact-map-editor-{path.Trim('/').Replace('/', '-')}@example.com"));
+
+        var html = await client.GetStringAsync(path);
+
+        Assert.Contains("data-cms-map-edit>Map location</button>", html);
+        Assert.DoesNotContain("contact-map__embed", html);
+        Assert.True(IsHidden(Tag(html, "data-map-url")));
+    }
+
     public static TheoryData<string, string, string> ConsentPages() => new()
     {
         { "/", "/aporrito", "Πολιτική απορρήτου" },

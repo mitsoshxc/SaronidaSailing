@@ -9,7 +9,7 @@ export const initContactMap = () => {
         return;
     }
 
-    const url = document.querySelector('[data-map-url]')?.textContent.trim() ?? '';
+    let url = document.querySelector('[data-map-url]')?.textContent.trim() ?? '';
     let frame = null;
 
     const sync = () => {
@@ -27,11 +27,17 @@ export const initContactMap = () => {
             frame.remove();
             frame = null;
             map.classList.remove('contact-map--live');
+        } else if (wanted && frame.getAttribute('src') !== url) {
+            frame.src = url;
         }
     };
 
     button.hidden = false;
     button.addEventListener('click', () => openConsentSettings(button, map));
     document.addEventListener('saronida:consent-change', sync);
+    document.addEventListener('saronida:map-change', (event) => {
+        url = event.detail.url;
+        sync();
+    });
     sync();
 };
