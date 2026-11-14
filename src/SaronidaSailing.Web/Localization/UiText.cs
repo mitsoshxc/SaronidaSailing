@@ -135,6 +135,18 @@ public static class UiText
 
     public static UiString SeeAlso { get; } = new("Δείτε επίσης", "See also");
 
+    public static UiString NotFoundTitle { get; } = new("Η σελίδα δεν βρέθηκε", "Page not found");
+
+    public static UiString NotFoundText { get; } = new(
+        "Ίσως άλλαξε η διεύθυνση ή η σελίδα δεν υπάρχει πια.",
+        "The address may have changed, or the page no longer exists.");
+
+    public static UiString ServerErrorTitle { get; } = new("Κάτι πήγε στραβά", "Something went wrong");
+
+    public static UiString ServerErrorText { get; } = new(
+        "Δοκιμάστε ξανά σε λίγα λεπτά.",
+        "Please try again in a few minutes.");
+
     public static IReadOnlyList<(string Name, UiString Text)> All { get; } =
     [
         (nameof(Home), Home),
@@ -192,6 +204,10 @@ public static class UiText
         (nameof(TripWeekShort), TripWeekShort),
         (nameof(OnThisPage), OnThisPage),
         (nameof(SeeAlso), SeeAlso),
+        (nameof(NotFoundTitle), NotFoundTitle),
+        (nameof(NotFoundText), NotFoundText),
+        (nameof(ServerErrorTitle), ServerErrorTitle),
+        (nameof(ServerErrorText), ServerErrorText),
     ];
 
     public static UiString MenuName(string pageKey) => pageKey switch

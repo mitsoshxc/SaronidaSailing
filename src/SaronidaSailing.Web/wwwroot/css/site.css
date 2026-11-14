@@ -3794,3 +3794,38 @@ html:has(dialog.lightbox[open]) {
         font-size: 1.0625rem;
     }
 }
+
+.error-header {
+    padding-block: var(--space-4);
+}
+
+.error-page {
+    padding-block: var(--space-8) var(--space-9);
+}
+
+.error-page__inner {
+    max-width: 640px;
+    text-align: center;
+}
+
+.error-page__title {
+    margin-bottom: var(--space-4);
+}
+
+.error-page__actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    margin-top: var(--space-6);
+}
+
+@media (min-width: 720px) {
+    .error-page {
+        padding-block: var(--space-9) 120px;
+    }
+
+    .error-page__actions {
+        flex-direction: row;
+        justify-content: center;
+    }
+}

@@ -1,0 +1,18 @@
+@page "/error/{code:regex(^(404|410)$)}"
+@model NotFoundModel
+@using SaronidaSailing.Web.Localization
+@{
+    Layout = "_ErrorLayout";
+    ViewData["Title"] = UiText.NotFoundTitle.For(Model.Locale);
+    ViewData["Locale"] = Model.Locale;
+    ViewData["HomePath"] = Model.HomePath;
+}
+<div class="wrap error-page__inner">
+    <h1 class="error-page__title">@UiText.NotFoundTitle.For(Model.Locale)</h1>
+    <p class="lead">@UiText.NotFoundText.For(Model.Locale)</p>
+    <div class="error-page__actions">
+        <a class="btn btn--cta" href="@Model.HomePath">@UiText.Home.For(Model.Locale)</a>
+        <a class="btn btn--outline" href="@Model.TripsPath">@UiText.TripsMenu.For(Model.Locale)</a>
+        <a class="btn btn--outline" href="@Model.ContactPath">@UiText.Contact.For(Model.Locale)</a>
+    </div>
+</div>

@@ -1,4 +1,5 @@
 using Hangfire;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
@@ -197,6 +198,11 @@ try
     app.UseForwardedHeaders();
     app.UseRequestDiagnostics();
 
+    if (app.Environment.IsPreview())
+    {
+        app.UsePreviewNoIndex();
+    }
+
     if (app.Environment.IsDevelopment())
     {
         app.UseDevelopmentMediaFiles(app.Services.GetRequiredService<IOptions<MediaOptions>>().Value.RootPath);
@@ -204,8 +210,18 @@ try
 
     if (!app.Environment.IsDevelopment())
     {
-        app.UseExceptionHandler("/Error");
+        app.UseExceptionHandler("/error/500");
     }
+
+    app.UseStatusCodePagesWithReExecute("/error/{0}");
+    app.Use(async (context, next) =>
+    {
+        await next(context);
+        if (!ErrorPageStatus.UsesErrorPage(context))
+        {
+            context.Features.Get<IStatusCodePagesFeature>()?.Enabled = false;
+        }
+    });
 
     app.UseRequestLocalization(options =>
     {
@@ -238,6 +254,7 @@ try
     app.MapContentEndpoints();
     app.MapMediaEndpoints();
     app.MapAdminEndpoints();
+    app.MapSeoEndpoints();
     app.MapRazorPages()
        .WithStaticAssets();
 

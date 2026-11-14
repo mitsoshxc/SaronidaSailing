@@ -8,4 +8,7 @@ public static class SiteCultures
     public const string EnglishPrefix = "en";
 
     public static IReadOnlyList<string> Supported { get; } = [Greek, English];
+
+    public static string ForPath(PathString path) =>
+        path.StartsWithSegments($"/{EnglishPrefix}", StringComparison.OrdinalIgnoreCase) ? English : Greek;
 }

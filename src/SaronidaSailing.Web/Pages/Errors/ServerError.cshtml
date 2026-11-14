@@ -1,0 +1,16 @@
+@page "/error/500"
+@model ServerErrorModel
+@using SaronidaSailing.Web.Localization
+@{
+    Layout = "_ErrorLayout";
+    ViewData["Title"] = UiText.ServerErrorTitle.For(Model.Locale);
+    ViewData["Locale"] = Model.Locale;
+    ViewData["HomePath"] = Model.HomePath;
+}
+<div class="wrap error-page__inner">
+    <h1 class="error-page__title">@UiText.ServerErrorTitle.For(Model.Locale)</h1>
+    <p class="lead">@UiText.ServerErrorText.For(Model.Locale)</p>
+    <div class="error-page__actions">
+        <a class="btn btn--cta" href="@Model.HomePath">@UiText.Home.For(Model.Locale)</a>
+    </div>
+</div>

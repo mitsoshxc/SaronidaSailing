@@ -1,0 +1,26 @@
+@using SaronidaSailing.Web.Localization
+@using SaronidaSailing.Web.Models
+@{
+    var locale = (string)ViewData["Locale"]!;
+    var logo = new SiteLogoViewModel("error", false, (string)ViewData["HomePath"]!, UiText.LogoLink.For(locale));
+}
+<!DOCTYPE html>
+<html lang="@locale">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] · Saronida Sailing</title>
+    <meta name="robots" content="noindex" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    <header class="error-header">
+        <div class="wrap">
+            <partial name="_Logo" model="logo" />
+        </div>
+    </header>
+    <main id="main" class="error-page">
+        @RenderBody()
+    </main>
+</body>
+</html>

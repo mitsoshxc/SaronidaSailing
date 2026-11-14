@@ -263,22 +263,20 @@ public class OutputCacheWebHostTests : IClassFixture<TempDatabaseWebApplicationF
         Assert.Contains("<title>Admin A</title>", await Get(anonymous, "/"));
     }
 
-    [Fact]
-    public async Task ErrorPage_IsNotCached()
+    [Theory]
+    [InlineData("/error/404", HttpStatusCode.NotFound)]
+    [InlineData("/error/500", HttpStatusCode.InternalServerError)]
+    public async Task ErrorPage_IsNotCached(string path, HttpStatusCode status)
     {
         var client = NewClient();
 
-        var first = await client.GetAsync("/Error");
-        var second = await client.GetAsync("/Error");
+        var first = await client.GetAsync(path);
+        var second = await client.GetAsync(path);
 
-        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(status, first.StatusCode);
+        Assert.Equal(status, second.StatusCode);
         Assert.Null(first.Headers.Age);
         Assert.Null(second.Headers.Age);
-        Assert.NotEqual(
-            await first.Content.ReadAsStringAsync().ContinueWith(t => ExtractRequestId(t.Result)),
-            await second.Content.ReadAsStringAsync().ContinueWith(t => ExtractRequestId(t.Result)));
+        Assert.True(second.Headers.CacheControl!.NoStore);
     }
-
-    private static string ExtractRequestId(string html) =>
-        System.Text.RegularExpressions.Regex.Match(html, "<code>([^<]*)</code>").Groups[1].Value;
 }
