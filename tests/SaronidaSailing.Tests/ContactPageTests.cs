@@ -125,7 +125,7 @@ public class ContactPageTests(SeededWebApplicationFactory factory) : IClassFixtu
         Assert.Matches(@"(\+|&#x2B;)30 697 885 6418</strong>", tiles[1]);
         Assert.Contains("href=\"mailto:email@example.com\"", tiles[2]);
         Assert.Contains("[EMAIL]</strong>", tiles[2]);
-        Assert.Contains("href=\"https://ig.me/m/saronidasailing\"", tiles[3]);
+        Assert.Contains("href=\"https://www.instagram.com/saronidasailing/\"", tiles[3]);
         Assert.Contains("@saronidasailing</strong>", tiles[3]);
         Assert.All(tiles, tile => Assert.Contains("<span class=\"contact-tile__label\">", tile));
     }

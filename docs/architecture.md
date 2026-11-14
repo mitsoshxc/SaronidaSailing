@@ -38,7 +38,7 @@ Status: **Phases 0-7 are implemented (decisions, foundation, admin authenticatio
 | SQLite | Replaced on 2026-11-11: two app pods cannot share a SQLite file safely, and the cache bus and Hangfire storage need a database server |
 | DigitalOcean Spaces | Paid; local disk + Cloudflare is enough |
 | Own booking system | Bookings happen on external platforms; the site links out |
-| Contact form / email provider | Contact page has no form (phone, email link, Instagram DM) |
+| Contact form / email provider | Contact page has no form (phone, email link, Instagram profile link) |
 | Google Fonts CDN | Fonts are self-hosted (sending visitor IPs to Google was ruled a GDPR violation by a Munich court, 2022) |
 | CI/CD pipeline | Deploys run from the developer's PC (see `docs/deployment.md`) |
 
