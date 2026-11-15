@@ -77,6 +77,7 @@ try
         .AddDefaultTokenProviders();
     builder.Services.AddScoped<IAdminAccountService, AdminAccountService>();
     builder.Services.AddScoped<IInstagramConnectionService, InstagramConnectionService>();
+    builder.Services.AddScoped<ISiteSettingsService, SiteSettingsService>();
     builder.Services.AddScoped<IInstagramFeedService, InstagramFeedService>();
     builder.Services.AddScoped<IInstagramScheduleSync, InstagramScheduleSync>();
     builder.Services.AddScoped<IInstagramWarningService, InstagramWarningService>();

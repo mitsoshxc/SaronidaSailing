@@ -21,14 +21,13 @@ public static class SeoEndpoints
 
     public static IEndpointRouteBuilder MapSeoEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapMethods(RobotsPath, ["GET", "HEAD"], (
-            HttpContext http, IHostEnvironment environment, IOptions<SiteOptions> site) =>
+        app.MapMethods(RobotsPath, ["GET", "HEAD"], async (
+            HttpContext http, IHostEnvironment environment, IOptions<SiteOptions> site, ISiteSettingsService settings) =>
         {
+            var isPreview = environment.IsPreview();
+            var stored = isPreview ? null : await settings.GetRobotsTxtAsync(http.RequestAborted);
             http.Response.Headers.CacheControl = CacheControl;
-            var text = environment.IsPreview()
-                ? "User-agent: *\nDisallow: /\n"
-                : $"User-agent: *\nDisallow: /admin\n\nSitemap: {site.Value.BaseUrl}{SitemapPath}\n";
-            return Results.Text(text, "text/plain; charset=utf-8");
+            return Results.Text(RobotsTxt.Served(isPreview, stored, site.Value.BaseUrl), "text/plain; charset=utf-8");
         });
 
         app.MapMethods(SitemapPath, ["GET", "HEAD"], async (

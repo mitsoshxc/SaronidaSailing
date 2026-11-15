@@ -1,0 +1,48 @@
+@page "/admin/settings"
+@model SettingsModel
+@{
+    ViewData["Title"] = "Site settings";
+}
+
+<h1>Site settings</h1>
+
+@if (Model.NoticeText is not null)
+{
+    <p class="admin-notice" role="status">@Model.NoticeText</p>
+}
+
+<h2>robots.txt</h2>
+
+@if (Model.IsPreview)
+{
+    <p>This server is a preview: robots.txt always blocks all crawlers, whatever is saved here.</p>
+}
+
+<form method="post">
+    <div class="admin-field">
+        <label for="@SettingsModel.RobotsTextFieldId">robots.txt contents</label>
+        @if (Model.Error is not null)
+        {
+            <p id="robots-error" class="admin-error" role="alert">@Model.Error</p>
+        }
+        <p id="robots-hint" class="admin-hint">Leave empty to use the default below.</p>
+        <textarea id="@SettingsModel.RobotsTextFieldId" name="RobotsText" rows="12" spellcheck="false"
+                  aria-describedby="@(Model.Error is null ? "robots-hint" : "robots-hint robots-error")"
+                  aria-invalid="@(Model.Error is null ? null : "true")">@Model.RobotsText</textarea>
+    </div>
+    <button type="submit" class="admin-button">Save</button>
+</form>
+
+<h3>Default</h3>
+<pre class="admin-pre">@Model.DefaultText</pre>
+
+<h3>Served now</h3>
+<pre class="admin-pre">@Model.ServedText</pre>
+<p><a href="/robots.txt" target="_blank" rel="noopener">Open /robots.txt (opens in a new tab)</a></p>
+
+<form method="post" asp-page-handler="UseDefault">
+    <p id="robots-default-warning">Use default removes the saved text.</p>
+    <button type="submit" class="admin-button admin-button-secondary" aria-describedby="robots-default-warning">Use default</button>
+</form>
+
+<p><a href="/">Back to the site</a></p>
