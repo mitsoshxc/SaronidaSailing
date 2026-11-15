@@ -6,11 +6,26 @@
     var status = Model.Status;
     var connected = status.State != InstagramConnectionState.NotConnected;
     var connectLabel = status.State == InstagramConnectionState.NotConnected ? "Connect Instagram" : "Reconnect";
+    var app = Model.AppStatus;
+    var anythingSaved = app.AppId is not null || app.SecretSaved;
+    var secretHint = app.SecretUnreadable
+        ? "The saved App secret can no longer be read (the server's encryption keys changed). Enter it again."
+        : app.SecretSaved ? "Saved. Leave empty to keep it." : null;
+    var idDescribedBy = "meta-app-id-help" + (Model.AppErrorIsAppId ? " meta-app-error" : "");
+    var secretDescribedBy = (secretHint is null ? "" : "meta-app-secret-hint ") + (Model.AppErrorIsSecret ? "meta-app-error" : "");
+    void NotSetUp()
+    {
+        <text>@InstagramModel.NotSetUpBeforeLink<a href="#meta-app">@InstagramModel.NotSetUpLinkText</a>.</text>
+    }
 }
 
 <h1>Instagram</h1>
 
-@if (Model.BannerText is not null)
+@if (Model.BannerIsNotSetUp)
+{
+    <p class="admin-error" role="alert">@{ NotSetUp(); }</p>
+}
+else if (Model.BannerText is not null)
 {
     <p class="@(Model.BannerIsError ? "admin-error" : "admin-notice")" role="@(Model.BannerIsError ? "alert" : "status")">@Model.BannerText</p>
 }
@@ -33,7 +48,7 @@
 <form method="post" asp-page-handler="Connect">
     @if (!status.CanConnect)
     {
-        <p id="instagram-not-set-up">@InstagramModel.NotSetUpText</p>
+        <p id="instagram-not-set-up">@{ NotSetUp(); }</p>
         <button type="submit" class="admin-button" disabled aria-describedby="instagram-not-set-up">@connectLabel</button>
     }
     else
@@ -46,6 +61,52 @@
 {
     <form method="post" asp-page-handler="Fetch">
         <button type="submit" class="admin-button">Fetch now</button>
+    </form>
+}
+
+<h2 id="meta-app">Meta app</h2>
+<p id="meta-app-help">Find both values in the Meta app dashboard under App settings → Basic. In Meta, add this OAuth redirect URI: <code>@Model.RedirectUri</code></p>
+
+<form method="post" asp-page-handler="SaveApp" data-instagram-app data-saved-app-id="@app.AppId" data-confirm-needed="@(Model.ConfirmNeeded ? "true" : "false")">
+    @if (Model.AppError is not null)
+    {
+        <p id="meta-app-error" class="admin-error" role="alert">@Model.AppError</p>
+    }
+    <div class="admin-field">
+        <label for="@InstagramModel.AppIdFieldId">App ID</label>
+        <p id="meta-app-id-help" class="admin-hint">The number shown in the Meta app dashboard.</p>
+        <input type="text" id="@InstagramModel.AppIdFieldId" name="AppId" value="@Model.AppId" inputmode="numeric" autocomplete="off"
+               aria-describedby="@idDescribedBy" aria-invalid="@(Model.AppErrorIsAppId ? "true" : null)" />
+    </div>
+    <div class="admin-field">
+        <label for="@InstagramModel.AppSecretFieldId">@(app.SecretSaved && !app.SecretUnreadable ? "Replace App secret (optional)" : "App secret")</label>
+        @if (secretHint is not null)
+        {
+            <p id="meta-app-secret-hint" class="admin-hint">@secretHint</p>
+        }
+        <input type="password" id="@InstagramModel.AppSecretFieldId" name="AppSecret" autocomplete="new-password"
+               aria-describedby="@(secretDescribedBy.Length == 0 ? null : secretDescribedBy)" aria-invalid="@(Model.AppErrorIsSecret ? "true" : null)" />
+    </div>
+    <button type="submit" class="admin-button" data-app-save>Save</button>
+    @if (connected)
+    {
+        <div data-app-confirm>
+            <p id="meta-app-confirm-question">Changing the App ID removes the Instagram connection. Visitors keep seeing the last posts.</p>
+            <button type="submit" name="ConfirmDisconnect" value="true" class="admin-button admin-button-danger" aria-describedby="meta-app-confirm-question">Save and disconnect</button>
+            <button type="button" class="admin-button admin-button-secondary" data-app-cancel hidden>Cancel</button>
+        </div>
+    }
+</form>
+
+@if (anythingSaved)
+{
+    <form method="post" asp-page-handler="RemoveApp" class="instagram-disconnect" data-instagram-remove>
+        <button type="button" class="admin-button admin-button-secondary" data-remove-open hidden>Remove app settings</button>
+        <div data-remove-confirm>
+            <p id="instagram-remove-question">Remove the Meta App ID and App secret? Instagram will be disconnected; visitors keep seeing the last posts.</p>
+            <button type="submit" class="admin-button admin-button-danger" aria-describedby="instagram-remove-question">Remove app settings</button>
+            <button type="button" class="admin-button admin-button-secondary" data-remove-cancel hidden>Cancel</button>
+        </div>
     </form>
 }
 

@@ -1,5 +1,7 @@
 namespace SaronidaSailing.Core.Interfaces;
 
+public sealed record InstagramAppCredentials(string AppId, string AppSecret);
+
 public sealed record InstagramShortLivedToken(string AccessToken, string UserId);
 
 public sealed record InstagramLongLivedToken(string AccessToken, DateTime ExpiresAt);

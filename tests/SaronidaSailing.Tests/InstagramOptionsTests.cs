@@ -11,44 +11,16 @@ namespace SaronidaSailing.Tests;
 public sealed class InstagramOptionsTests
 {
     [Fact]
-    public void MissingAppIdAndSecret_StartsFine_AndIsNotConfigured()
+    public void NoConfiguration_StartsFine_WithTheDefaultUrls()
     {
         using var provider = Build(new Dictionary<string, string?>());
 
         provider.GetRequiredService<IStartupValidator>().Validate();
         var options = provider.GetRequiredService<IOptions<InstagramOptions>>().Value;
 
-        Assert.False(options.IsConfigured);
         Assert.Equal("https://www.instagram.com/oauth/authorize", options.AuthorizeUrl);
         Assert.Equal("https://api.instagram.com", options.ApiBaseUrl);
         Assert.Equal("https://graph.instagram.com", options.GraphBaseUrl);
-    }
-
-    [Fact]
-    public void EmptyAppIdLikeAppsettings_StartsFine()
-    {
-        using var provider = Build(new Dictionary<string, string?> { ["Instagram:AppId"] = "" });
-
-        provider.GetRequiredService<IStartupValidator>().Validate();
-
-        Assert.False(provider.GetRequiredService<IOptions<InstagramOptions>>().Value.IsConfigured);
-    }
-
-    [Theory]
-    [InlineData("123", "", false)]
-    [InlineData("", "secret", false)]
-    [InlineData("  ", "secret", false)]
-    [InlineData("123", " ", false)]
-    [InlineData("123", "secret", true)]
-    public void IsConfigured_NeedsBothValues(string appId, string appSecret, bool expected)
-    {
-        using var provider = Build(new Dictionary<string, string?>
-        {
-            ["Instagram:AppId"] = appId,
-            ["Instagram:AppSecret"] = appSecret,
-        });
-
-        Assert.Equal(expected, provider.GetRequiredService<IOptions<InstagramOptions>>().Value.IsConfigured);
     }
 
     [Theory]
@@ -80,13 +52,7 @@ public sealed class InstagramOptionsTests
     public async Task HttpClientLogs_NeverContainTheTokenOrTheSecret()
     {
         var logs = new CapturingProvider();
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Instagram:AppId"] = "app-1",
-                ["Instagram:AppSecret"] = "SECRET-xyz",
-            })
-            .Build();
+        var configuration = new ConfigurationBuilder().Build();
         var services = new ServiceCollection();
         services.AddLogging(builder => builder.SetMinimumLevel(LogLevel.Trace).AddProvider(logs));
         services.AddInstagram(configuration)
@@ -96,7 +62,7 @@ public sealed class InstagramOptionsTests
             }));
         await using var provider = services.BuildServiceProvider();
 
-        await provider.GetRequiredService<IInstagramApiClient>().ExchangeForLongLivedAsync("TOKEN-abc-12345");
+        await provider.GetRequiredService<IInstagramApiClient>().ExchangeForLongLivedAsync(new InstagramAppCredentials("1234567890", "SECRET-xyz"), "TOKEN-abc-12345");
 
         var all = logs.Messages;
         Assert.Contains(all, m => m.Contains("graph.instagram.com"));

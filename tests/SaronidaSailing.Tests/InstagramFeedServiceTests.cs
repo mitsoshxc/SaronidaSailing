@@ -31,6 +31,10 @@ public sealed class InstagramFeedServiceTests : IAsyncLifetime
         Directory.CreateDirectory(Path.Combine(_folder, "media"));
         Directory.CreateDirectory(Path.Combine(_folder, "originals"));
         _client.ExpiresAt = _time.GetUtcNow().UtcDateTime.AddDays(60);
+        var appContext = NewContext();
+        var appSettings = new InstagramAppSettingsService(
+            new IntegrationSettingRepository(appContext), new UnitOfWork(appContext), _protector, new InstagramAuditLog());
+        Assert.True((await appSettings.SaveAsync("1234567890", "APP-SECRET-0123456789", false, "admin@example.com", null)).Succeeded);
         var connection = Connection(NewContext());
         Assert.True((await connection.CompleteConnectAsync("code", "https://example.test/cb", "admin@example.com", null)).Succeeded);
     }
@@ -371,9 +375,14 @@ public sealed class InstagramFeedServiceTests : IAsyncLifetime
             new IntegrationSettingRepository(context), media, unitOfWork, _cache, NullLogger<InstagramFeedService>.Instance, _time);
     }
 
-    private InstagramConnectionService Connection(AppDbContext context) =>
-        new(_client, new IntegrationSettingRepository(context), new UnitOfWork(context), _protector, new InstagramAuditLog(),
+    private InstagramConnectionService Connection(AppDbContext context)
+    {
+        var settings = new IntegrationSettingRepository(context);
+        var unitOfWork = new UnitOfWork(context);
+        var audit = new InstagramAuditLog();
+        return new(_client, new InstagramAppSettingsService(settings, unitOfWork, _protector, audit), settings, unitOfWork, _protector, audit,
             _queue, NullLogger<InstagramConnectionService>.Instance, _time);
+    }
 
     private AppDbContext NewContext()
     {

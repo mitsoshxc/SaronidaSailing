@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using SaronidaSailing.Core.Interfaces;
+using SaronidaSailing.Core.Services;
 using SaronidaSailing.Web.Identity;
 using SaronidaSailing.Web.Instagram;
 
@@ -12,6 +13,7 @@ namespace SaronidaSailing.Web.Pages.Admin;
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public class InstagramModel(
     IInstagramConnectionService connection,
+    IInstagramAppSettingsService appSettings,
     IInstagramApiClient client,
     IInstagramFeedService feed,
     IInstagramScheduleSync schedule,
@@ -20,7 +22,13 @@ public class InstagramModel(
     InstagramOAuthState oauthState,
     IOptions<SiteOptions> site) : AdminPageModel
 {
-    public const string NotSetUpText = "Instagram is not set up on this server (the Meta app ID or secret is missing).";
+    public const string NotSetUpBeforeLink = "Instagram is not set up yet: enter the Meta App ID and App secret under ";
+
+    public const string NotSetUpLinkText = "Meta app";
+
+    public const string AppIdFieldId = "MetaAppId";
+
+    public const string AppSecretFieldId = "MetaAppSecret";
 
     private static readonly Dictionary<string, (string Text, bool IsError)> Banners = new()
     {
@@ -29,7 +37,9 @@ public class InstagramModel(
         ["expired"] = ("The connection attempt took too long. Please try again.", true),
         ["invalid"] = ("The connection attempt could not be verified. Please try again.", true),
         ["failed"] = ("Instagram did not accept the connection. Please try again later.", true),
-        ["notconfigured"] = (NotSetUpText, true),
+        ["app-saved"] = ("Meta app settings saved.", false),
+        ["app-saved-disconnected"] = ("Meta app settings saved. Instagram was disconnected; connect again.", false),
+        ["app-removed"] = ("Meta app settings removed.", false),
         ["fetch-queued"] = ("Fetching the latest posts. Reload this page in a minute to see the result.", false),
     };
 
@@ -53,7 +63,18 @@ public class InstagramModel(
         ["skipped:too-recent"] = "not needed yet",
     };
 
+    [BindProperty]
+    public string? AppId { get; set; }
+
+    [BindProperty(Name = "AppSecret")]
+    public string? NewSecret { get; set; }
+
+    [BindProperty]
+    public bool ConfirmDisconnect { get; set; }
+
     public InstagramStatus Status { get; private set; } = null!;
+
+    public InstagramAppStatus AppStatus { get; private set; } = null!;
 
     public InstagramActivity Activity { get; private set; } = null!;
 
@@ -62,6 +83,19 @@ public class InstagramModel(
     public string? BannerText { get; private set; }
 
     public bool BannerIsError { get; private set; }
+
+    public bool BannerIsNotSetUp { get; private set; }
+
+    public string? AppError { get; private set; }
+
+    public bool AppErrorIsAppId => AppError == InstagramAppSettingsService.AppIdError;
+
+    public bool AppErrorIsSecret =>
+        AppError is InstagramAppSettingsService.SecretLengthError or InstagramAppSettingsService.SecretMissingError;
+
+    public bool ConfirmNeeded => AppError == InstagramAppSettingsService.ConfirmError;
+
+    public string RedirectUri => InstagramPaths.RedirectUri(site.Value.BaseUrl);
 
     public string? ExpiresAtText => Status.ExpiresAt is { } value ? AthensTime.Format(value) : null;
 
@@ -73,18 +107,22 @@ public class InstagramModel(
 
     public async Task OnGetAsync(string? result, CancellationToken ct)
     {
-        Status = await connection.GetStatusAsync(ct);
-        Activity = await feed.GetActivityAsync(ct);
-        SchedulesOn = await schedule.IsSectionActiveAsync(ct);
-        if (result is not null && Banners.TryGetValue(result, out var banner))
+        await LoadAsync(ct);
+        AppId = AppStatus.AppId;
+        if (result == "notconfigured")
+        {
+            (BannerIsNotSetUp, BannerIsError) = (true, true);
+        }
+        else if (result is not null && Banners.TryGetValue(result, out var banner))
         {
             (BannerText, BannerIsError) = banner;
         }
     }
 
-    public IActionResult OnPostConnect()
+    public async Task<IActionResult> OnPostConnectAsync(CancellationToken ct)
     {
-        if (!client.IsConfigured)
+        var credentials = await appSettings.GetCredentialsAsync(ct);
+        if (credentials is null)
         {
             return LocalRedirect(InstagramPaths.ResultUrl("notconfigured"));
         }
@@ -96,7 +134,26 @@ public class InstagramModel(
         }
 
         var state = oauthState.Create(HttpContext, adminUserId);
-        return Redirect(client.BuildAuthorizeUrl(InstagramPaths.RedirectUri(site.Value.BaseUrl), state));
+        return Redirect(client.BuildAuthorizeUrl(credentials, RedirectUri, state));
+    }
+
+    public async Task<IActionResult> OnPostSaveAppAsync(CancellationToken ct)
+    {
+        var result = await appSettings.SaveAsync(AppId, NewSecret, ConfirmDisconnect, User.Identity?.Name, ClientIp, ct);
+        if (!result.Succeeded)
+        {
+            AppError = result.Error;
+            await LoadAsync(ct);
+            return Page();
+        }
+
+        return LocalRedirect(InstagramPaths.ResultUrl(result.Disconnected ? "app-saved-disconnected" : "app-saved"));
+    }
+
+    public async Task<IActionResult> OnPostRemoveAppAsync(CancellationToken ct)
+    {
+        await appSettings.RemoveAsync(User.Identity?.Name, ClientIp, ct);
+        return LocalRedirect(InstagramPaths.ResultUrl("app-removed"));
     }
 
     public async Task<IActionResult> OnPostFetchAsync(CancellationToken ct)
@@ -115,6 +172,14 @@ public class InstagramModel(
     {
         await connection.DisconnectAsync(User.Identity?.Name ?? "", ClientIp, ct);
         return LocalRedirect(InstagramPaths.Admin);
+    }
+
+    private async Task LoadAsync(CancellationToken ct)
+    {
+        Status = await connection.GetStatusAsync(ct);
+        AppStatus = await appSettings.GetStatusAsync(ct);
+        Activity = await feed.GetActivityAsync(ct);
+        SchedulesOn = await schedule.IsSectionActiveAsync(ct);
     }
 
     private static string? Describe(DateTime? at, string? result, Dictionary<string, string> texts)

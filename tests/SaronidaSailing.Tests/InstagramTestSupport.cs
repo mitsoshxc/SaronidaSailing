@@ -36,8 +36,6 @@ internal sealed class StubInstagramClient : IInstagramApiClient
 
     private int _seed;
 
-    public bool IsConfigured { get; set; } = true;
-
     public DateTime ExpiresAt { get; set; }
 
     public List<InstagramMediaItem> Items { get; } = [];
@@ -74,12 +72,12 @@ internal sealed class StubInstagramClient : IInstagramApiClient
         Items[index] = change(Items[index]);
     }
 
-    public string BuildAuthorizeUrl(string redirectUri, string state) => throw new NotSupportedException();
+    public string BuildAuthorizeUrl(InstagramAppCredentials credentials, string redirectUri, string state) => throw new NotSupportedException();
 
-    public Task<InstagramShortLivedToken> ExchangeCodeAsync(string code, string redirectUri, CancellationToken ct = default) =>
+    public Task<InstagramShortLivedToken> ExchangeCodeAsync(InstagramAppCredentials credentials, string code, string redirectUri, CancellationToken ct = default) =>
         Task.FromResult(new InstagramShortLivedToken("SHORT-TOKEN", "17841400000000001"));
 
-    public Task<InstagramLongLivedToken> ExchangeForLongLivedAsync(string shortLivedToken, CancellationToken ct = default) =>
+    public Task<InstagramLongLivedToken> ExchangeForLongLivedAsync(InstagramAppCredentials credentials, string shortLivedToken, CancellationToken ct = default) =>
         Task.FromResult(new InstagramLongLivedToken(Token, ExpiresAt));
 
     public Task<InstagramLongLivedToken> RefreshAsync(string longLivedToken, CancellationToken ct = default)

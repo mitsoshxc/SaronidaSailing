@@ -2,13 +2,13 @@ namespace SaronidaSailing.Core.Interfaces;
 
 public interface IInstagramApiClient
 {
-    bool IsConfigured { get; }
+    string BuildAuthorizeUrl(InstagramAppCredentials credentials, string redirectUri, string state);
 
-    string BuildAuthorizeUrl(string redirectUri, string state);
+    Task<InstagramShortLivedToken> ExchangeCodeAsync(
+        InstagramAppCredentials credentials, string code, string redirectUri, CancellationToken ct = default);
 
-    Task<InstagramShortLivedToken> ExchangeCodeAsync(string code, string redirectUri, CancellationToken ct = default);
-
-    Task<InstagramLongLivedToken> ExchangeForLongLivedAsync(string shortLivedToken, CancellationToken ct = default);
+    Task<InstagramLongLivedToken> ExchangeForLongLivedAsync(
+        InstagramAppCredentials credentials, string shortLivedToken, CancellationToken ct = default);
 
     Task<InstagramLongLivedToken> RefreshAsync(string longLivedToken, CancellationToken ct = default);
 

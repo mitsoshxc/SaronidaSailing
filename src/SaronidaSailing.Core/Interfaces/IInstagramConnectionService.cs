@@ -17,7 +17,7 @@ public sealed record InstagramStatus(
 
 public sealed record InstagramRefreshResult(string Code);
 
-public sealed record InstagramConnectResult(bool Succeeded, string? Username, InstagramApiErrorKind? ErrorKind);
+public sealed record InstagramConnectResult(bool Succeeded, string? Username, InstagramApiErrorKind? ErrorKind, bool NotConfigured = false);
 
 public interface IInstagramConnectionService
 {

@@ -55,6 +55,11 @@ public class InstagramCallbackModel(
 
         var connectResult = await connection.CompleteConnectAsync(
             code, InstagramPaths.RedirectUri(site.Value.BaseUrl), user.Email, ClientIp, ct);
+        if (connectResult.NotConfigured)
+        {
+            return "notconfigured";
+        }
+
         return connectResult.Succeeded ? "connected" : "failed";
     }
 

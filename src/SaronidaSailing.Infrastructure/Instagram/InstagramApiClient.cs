@@ -25,26 +25,25 @@ public sealed partial class InstagramApiClient(
 
     private InstagramOptions Options => options.Value;
 
-    public bool IsConfigured => Options.IsConfigured;
-
     [GeneratedRegex(@"https?://\S+", RegexOptions.IgnoreCase)]
     private static partial Regex UrlPattern();
 
-    public string BuildAuthorizeUrl(string redirectUri, string state)
+    public string BuildAuthorizeUrl(InstagramAppCredentials credentials, string redirectUri, string state)
     {
-        RequireConfigured();
+        RequireCredentials(credentials);
         var separator = Options.AuthorizeUrl.Contains('?') ? "&" : "?";
         return Options.AuthorizeUrl + separator + Query(
-            ("client_id", Options.AppId),
+            ("client_id", credentials.AppId),
             ("redirect_uri", redirectUri),
             ("response_type", "code"),
             ("scope", Scope),
             ("state", state));
     }
 
-    public async Task<InstagramShortLivedToken> ExchangeCodeAsync(string code, string redirectUri, CancellationToken ct = default)
+    public async Task<InstagramShortLivedToken> ExchangeCodeAsync(
+        InstagramAppCredentials credentials, string code, string redirectUri, CancellationToken ct = default)
     {
-        RequireConfigured();
+        RequireCredentials(credentials);
         var cleanCode = code.Trim();
         if (cleanCode.EndsWith("#_", StringComparison.Ordinal))
         {
@@ -55,15 +54,15 @@ public sealed partial class InstagramApiClient(
         {
             Content = new FormUrlEncodedContent(new Dictionary<string, string>
             {
-                ["client_id"] = Options.AppId,
-                ["client_secret"] = Options.AppSecret,
+                ["client_id"] = credentials.AppId,
+                ["client_secret"] = credentials.AppSecret,
                 ["grant_type"] = "authorization_code",
                 ["redirect_uri"] = redirectUri,
                 ["code"] = cleanCode,
             }),
         };
 
-        var body = await SendAsync(request, [Options.AppSecret, cleanCode], ct);
+        var body = await SendAsync(request, [credentials.AppSecret, cleanCode], ct);
         var dto = Parse<TokenResponseDto>(body);
         var token = dto.Data is { Count: > 0 } data ? data[0] : dto;
         var userId = AsString(token.UserId);
@@ -75,14 +74,15 @@ public sealed partial class InstagramApiClient(
         return new InstagramShortLivedToken(token.AccessToken, userId);
     }
 
-    public async Task<InstagramLongLivedToken> ExchangeForLongLivedAsync(string shortLivedToken, CancellationToken ct = default)
+    public async Task<InstagramLongLivedToken> ExchangeForLongLivedAsync(
+        InstagramAppCredentials credentials, string shortLivedToken, CancellationToken ct = default)
     {
-        RequireConfigured();
+        RequireCredentials(credentials);
         var url = Url(Options.GraphBaseUrl, "access_token", Query(
             ("grant_type", "ig_exchange_token"),
-            ("client_secret", Options.AppSecret),
+            ("client_secret", credentials.AppSecret),
             ("access_token", shortLivedToken)));
-        return await GetLongLivedAsync(url, [Options.AppSecret, shortLivedToken], ct);
+        return await GetLongLivedAsync(url, [credentials.AppSecret, shortLivedToken], ct);
     }
 
     public async Task<InstagramLongLivedToken> RefreshAsync(string longLivedToken, CancellationToken ct = default)
@@ -297,11 +297,17 @@ public sealed partial class InstagramApiClient(
         return string.IsNullOrWhiteSpace(fromChild) ? dto.MediaUrl : fromChild;
     }
 
-    private void RequireConfigured()
+    private static void RequireCredentials(InstagramAppCredentials credentials)
     {
-        if (!Options.IsConfigured)
+        ArgumentNullException.ThrowIfNull(credentials);
+        if (string.IsNullOrWhiteSpace(credentials.AppId))
         {
-            throw new InvalidOperationException("Instagram:AppId and Instagram:AppSecret are not configured.");
+            throw new ArgumentException("The App ID is required.", nameof(credentials));
+        }
+
+        if (string.IsNullOrWhiteSpace(credentials.AppSecret))
+        {
+            throw new ArgumentException("The App secret is required.", nameof(credentials));
         }
     }
 

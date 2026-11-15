@@ -13,9 +13,10 @@ namespace SaronidaSailing.Tests;
 
 public sealed class InstagramApiClientTests
 {
-    private const string AppId = "app-1";
+    private const string AppId = "1234567890";
     private const string AppSecret = "SECRET-xyz";
     private const string Token = "TOKEN-abc";
+    private static readonly InstagramAppCredentials Credentials = new(AppId, AppSecret);
     private const string Redirect = "https://example.test/admin/instagram/callback";
 
     private static readonly DateTimeOffset Now = new(2026, 11, 13, 10, 0, 0, TimeSpan.Zero);
@@ -25,21 +26,29 @@ public sealed class InstagramApiClientTests
     {
         var (client, _) = NewClient();
 
-        var url = client.BuildAuthorizeUrl("https://example.test/admin/instagram/callback?a=b", "s t/ate+");
+        var url = client.BuildAuthorizeUrl(Credentials, "https://example.test/admin/instagram/callback?a=b", "s t/ate+");
 
         Assert.Equal(
-            "https://www.instagram.com/oauth/authorize?client_id=app-1"
+            "https://www.instagram.com/oauth/authorize?client_id=1234567890"
             + "&redirect_uri=https%3A%2F%2Fexample.test%2Fadmin%2Finstagram%2Fcallback%3Fa%3Db"
             + "&response_type=code&scope=instagram_business_basic&state=s%20t%2Fate%2B",
             url);
     }
 
-    [Fact]
-    public void BuildAuthorizeUrl_WithoutConfiguration_Throws()
+    [Theory]
+    [InlineData("", AppSecret)]
+    [InlineData("  ", AppSecret)]
+    [InlineData(AppId, "")]
+    [InlineData(AppId, " ")]
+    public async Task BlankCredentials_Throw_AndSendNothing(string appId, string appSecret)
     {
-        var (client, _) = NewClient(appId: "", appSecret: "");
+        var (client, handler) = NewClient();
+        var blank = new InstagramAppCredentials(appId, appSecret);
 
-        Assert.Throws<InvalidOperationException>(() => client.BuildAuthorizeUrl(Redirect, "state"));
+        Assert.Throws<ArgumentException>(() => client.BuildAuthorizeUrl(blank, Redirect, "state"));
+        await Assert.ThrowsAsync<ArgumentException>(() => client.ExchangeCodeAsync(blank, "code", Redirect));
+        await Assert.ThrowsAsync<ArgumentException>(() => client.ExchangeForLongLivedAsync(blank, Token));
+        Assert.Empty(handler.Requests);
     }
 
     [Theory]
@@ -50,7 +59,7 @@ public sealed class InstagramApiClientTests
     {
         var (client, handler) = NewClient(_ => Json(json));
 
-        var token = await client.ExchangeCodeAsync("the-code", Redirect);
+        var token = await client.ExchangeCodeAsync(Credentials, "the-code", Redirect);
 
         Assert.Equal("SHORT", token.AccessToken);
         Assert.Equal("17841400000000001", token.UserId);
@@ -70,7 +79,7 @@ public sealed class InstagramApiClientTests
     {
         var (client, handler) = NewClient(_ => Json("""{ "access_token": "SHORT", "user_id": 1 }"""));
 
-        await client.ExchangeCodeAsync("AQD-code#_", Redirect);
+        await client.ExchangeCodeAsync(Credentials, "AQD-code#_", Redirect);
 
         Assert.Equal("AQD-code", HttpUtility.ParseQueryString(handler.Requests[0].Body)["code"]);
     }
@@ -80,7 +89,7 @@ public sealed class InstagramApiClientTests
     {
         var (client, _) = NewClient(_ => Json("{}"));
 
-        var ex = await Assert.ThrowsAsync<InstagramApiException>(() => client.ExchangeCodeAsync("c", Redirect));
+        var ex = await Assert.ThrowsAsync<InstagramApiException>(() => client.ExchangeCodeAsync(Credentials, "c", Redirect));
 
         Assert.Equal(InstagramApiErrorKind.Other, ex.Kind);
     }
@@ -91,7 +100,7 @@ public sealed class InstagramApiClientTests
         var (client, handler) = NewClient(_ =>
             Json("""{ "access_token": "LONG", "token_type": "bearer", "expires_in": 5184000 }"""));
 
-        var token = await client.ExchangeForLongLivedAsync(Token);
+        var token = await client.ExchangeForLongLivedAsync(Credentials, Token);
 
         Assert.Equal("LONG", token.AccessToken);
         Assert.Equal(Now.UtcDateTime.AddSeconds(5184000), token.ExpiresAt);
@@ -269,7 +278,7 @@ public sealed class InstagramApiClientTests
                 $$"""{ "error": { "message": "Bad {{Token}} and {{AppSecret}} at https://graph.instagram.com/x?access_token={{Token}}", "code": 190 } }"""),
         });
 
-        var ex = await Assert.ThrowsAsync<InstagramApiException>(() => client.ExchangeForLongLivedAsync(Token));
+        var ex = await Assert.ThrowsAsync<InstagramApiException>(() => client.ExchangeForLongLivedAsync(Credentials, Token));
 
         Assert.DoesNotContain(Token, ex.Message);
         Assert.DoesNotContain(AppSecret, ex.Message);
@@ -392,12 +401,10 @@ public sealed class InstagramApiClientTests
 
     private static (InstagramApiClient Client, StubHandler Handler) NewClient(
         Func<HttpRequestMessage, HttpResponseMessage>? respond = null,
-        string appId = AppId,
-        string appSecret = AppSecret,
         ILogger<InstagramApiClient>? logger = null)
     {
         var handler = new StubHandler(respond ?? (_ => Json("{}")));
-        var options = Options.Create(new InstagramOptions { AppId = appId, AppSecret = appSecret });
+        var options = Options.Create(new InstagramOptions());
         var client = new InstagramApiClient(
             new HttpClient(handler),
             options,

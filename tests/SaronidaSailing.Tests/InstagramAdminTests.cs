@@ -43,19 +43,17 @@ public sealed class FakeInstagramClient : IInstagramApiClient
 {
     public const string LongToken = "LONG-LIVED-TOKEN-xyz";
 
-    public bool IsConfigured { get; set; } = true;
-
     public InstagramApiException? Failure { get; set; }
 
-    public string BuildAuthorizeUrl(string redirectUri, string state) =>
-        $"https://www.instagram.com/oauth/authorize?client_id=app-1&redirect_uri={Uri.EscapeDataString(redirectUri)}&state={Uri.EscapeDataString(state)}";
+    public string BuildAuthorizeUrl(InstagramAppCredentials credentials, string redirectUri, string state) =>
+        $"https://www.instagram.com/oauth/authorize?client_id={credentials.AppId}&redirect_uri={Uri.EscapeDataString(redirectUri)}&state={Uri.EscapeDataString(state)}";
 
-    public Task<InstagramShortLivedToken> ExchangeCodeAsync(string code, string redirectUri, CancellationToken ct = default) =>
+    public Task<InstagramShortLivedToken> ExchangeCodeAsync(InstagramAppCredentials credentials, string code, string redirectUri, CancellationToken ct = default) =>
         Failure is null
             ? Task.FromResult(new InstagramShortLivedToken("SHORT", "17841400000000001"))
             : Task.FromException<InstagramShortLivedToken>(Failure);
 
-    public Task<InstagramLongLivedToken> ExchangeForLongLivedAsync(string shortLivedToken, CancellationToken ct = default) =>
+    public Task<InstagramLongLivedToken> ExchangeForLongLivedAsync(InstagramAppCredentials credentials, string shortLivedToken, CancellationToken ct = default) =>
         Task.FromResult(new InstagramLongLivedToken(LongToken, DateTime.UtcNow.AddDays(60)));
 
     public Task<InstagramLongLivedToken> RefreshAsync(string longLivedToken, CancellationToken ct = default) =>
@@ -75,6 +73,7 @@ public class InstagramAdminTests(InstagramWebApplicationFactory factory) : IClas
 {
     private const string Page = "/admin/instagram";
     private const string CookieName = "saronida.ig-oauth";
+    private const string SecretValue = "SUPER-SECRET-VALUE-0123456789";
 
     [Fact]
     public async Task Page_Anonymous_IsRedirectedToLogin()
@@ -143,23 +142,183 @@ public class InstagramAdminTests(InstagramWebApplicationFactory factory) : IClas
     public async Task NotConfigured_DisablesConnect_AndPostRedirectsWithNotConfigured()
     {
         var client = await LoggedInClientAsync("ig-notconfigured@example.com");
-        factory.Instagram.IsConfigured = false;
-        try
-        {
-            var html = await (await client.GetAsync(Page)).Content.ReadAsStringAsync();
-            var post = await PostHandlerAsync(client, "Connect");
-            var banner = await (await client.GetAsync(Location(post))).Content.ReadAsStringAsync();
+        await RemoveAppAsync();
 
-            Assert.Contains("Instagram is not set up on this server (the Meta app ID or secret is missing).", html);
-            Assert.Contains("disabled", html);
-            Assert.Contains("aria-describedby=\"instagram-not-set-up\"", html);
-            Assert.Equal("/admin/instagram?result=notconfigured", Location(post));
-            Assert.Contains("role=\"alert\"", banner);
-        }
-        finally
+        var html = await (await client.GetAsync(Page)).Content.ReadAsStringAsync();
+        var post = await PostHandlerAsync(client, "Connect");
+        var banner = await (await client.GetAsync(Location(post))).Content.ReadAsStringAsync();
+
+        const string text = "Instagram is not set up yet: enter the Meta App ID and App secret under <a href=\"#meta-app\">Meta app</a>.";
+        Assert.Contains(text, html);
+        Assert.Contains("disabled", html);
+        Assert.Contains("aria-describedby=\"instagram-not-set-up\"", html);
+        Assert.Equal("/admin/instagram?result=notconfigured", Location(post));
+        Assert.Contains("role=\"alert\"", banner);
+        Assert.Contains($"<p class=\"admin-error\" role=\"alert\">{text}</p>", banner);
+    }
+
+    [Fact]
+    public async Task Connect_AfterSavingTheApp_RedirectsToTheAuthorizeUrlWithTheSavedAppId()
+    {
+        var client = await LoggedInClientAsync("ig-connect-saved@example.com");
+        await RemoveAppAsync();
+        var save = await PostFormAsync(client, "SaveApp", new() { ["AppId"] = " 987654321 ", ["AppSecret"] = SecretValue });
+        Assert.Equal("/admin/instagram?result=app-saved", Location(save));
+
+        var response = await PostHandlerAsync(client, "Connect");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        var query = HttpUtility.ParseQueryString(new Uri(Location(response)).Query);
+        Assert.Equal("987654321", query["client_id"]);
+    }
+
+    [Fact]
+    public async Task SaveApp_WithoutAntiforgery_IsRejected()
+    {
+        var client = await LoggedInClientAsync("ig-app-csrf@example.com");
+
+        var response = await client.PostAsync(Page + "?handler=SaveApp", new FormUrlEncodedContent(new Dictionary<string, string>
         {
-            factory.Instagram.IsConfigured = true;
-        }
+            ["AppId"] = "12345",
+            ["AppSecret"] = SecretValue,
+        }));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task RemoveApp_WithoutAntiforgery_IsRejected()
+    {
+        var client = await LoggedInClientAsync("ig-remove-csrf@example.com");
+
+        var response = await client.PostAsync(Page + "?handler=RemoveApp", new FormUrlEncodedContent(new Dictionary<string, string>()));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("SaveApp")]
+    [InlineData("RemoveApp")]
+    public async Task AppHandlers_Anonymous_AreRedirectedToLogin(string handler)
+    {
+        var response = await NewClient(factory).PostAsync(Page + $"?handler={handler}", new FormUrlEncodedContent(new Dictionary<string, string>()));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Contains("/admin/login", Location(response));
+    }
+
+    [Fact]
+    public async Task Page_NeverRendersTheSecret_AndShowsTheSavedHint()
+    {
+        var client = await LoggedInClientAsync("ig-secret-render@example.com");
+        await RemoveAppAsync();
+        var empty = await client.GetStringAsync(Page);
+        await PostFormAsync(client, "SaveApp", new() { ["AppId"] = "70000005", ["AppSecret"] = SecretValue });
+
+        var saved = await client.GetStringAsync(Page);
+        var banner = await client.GetStringAsync("/admin/instagram?result=app-saved");
+
+        Assert.DoesNotContain(SecretValue, saved);
+        Assert.DoesNotContain(SecretValue, banner);
+        Assert.Contains("<h2 id=\"meta-app\">Meta app</h2>", empty);
+        Assert.Contains(">App secret</label>", empty);
+        Assert.DoesNotContain("Remove app settings", empty);
+        Assert.Contains("value=\"70000005\"", saved);
+        Assert.Contains("Replace App secret (optional)", saved);
+        Assert.Contains("Saved. Leave empty to keep it.", saved);
+        Assert.Contains("type=\"password\"", saved);
+        Assert.Contains("autocomplete=\"new-password\"", saved);
+        Assert.Contains("Remove app settings", saved);
+        Assert.Contains("https://localhost/admin/instagram/callback", saved);
+        Assert.Contains("Meta app settings saved.", banner);
+        Assert.Contains("role=\"status\"", banner);
+    }
+
+    [Fact]
+    public async Task SaveApp_WithAnInvalidAppId_ShowsTheErrorOnTheFieldAndSavesNothing_WithoutEchoingTheSecret()
+    {
+        var client = await LoggedInClientAsync("ig-app-invalid@example.com");
+        await RemoveAppAsync();
+
+        var response = await PostFormAsync(client, "SaveApp", new() { ["AppId"] = "not-a-number", ["AppSecret"] = SecretValue });
+
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("The App ID is the number shown in the Meta app dashboard (App settings &#x2192; Basic).", html);
+        Assert.Contains("id=\"meta-app-error\"", html);
+        Assert.Contains("aria-describedby=\"meta-app-id-help meta-app-error\"", html);
+        Assert.Contains("value=\"not-a-number\"", html);
+        Assert.DoesNotContain(SecretValue, html);
+        Assert.False((await AppStatusAsync()).IsConfigured);
+    }
+
+    [Fact]
+    public async Task SaveApp_ChangingTheAppIdWhileConnected_NeedsConfirmation_ThenDisconnects()
+    {
+        await RemoveAppAsync();
+        var admin = await AdminWithClientAsync("ig-app-change@example.com");
+        await PostFormAsync(admin.Client, "SaveApp", new() { ["AppId"] = "70000001", ["AppSecret"] = SecretValue });
+        var (state, nonce) = await StartAsync(admin.Client);
+        await CallbackAsync(NewClient(factory), $"code=C&state={Uri.EscapeDataString(state)}", nonce);
+
+        var rejected = await PostFormAsync(admin.Client, "SaveApp", new() { ["AppId"] = "70000002" });
+        var rejectedHtml = await rejected.Content.ReadAsStringAsync();
+        var afterRejected = await AppStatusAsync();
+        var secretOnly = await PostFormAsync(admin.Client, "SaveApp", new() { ["AppId"] = "70000001", ["AppSecret"] = SecretValue + "2" });
+        var stillConnected = (await ConnectionStatusAsync()).State;
+        var confirmed = await PostFormAsync(admin.Client, "SaveApp", new() { ["AppId"] = "70000002", ["ConfirmDisconnect"] = "true" });
+
+        Assert.Equal(HttpStatusCode.OK, rejected.StatusCode);
+        Assert.Contains("Changing the App ID removes the Instagram connection. Confirm to continue.", rejectedHtml);
+        Assert.Contains("Save and disconnect", rejectedHtml);
+        Assert.Equal("70000001", afterRejected.AppId);
+        Assert.Equal("/admin/instagram?result=app-saved", Location(secretOnly));
+        Assert.Equal(InstagramConnectionState.Connected, stillConnected);
+        Assert.Equal("/admin/instagram?result=app-saved-disconnected", Location(confirmed));
+        Assert.Equal(InstagramConnectionState.NotConnected, (await ConnectionStatusAsync()).State);
+        Assert.Equal("70000002", (await AppStatusAsync()).AppId);
+        var banner = await admin.Client.GetStringAsync(Location(confirmed));
+        Assert.Contains("Meta app settings saved. Instagram was disconnected; connect again.", banner);
+        var audit = ReadLogLines(factory.LogsPath, "audit");
+        Assert.Contains(audit, l => l.Contains($"|instagram-app-saved|user={admin.Email}|") && l.Contains("app-id-changed=true secret-replaced=false disconnected=true"));
+        Assert.DoesNotContain(audit, l => l.Contains(SecretValue) || l.Contains("70000001") || l.Contains("70000002"));
+    }
+
+    [Fact]
+    public async Task RemoveApp_ClearsTheSettingsAndTheConnection_AndAudits()
+    {
+        await RemoveAppAsync();
+        var admin = await AdminWithClientAsync("ig-app-remove@example.com");
+        await PostFormAsync(admin.Client, "SaveApp", new() { ["AppId"] = "33333", ["AppSecret"] = SecretValue });
+        var (state, nonce) = await StartAsync(admin.Client);
+        await CallbackAsync(NewClient(factory), $"code=C&state={Uri.EscapeDataString(state)}", nonce);
+
+        var response = await PostHandlerAsync(admin.Client, "RemoveApp");
+
+        Assert.Equal("/admin/instagram?result=app-removed", Location(response));
+        var status = await AppStatusAsync();
+        Assert.Null(status.AppId);
+        Assert.False(status.SecretSaved);
+        Assert.Equal(InstagramConnectionState.NotConnected, (await ConnectionStatusAsync()).State);
+        Assert.Contains("Meta app settings removed.", await admin.Client.GetStringAsync(Location(response)));
+        Assert.Contains(
+            ReadLogLines(factory.LogsPath, "audit"),
+            l => l.Contains($"|instagram-app-removed|user={admin.Email}|") && l.Contains("disconnected=true"));
+    }
+
+    [Fact]
+    public async Task Callback_WhenTheAppSettingsWereRemovedMeanwhile_RedirectsWithNotConfigured()
+    {
+        await ResetAsync();
+        var admin = await AdminWithClientAsync("ig-callback-removed@example.com");
+        var (state, nonce) = await StartAsync(admin.Client);
+        await RemoveAppAsync();
+
+        var response = await CallbackAsync(NewClient(factory), $"code=C&state={Uri.EscapeDataString(state)}", nonce);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("url=/admin/instagram?result=notconfigured", await response.Content.ReadAsStringAsync());
+        await AssertNotConnectedAsync();
     }
 
     [Fact]
@@ -669,6 +828,7 @@ public class InstagramAdminTests(InstagramWebApplicationFactory factory) : IClas
         var client = NewClient(factory);
         var admin = await AddTwoFactorAdminAsync(factory, email);
         await LoginWithTotpAsync(client, admin);
+        await EnsureAppAsync();
         return (client, email);
     }
 
@@ -680,6 +840,45 @@ public class InstagramAdminTests(InstagramWebApplicationFactory factory) : IClas
         var cookie = SetCookie(response, CookieName)!;
         var nonce = cookie[(CookieName.Length + 1)..cookie.IndexOf(';')];
         return (state, nonce);
+    }
+
+    private static async Task<HttpResponseMessage> PostFormAsync(HttpClient client, string handler, Dictionary<string, string> fields)
+    {
+        var form = await client.GetAsync(Page);
+        form.EnsureSuccessStatusCode();
+        var data = new Dictionary<string, string>(fields)
+        {
+            ["__RequestVerificationToken"] = ExtractToken(await form.Content.ReadAsStringAsync()),
+        };
+        return await client.PostAsync($"{Page}?handler={handler}", new FormUrlEncodedContent(data));
+    }
+
+    private async Task EnsureAppAsync()
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var service = scope.ServiceProvider.GetRequiredService<IInstagramAppSettingsService>();
+        if (!(await service.GetStatusAsync()).IsConfigured)
+        {
+            Assert.True((await service.SaveAsync("1234567890", SecretValue, false, "ensure@example.com", null)).Succeeded);
+        }
+    }
+
+    private async Task RemoveAppAsync()
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        await scope.ServiceProvider.GetRequiredService<IInstagramAppSettingsService>().RemoveAsync("reset@example.com", null);
+    }
+
+    private async Task<InstagramAppStatus> AppStatusAsync()
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<IInstagramAppSettingsService>().GetStatusAsync();
+    }
+
+    private async Task<InstagramStatus> ConnectionStatusAsync()
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<IInstagramConnectionService>().GetStatusAsync();
     }
 
     private static async Task<HttpResponseMessage> PostHandlerAsync(HttpClient client, string handler)

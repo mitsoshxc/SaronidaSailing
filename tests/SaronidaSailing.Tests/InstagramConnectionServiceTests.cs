@@ -17,6 +17,8 @@ public sealed class InstagramConnectionServiceTests : IAsyncLifetime
     private const string Redirect = "https://example.test/admin/instagram/callback";
     private const string LongToken = "LONG-LIVED-TOKEN-123";
     private const string Code = "AUTH-CODE-456";
+    private const string AppId = "1234567890";
+    private const string AppSecret = "APP-SECRET-0123456789";
 
     private string _connectionString = "";
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 11, 13, 10, 0, 0, TimeSpan.Zero));
@@ -33,16 +35,20 @@ public sealed class InstagramConnectionServiceTests : IAsyncLifetime
     public async Task Connect_StoresEveryKey_WithTheTokenProtected_AndAuditsOnce()
     {
         _client.ExpiresAt = _time.GetUtcNow().UtcDateTime.AddDays(60);
+        await SaveAppAsync();
         await Run(s => s.SetAsync(InstagramSettingKeys.TokenInvalidAt, "2026-11-01T00:00:00.0000000Z"), save: true);
 
         var result = await Service(out _).CompleteConnectAsync(Code, Redirect, Admin, "10.0.0.1");
 
         Assert.True(result.Succeeded);
         Assert.Equal("saronida", result.Username);
+        Assert.Equal(new InstagramAppCredentials(AppId, AppSecret), _client.ReceivedCredentials);
         var rows = await Rows();
         Assert.Equal(
             [
-                InstagramSettingKeys.AccessToken, InstagramSettingKeys.ConnectedAt, InstagramSettingKeys.ConnectedBy,
+                InstagramSettingKeys.AccessToken,
+                InstagramAppSettingKeys.AppId, InstagramAppSettingKeys.AppSecret,
+                InstagramSettingKeys.ConnectedAt, InstagramSettingKeys.ConnectedBy,
                 InstagramSettingKeys.TokenExpiresAt, InstagramSettingKeys.TokenIssuedAt, InstagramSettingKeys.UserId,
                 InstagramSettingKeys.Username,
             ],
@@ -71,13 +77,16 @@ public sealed class InstagramConnectionServiceTests : IAsyncLifetime
         InstagramApiErrorKind kind, int? errorCode, string expectedDetails)
     {
         _client.Failure = new InstagramApiException(kind, $"boom {Code} {LongToken}", errorCode);
+        await SaveAppAsync();
 
         var result = await Service(out _).CompleteConnectAsync(Code, Redirect, Admin, "10.0.0.1");
 
         Assert.False(result.Succeeded);
         Assert.Equal(kind, result.ErrorKind);
         Assert.Equal(0, _queue.FetchCount);
-        Assert.Empty(await Rows());
+        Assert.Equal(
+            [InstagramAppSettingKeys.AppId, InstagramAppSettingKeys.AppSecret],
+            (await Rows()).Keys.Order().ToArray());
         var entry = Assert.Single(_audit.Entries);
         Assert.Equal(("instagram-connect-failed", Admin, "10.0.0.1", expectedDetails), entry);
         Assert.DoesNotContain(Code, entry.Details);
@@ -85,16 +94,29 @@ public sealed class InstagramConnectionServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Status_WithoutAToken_IsNotConnected_AndReportsCanConnect()
+    public async Task Status_WithoutAToken_IsNotConnected_AndCannotConnectUntilTheAppIsSaved()
     {
-        _client.IsConfigured = false;
+        var before = await Service(out _).GetStatusAsync();
+        await SaveAppAsync();
+        var after = await Service(out _).GetStatusAsync();
 
-        var status = await Service(out _).GetStatusAsync();
-
-        Assert.Equal(InstagramConnectionState.NotConnected, status.State);
-        Assert.False(status.CanConnect);
-        Assert.Null(status.Username);
+        Assert.Equal(InstagramConnectionState.NotConnected, before.State);
+        Assert.False(before.CanConnect);
+        Assert.True(after.CanConnect);
+        Assert.Null(before.Username);
         Assert.Null(await Service(out _).GetAccessTokenAsync());
+    }
+
+    [Fact]
+    public async Task Connect_WithoutSavedAppSettings_ReportsNotConfigured_CallsNothing_AndStoresNothing()
+    {
+        var result = await Service(out _).CompleteConnectAsync(Code, Redirect, Admin, "10.0.0.1");
+
+        Assert.False(result.Succeeded);
+        Assert.True(result.NotConfigured);
+        Assert.Null(_client.ReceivedCode);
+        Assert.Empty(await Rows());
+        Assert.Equal(("instagram-connect-failed", Admin, "10.0.0.1", "reason=not-configured"), Assert.Single(_audit.Entries));
     }
 
     [Fact]
@@ -169,7 +191,7 @@ public sealed class InstagramConnectionServiceTests : IAsyncLifetime
         var service = Service(out _);
         await service.DisconnectAsync(Admin, "10.0.0.2");
 
-        Assert.Empty(await Rows());
+        Assert.Equal([InstagramAppSettingKeys.AppId, InstagramAppSettingKeys.AppSecret], (await Rows()).Keys.Order().ToArray());
         Assert.Equal(InstagramConnectionState.NotConnected, (await Service(out _).GetStatusAsync()).State);
         await using var verify = CreateContext();
         Assert.Single(await verify.Set<InstagramPost>().ToListAsync());
@@ -286,6 +308,7 @@ public sealed class InstagramConnectionServiceTests : IAsyncLifetime
 
         Assert.Equal(
             [
+                InstagramAppSettingKeys.AppId, InstagramAppSettingKeys.AppSecret,
                 InstagramSettingKeys.LastFetchResult, InstagramSettingKeys.LastRefreshAt, InstagramSettingKeys.LastRefreshResult,
             ],
             (await Rows()).Keys.Order().ToArray());
@@ -303,6 +326,7 @@ public sealed class InstagramConnectionServiceTests : IAsyncLifetime
     private async Task Connect()
     {
         _client.ExpiresAt = _time.GetUtcNow().UtcDateTime.AddDays(60);
+        await SaveAppAsync();
         Assert.True((await Service(out _).CompleteConnectAsync(Code, Redirect, Admin, null)).Succeeded);
         _audit.Entries.Clear();
     }
@@ -310,8 +334,19 @@ public sealed class InstagramConnectionServiceTests : IAsyncLifetime
     private InstagramConnectionService Service(out AppDbContext context)
     {
         context = CreateContext();
+        var settings = new IntegrationSettingRepository(context);
+        var unitOfWork = new UnitOfWork(context);
+        var appSettings = new InstagramAppSettingsService(settings, unitOfWork, _protector, _audit);
         return new InstagramConnectionService(
-            _client, new IntegrationSettingRepository(context), new UnitOfWork(context), _protector, _audit, _queue, NullLogger<InstagramConnectionService>.Instance, _time);
+            _client, appSettings, settings, unitOfWork, _protector, _audit, _queue, NullLogger<InstagramConnectionService>.Instance, _time);
+    }
+
+    private async Task SaveAppAsync()
+    {
+        await using var context = CreateContext();
+        var service = new InstagramAppSettingsService(new IntegrationSettingRepository(context), new UnitOfWork(context), _protector, _audit);
+        Assert.True((await service.SaveAsync(AppId, AppSecret, false, Admin, null)).Succeeded);
+        _audit.Entries.Clear();
     }
 
     private async Task Run(Func<IIntegrationSettingRepository, Task> action, bool save)
@@ -335,8 +370,6 @@ public sealed class InstagramConnectionServiceTests : IAsyncLifetime
 
     private sealed class FakeClient : IInstagramApiClient
     {
-        public bool IsConfigured { get; set; } = true;
-
         public DateTime ExpiresAt { get; set; }
 
         public InstagramApiException? Failure { get; set; }
@@ -353,10 +386,13 @@ public sealed class InstagramConnectionServiceTests : IAsyncLifetime
 
         public string? ReceivedRedirect { get; private set; }
 
-        public string BuildAuthorizeUrl(string redirectUri, string state) => throw new NotSupportedException();
+        public InstagramAppCredentials? ReceivedCredentials { get; private set; }
 
-        public Task<InstagramShortLivedToken> ExchangeCodeAsync(string code, string redirectUri, CancellationToken ct = default)
+        public string BuildAuthorizeUrl(InstagramAppCredentials credentials, string redirectUri, string state) => throw new NotSupportedException();
+
+        public Task<InstagramShortLivedToken> ExchangeCodeAsync(InstagramAppCredentials credentials, string code, string redirectUri, CancellationToken ct = default)
         {
+            ReceivedCredentials = credentials;
             ReceivedCode = code;
             ReceivedRedirect = redirectUri;
             return Failure is null
@@ -364,7 +400,7 @@ public sealed class InstagramConnectionServiceTests : IAsyncLifetime
                 : Task.FromException<InstagramShortLivedToken>(Failure);
         }
 
-        public Task<InstagramLongLivedToken> ExchangeForLongLivedAsync(string shortLivedToken, CancellationToken ct = default) =>
+        public Task<InstagramLongLivedToken> ExchangeForLongLivedAsync(InstagramAppCredentials credentials, string shortLivedToken, CancellationToken ct = default) =>
             Task.FromResult(new InstagramLongLivedToken(LongToken, ExpiresAt));
 
         public Task<InstagramLongLivedToken> RefreshAsync(string longLivedToken, CancellationToken ct = default)

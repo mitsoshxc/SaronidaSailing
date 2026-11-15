@@ -5,6 +5,7 @@ namespace SaronidaSailing.Core.Services;
 
 public sealed class InstagramConnectionService(
     IInstagramApiClient client,
+    IInstagramAppSettingsService appSettings,
     IIntegrationSettingRepository settings,
     IUnitOfWork unitOfWork,
     ISecretProtector protector,
@@ -24,10 +25,17 @@ public sealed class InstagramConnectionService(
     public async Task<InstagramConnectResult> CompleteConnectAsync(
         string code, string redirectUri, string adminEmail, string? ipAddress, CancellationToken ct = default)
     {
+        var credentials = await appSettings.GetCredentialsAsync(ct);
+        if (credentials is null)
+        {
+            audit.Record("instagram-connect-failed", adminEmail, ipAddress, "reason=not-configured");
+            return new InstagramConnectResult(false, null, null, NotConfigured: true);
+        }
+
         try
         {
-            var shortLived = await client.ExchangeCodeAsync(code, redirectUri, ct);
-            var longLived = await client.ExchangeForLongLivedAsync(shortLived.AccessToken, ct);
+            var shortLived = await client.ExchangeCodeAsync(credentials, code, redirectUri, ct);
+            var longLived = await client.ExchangeForLongLivedAsync(credentials, shortLived.AccessToken, ct);
             var profile = await client.GetProfileAsync(longLived.AccessToken, ct);
 
             await settings.SetAsync(InstagramSettingKeys.AccessToken, protector.Protect(longLived.AccessToken), ct);
@@ -118,7 +126,7 @@ public sealed class InstagramConnectionService(
 
     private async Task<(InstagramStatus Status, string? Token)> ReadAsync(CancellationToken ct)
     {
-        var canConnect = client.IsConfigured;
+        var canConnect = (await appSettings.GetStatusAsync(ct)).IsConfigured;
         var stored = await settings.GetAsync(InstagramSettingKeys.AccessToken, ct);
         if (stored is null)
         {
