@@ -206,6 +206,8 @@ Tech-lead details to settle in the briefs (propose → confirm with the develope
 - [ ] Page settings: Index / Follow switches per page (robots meta, sitemap)
 - Developer, 2026-11-15: a **robots.txt text area in the admin settings** where the admin pastes the robots.txt text. Tech-lead proposal to confirm in the brief: one site-wide value (not per page), edited in a site-wide settings window; empty → today's generated robots.txt (`Disallow: /admin` + the `Sitemap:` line); the Preview environment keeps serving `Disallow: /` whatever is stored, so the preview can never be crawled; a save evicts nothing extra (robots.txt is not output-cached, `Cache-Control: max-age=3600`)
 - [ ] Site settings: editable robots.txt text (empty = generated default, ignored in Preview)
+- Developer, 2026-11-15: the **Meta App ID and App secret are entered on the admin Instagram page**, not in server configuration — **admin page only** (the `Instagram:AppId` / `Instagram:AppSecret` settings and the planned Kubernetes Secret for the app secret are dropped). The secret is stored encrypted with Data Protection (like the Instagram token), is write-only (never shown again; a "Replace secret" action), and every change is audited without the value. Tech-lead details to confirm in the brief: where the values live (`IntegrationSettings`), that changing the App ID while connected disconnects (the stored token belongs to the old app) after a confirmation, how the developer's local user-secrets setup moves over (enter the values once on the local admin page), and the "not set up" message pointing to the form
+- [ ] Instagram page: Meta App ID and App secret entered by the admin (encrypted, write-only secret, audited; config settings removed)
 - [ ] Check in the Claude browser (editing flows, keyboard, axe on the changed parts), then `/doc` for the phase
 
 ## Phase 8 — Preview & Production
@@ -214,7 +216,7 @@ Tech-lead details to settle in the briefs (propose → confirm with the develope
 
 Infrastructure as agreed on 2026-11-11 (see Phase 4.5); replaces the Docker Compose tasks.
 
-- [ ] `deploy/k8s/` manifests: namespace, app Deployment (`replicas: 1`, readiness/liveness probes) + NodePort Service, PostgreSQL StatefulSet, `migrate` Job, `pg_dump` CronJob, Secrets (DB password, Instagram app secret), host-folder mounts under `/var/saronida`
+- [ ] `deploy/k8s/` manifests: namespace, app Deployment (`replicas: 1`, readiness/liveness probes) + NodePort Service, PostgreSQL StatefulSet, `migrate` Job, `pg_dump` CronJob, Secrets (DB password; the Instagram app secret is entered on the admin page since 2026-11-15), host-folder mounts under `/var/saronida`
 - [ ] `deploy/nginx/` site config proxying to the NodePort (incl. `/health` denied externally); `ForwardedHeaders:KnownNetworks` set to the k3s network
 - [ ] nginx maintenance mode: `/var/saronida/maintenance.on` → 503 + `deploy/nginx/maintenance.html`
 - [ ] `deploy/deploy.ps1`: build on the PC → `docker save | ssh k3s ctr images import` → `migrate` Job → rollout → `/health` check
@@ -225,7 +227,7 @@ Infrastructure as agreed on 2026-11-11 (see Phase 4.5); replaces the Docker Comp
 - [ ] nginx access and error logs kept 30 days (logrotate)
 - [ ] Persistent systemd journal with a size cap, so the kernel's out-of-memory messages for the whole droplet are kept
 - [ ] **Early in Phase 8 (before the preview session), with the owner:** create the Meta app with the "Other" use case + Business type and check whether "API setup with Instagram login" is offered (see the Phase 6 finding). If only Unified login is offered: the owner creates a business portfolio, and the tech lead writes a rework brief (API client, Connect flow, token renewal) before go-live
-- [ ] Instagram on the preview with the owner: add the preview + production redirect URIs and the `Instagram__AppSecret` Secret, add the owner's account as Instagram tester, check development mode works without App Review, press Connect Instagram, check the first fetch, the feed, Fetch now, renewal and a revoke → "disconnected" (moved back from Phase 6, 2026-11-13)
+- [ ] Instagram on the preview with the owner: add the preview + production redirect URIs, enter the App ID and App secret on the preview's admin Instagram page, add the owner's account as Instagram tester, check development mode works without App Review, press Connect Instagram, check the first fetch, the feed, Fetch now, renewal and a revoke → "disconnected" (moved back from Phase 6, 2026-11-13)
 - [ ] Two-pod rehearsal on the preview: `replicas: 2` → cache eviction across pods, jobs run once, admin login, both pods in the shared log files, a forced pod kill shows up in `k8s-events` → back to 1; write the scale-up runbook (resize droplet → `replicas: 2`)
 - [ ] Cloudflare: DNS (apex + www, proxied), Full (strict) SSL, Always Use HTTPS, Web Analytics
 - [ ] Canonical redirects: http → https and no-www → `https://www.saronidasailing.gr` in one hop (nginx); certificate for both names
