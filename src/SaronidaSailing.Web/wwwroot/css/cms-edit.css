@@ -785,6 +785,22 @@ html:not(.cms-view) [data-cms-item]:focus-within > .cms-itembar {
     list-style: none;
 }
 
+@media (min-width: 960px) {
+    #site-menu .site-nav__list > li.cms-list-add {
+        display: flex;
+        align-self: flex-start;
+        margin-block: 0;
+        margin-inline-start: var(--space-4);
+    }
+
+    #site-menu .site-nav__list > li.cms-list-add > button.cms-button {
+        min-height: 48px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+}
+
 html.cms-view .cms-itembar,
 html.cms-view .cms-sectionbar,
 html.cms-view .cms-list-add {
