@@ -123,6 +123,8 @@ export const createFieldBar = ({ editMode, windows }) => {
         window.addEventListener('resize', schedulePlace);
     };
 
+    const navigates = (field) => field.dataset.cmsType === 'link' && field.closest('[data-cms-list-nav]') !== null;
+
     const fieldOf = (target) => (target instanceof Element ? target.closest(fieldSelector) : null);
 
     const setFocusable = (editing) => {
@@ -160,7 +162,9 @@ export const createFieldBar = ({ editMode, windows }) => {
             dismissed = null;
         }
         if (field && field !== dismissed) {
-            show(field);
+            if (!navigates(field) || field.matches(':focus-visible')) {
+                show(field);
+            }
         } else if (!field) {
             hide();
         }
@@ -190,7 +194,7 @@ export const createFieldBar = ({ editMode, windows }) => {
             return;
         }
         const field = fieldOf(event.target);
-        if (!field) {
+        if (!field || navigates(field)) {
             return;
         }
         const type = field.dataset.cmsType;
@@ -209,7 +213,7 @@ export const createFieldBar = ({ editMode, windows }) => {
         }
         const field = fieldOf(event.target);
         const type = field?.dataset.cmsType;
-        if (field && windowTypes.includes(type)) {
+        if (field && windowTypes.includes(type) && !navigates(field)) {
             event.preventDefault();
             openAction(directActions[type], field, null);
         }

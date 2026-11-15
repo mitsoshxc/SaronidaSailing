@@ -41,7 +41,7 @@ const makeButton = (text, label) => {
     return button;
 };
 
-export const createLists = ({ pending, inline, fieldBar, toolbar, editMode, config }) => {
+export const createLists = ({ pending, inline, fieldBar, toolbar, editMode, config, windows }) => {
     const lists = new Map();
 
     const position = (element) => {
@@ -193,6 +193,25 @@ export const createLists = ({ pending, inline, fieldBar, toolbar, editMode, conf
         win.actions.querySelector('button')?.focus();
     };
 
+    const navButtons = (item, bar) => {
+        const run = (action, button) => {
+            bar.classList.add('cms-itembar-held');
+            action(item.querySelector('[data-cms-type="link"]'), () => {
+                button.focus();
+                bar.classList.remove('cms-itembar-held');
+            });
+        };
+        const edit = makeButton('Edit link', 'Edit link');
+        edit.dataset.cmsItemaction = 'edit-link';
+        edit.dataset.cmsBaseLabel = 'Edit link';
+        edit.addEventListener('click', () => run(windows.openLink, edit));
+        const history = makeButton('History', 'History');
+        history.dataset.cmsItemaction = 'history';
+        history.dataset.cmsBaseLabel = 'History';
+        history.addEventListener('click', () => run(windows.openHistory, history));
+        return [edit, history];
+    };
+
     const addBar = (list, item) => {
         const bar = el('div', 'cms-itembar');
         bar.setAttribute('role', 'group');
@@ -222,7 +241,11 @@ export const createLists = ({ pending, inline, fieldBar, toolbar, editMode, conf
         hide.addEventListener('click', () => setActive(list, item, !isActive(item), hide));
         remove.addEventListener('click', () => confirmDelete(list, item, remove, hide));
 
-        bar.append(drag, up, down, hide, remove);
+        bar.append(drag, up, down, hide);
+        if (item.hasAttribute('data-cms-list-nav')) {
+            bar.append(...navButtons(item, bar));
+        }
+        bar.append(remove);
         item.append(bar);
         position(item);
     };

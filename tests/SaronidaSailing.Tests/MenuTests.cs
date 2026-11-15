@@ -265,3 +265,27 @@ public class MenuEditingTests(SeededWebApplicationFactory factory) : IClassFixtu
         Assert.True((await Apply(new DeleteListItem("shared.menu-footer", id))).Succeeded);
     }
 }
+
+public class MenuNavMarkerTests(SeededWebApplicationFactory factory) : IClassFixture<SeededWebApplicationFactory>
+{
+    [Fact]
+    public async Task OnlyTheTwoMenuLists_CarryTheNavMarker_ForEditorsOnly()
+    {
+        var visitor = AdminTestHelpers.NewClient(factory);
+        var visitorHtml = await visitor.GetStringAsync("/");
+        Assert.DoesNotContain("data-cms-list-nav", visitorHtml);
+
+        var admin = AdminTestHelpers.NewClient(factory);
+        await AdminTestHelpers.LoginWithTotpAsync(admin, await AdminTestHelpers.AddTwoFactorAdminAsync(factory, "menu-nav@example.com"));
+        var html = await admin.GetStringAsync("/");
+
+        var tags = Regex.Matches(html, "<[a-z]+ [^>]*data-cms-list=\"([^\"]+)\"[^>]*>")
+            .Select(m => (List: m.Groups[1].Value, Marked: m.Value.Contains("data-cms-list-nav")))
+            .ToList();
+        Assert.Contains(tags, t => t.List == "shared.menu-header" && t.Marked);
+        Assert.Contains(tags, t => t.List == "shared.menu-footer" && t.Marked);
+        Assert.Contains(tags, t => !t.Marked);
+        Assert.All(tags.Where(t => t.Marked), t => Assert.StartsWith("shared.menu-", t.List));
+        Assert.All(tags.Where(t => t.List.StartsWith("shared.menu-")), t => Assert.True(t.Marked));
+    }
+}

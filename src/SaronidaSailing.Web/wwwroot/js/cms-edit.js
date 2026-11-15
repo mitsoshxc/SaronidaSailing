@@ -24,7 +24,7 @@ createMissing();
 createSections({ pending, toolbar });
 createInstagramCount({ pending, toolbar });
 createMapWindow({ pending, toolbar });
-createLists({ pending, inline, fieldBar, toolbar, editMode, config });
+createLists({ pending, inline, fieldBar, toolbar, editMode, config, windows });
 
 const settingsButton = document.querySelector('[data-cms-action="page-settings"]');
 settingsButton?.addEventListener('click', () => windows.openSettings(() => settingsButton.focus()));

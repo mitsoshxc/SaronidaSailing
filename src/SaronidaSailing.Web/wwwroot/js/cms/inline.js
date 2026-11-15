@@ -66,6 +66,9 @@ export const createInline = ({ fields, editMode }) => {
             return;
         }
         const editable = event.target.closest('[data-cms-key]');
+        if (editable?.dataset.cmsType === 'link' && editable.closest('[data-cms-list-nav]')) {
+            return;
+        }
         if (editable?.closest('a') || editable?.closest('summary')) {
             event.preventDefault();
         }
