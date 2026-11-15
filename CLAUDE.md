@@ -8,7 +8,7 @@ Stack: ASP.NET Core 10 Razor Pages · Entity Framework Core 10 · PostgreSQL · 
 
 Languages: Greek (default, no URL prefix) and English (`/en/`). Pages and sections come from the "Saronida Sailing Redesign" design canvas: https://claude.ai/artifact/RcU5iMfQSTJ34rH5gFB7MC (read it with the Artifact tool; desktop artboards `Desktop*.dc.html` hold the full layouts, the canvas notes hold design decisions).
 
-Project status: **Phases 0–7 are complete (Phase 7, Public Pages, with an axe-core and keyboard pass in the Claude browser); Phase 7.5 (editing fixes: map window, editable menus, editable logos) is next, then Phase 8; the real-iPhone HEIC test, the first real Instagram connection and the axe re-run wait for the Phase 8 preview**. Owner-review items from Phase 7 (English drafts, placeholders, legal texts) are listed in `PLAN.md` → Phase 7. Docs mark what is implemented and what is still agreed design; `PLAN.md` tracks the rest of the build.
+Project status: **Phases 0–7 are complete (Phase 7, Public Pages, with an axe-core and keyboard pass in the Claude browser); Phase 7.5 (editing fixes: map window, editable header and footer menus, Index/Follow switches, Site settings with robots.txt, Meta App ID and secret on the admin Instagram page) is also complete; Phase 8 is next; the real-iPhone HEIC test, the first real Instagram connection and the axe re-run wait for the Phase 8 preview**. Owner-review items from Phase 7 (English drafts, placeholders, legal texts) are listed in `PLAN.md` → Phase 7. Docs mark what is implemented and what is still agreed design; `PLAN.md` tracks the rest of the build.
 
 ## Before You Start (working agreements)
 

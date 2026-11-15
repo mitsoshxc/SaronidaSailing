@@ -36,6 +36,12 @@ Phase 7 keys, as seeded (`src/SaronidaSailing.Web/Seed/{group}.json`) and render
 | `shared.prices` | `day`, `islands`, `week` (Text): the only place a trip price is stored |
 | `shared.charter-costs` | A list (the key is the list key, no field segment) [`label`, `value`] |
 | `shared.cookies` | `title`, `text`, `settings-title`, `necessary-title`, `necessary-text`, `external-title`, `external-text` (the banner and settings texts) |
+| `shared.menu-header` | A list (the key is the list key) [`link`: Link]. Seed v1 (`Seed/shared.menu-header.json`): Trips, The boat, Instagram (the profile URL), Contact; the first, second and fourth are `page:{key}` links |
+| `shared.menu-footer` | A list [`link`: Link]. Seed v1 (`Seed/shared.menu-footer.json`): Trips & booking, The boat, Contact, Terms, Privacy policy, Accessibility, all `page:{key}` links. The "Cookie settings" button after the list is fixed in code |
+| `shared.book` | A **section** only (no fields): visibility of the header Book button, toggled like any section (`ContentSection`, no row = shown) |
+| `{page}.seo.index`, `{page}.seo.follow` | For each of the seven site pages (not `shared`): `Text`, **Greek only**, `true` or `false`; no row means on. Validated by `PageRobots` in `ContentBatch`; not seeded. See `docs/architecture.md` → SEO |
+
+**Site page link values.** A `Link` value may have `url` = `page:{key}`, where `{key}` is one of `home`, `trips`, `boat`, `contact`, `terms`, `privacy`, `accessibility` (`Core/Services/SitePageKeys.cs`). It is stored as the page, not as a path, and rendered as the visitor's-language URL. `ContentLink.TryParse` accepts known keys only; an unknown key rejects the save. Rich-text links never accept it.
 
 The exact field type of each key is in its seed file and in the template that renders it (`Web/Pages/*.cshtml`); a template and a stored type must agree. Rows left in the database after a seed version dropped a key (for example `trips.week-prices`, replaced by `shared.prices.week`) are never rendered and are harmless.
 
@@ -186,6 +192,14 @@ Keys in use (constants in `Core/Services/InstagramSettingKeys.cs`). Timestamps a
 | `instagram.token-invalid-at` | Set only when Meta answers error 190 (the only thing that marks the connection disconnected before the expiry); cleared by a new connect | yes |
 | `instagram.last-fetch-at`, `instagram.last-fetch-result` | Latest fetch: `ok:{count}`, `skipped:not-connected`, `skipped:no-posts`, `failed:{TokenInvalid\|Transient\|Other}` | **no** |
 | `instagram.last-refresh-at`, `instagram.last-refresh-result` | Latest renewal: `ok`, `skipped:not-connected`, `skipped:too-recent`, `failed:{kind}` | **no** |
+
+Other keys (not removed by Instagram Disconnect):
+
+| Key | Value |
+|---|---|
+| `instagram.app-id` | The Meta App ID entered on `/admin/instagram` (`InstagramAppSettingKeys.AppId`); removed by "Remove app settings", kept by Disconnect |
+| `instagram.app-secret` | The Meta App secret, **encrypted** with Data Protection (`ISecretProtector`), write-only in the UI; a value that cannot be decrypted counts as not set up |
+| `site.robots-txt` | The robots.txt text saved on `/admin/settings` (`SiteSettingsService.RobotsTxtKey`); no row = generated default; ignored in the Preview environment |
 
 Related content key: `home.instagram.post-count` is an ordinary `ContentItem` (Text, locale `el` only, 1-12, default 6), not an integration setting (`docs/architecture.md` → Instagram Feed → Rendering).
 
