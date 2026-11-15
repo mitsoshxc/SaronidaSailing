@@ -86,6 +86,46 @@ public sealed class CmsListAndSectionTagHelperTests
         Assert.DoesNotContain("cms-add-label=\"Add step\" class", html);
     }
 
+    private static async Task<string> RenderWithListLabel(ICmsEditContext editContext, string? listLabel)
+    {
+        var accessor = new FakePageContentAccessor(ListContent(Entry(1, true)));
+        var attributes = new TagHelperAttributeList { { "class", "item" } };
+        var context = NewContext("li", attributes);
+        var output = NewOutput("li", attributes, () => Task.FromResult<TagHelperContent>(Html("")));
+
+        await new CmsListTagHelper(accessor, editContext)
+            { Key = "home.highlights", AddLabel = "Add step", Label = listLabel }
+            .ProcessAsync(context, output);
+
+        return Render(output);
+    }
+
+    [Fact]
+    public async Task List_Editor_CarriesListLabelOnItemsAndTemplate()
+    {
+        var html = await RenderWithListLabel(Editor, "Footer menu");
+
+        Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(html, "data-cms-list-label=\"Footer menu\"").Count);
+        Assert.DoesNotContain("cms-list-label=\"Footer menu\" ", html.Replace("data-cms-list-label", ""));
+    }
+
+    [Fact]
+    public async Task List_Visitor_NeverShowsListLabel()
+    {
+        var html = await RenderWithListLabel(Visitor, "Footer menu");
+
+        Assert.DoesNotContain("list-label", html);
+        Assert.DoesNotContain("Footer menu", html);
+    }
+
+    [Fact]
+    public async Task List_WithoutListLabel_AddsNoLabelAttribute()
+    {
+        var html = await RenderWithListLabel(Editor, null);
+
+        Assert.DoesNotContain("list-label", html);
+    }
+
     private static async Task<(string Html, ContentListEntry[] Entries)> RenderWithPrefix(
         ICmsEditContext editContext, string? prefix)
     {

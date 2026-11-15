@@ -30,7 +30,9 @@ const linkLabel = (item) => {
 
 const itemName = (item, index) => {
     const text = normalize(item.querySelector('[data-cms-type="text"]')?.textContent ?? '') || normalize(linkLabel(item));
-    return text === '' ? `item ${index + 1}` : shorten(text, 40);
+    const name = text === '' ? `item ${index + 1}` : shorten(text, 40);
+    const label = item.dataset.cmsListLabel;
+    return label ? `${name}, ${label}` : name;
 };
 
 const makeButton = (text, label) => {

@@ -20,6 +20,9 @@ public sealed class CmsListTagHelper(IPageContentAccessor accessor, ICmsEditCont
     [HtmlAttributeName("cms-list-nav")]
     public bool Navigates { get; set; }
 
+    [HtmlAttributeName("cms-list-label")]
+    public string? Label { get; set; }
+
     public override async Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
     {
         var key = CmsFieldResolver.RequireListKey(Key, "cms-list");
@@ -44,13 +47,14 @@ public sealed class CmsListTagHelper(IPageContentAccessor accessor, ICmsEditCont
         var attributes = new TagHelperAttributeList(output.Attributes);
         attributes.RemoveAll("cms-list");
         attributes.RemoveAll("cms-list-nav");
+        attributes.RemoveAll("cms-list-label");
 
         var copies = new HtmlContentBuilder();
         try
         {
             foreach (var entry in entries)
             {
-                copies.AppendHtml(await RenderCopyAsync(context, output, attributes, key, entry, editor, ItemIdPrefix, Navigates));
+                copies.AppendHtml(await RenderCopyAsync(context, output, attributes, key, entry, editor, ItemIdPrefix, Navigates, Label));
             }
 
             if (editor)
@@ -61,7 +65,7 @@ public sealed class CmsListTagHelper(IPageContentAccessor accessor, ICmsEditCont
                 copies.AppendHtml("\" data-cms-add-label=\"");
                 copies.Append(addLabel);
                 copies.AppendHtml("\">");
-                copies.AppendHtml(await RenderCopyAsync(context, output, attributes, key, empty, editor, ItemIdPrefix, Navigates));
+                copies.AppendHtml(await RenderCopyAsync(context, output, attributes, key, empty, editor, ItemIdPrefix, Navigates, Label));
                 copies.AppendHtml("</template>");
             }
         }
@@ -83,7 +87,8 @@ public sealed class CmsListTagHelper(IPageContentAccessor accessor, ICmsEditCont
         ContentListEntry entry,
         bool editor,
         string? itemIdPrefix,
-        bool navigates)
+        bool navigates,
+        string? label)
     {
         CmsFieldResolver.EnterListItem(context, key, entry);
         var children = await output.GetChildContentAsync(useCachedResult: false);
@@ -110,6 +115,11 @@ public sealed class CmsListTagHelper(IPageContentAccessor accessor, ICmsEditCont
             if (navigates)
             {
                 copyAttributes.SetAttribute("data-cms-list-nav", "");
+            }
+
+            if (!string.IsNullOrEmpty(label))
+            {
+                copyAttributes.SetAttribute("data-cms-list-label", label);
             }
         }
 

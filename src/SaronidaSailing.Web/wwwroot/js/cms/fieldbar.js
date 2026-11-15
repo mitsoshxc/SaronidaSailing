@@ -162,7 +162,7 @@ export const createFieldBar = ({ editMode, windows }) => {
             dismissed = null;
         }
         if (field && field !== dismissed) {
-            if (!navigates(field) || field.matches(':focus-visible')) {
+            if (!navigates(field)) {
                 show(field);
             }
         } else if (!field) {
