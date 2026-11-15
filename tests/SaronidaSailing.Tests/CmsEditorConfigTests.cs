@@ -30,6 +30,34 @@ public sealed class CmsEditorConfigTests
         Assert.Null(CmsEditorConfig.Create(Content(), "token", null).Seo);
 
     [Fact]
+    public void Robots_WithoutRows_AreOn()
+    {
+        var seo = Seo();
+
+        Assert.True(seo.Index);
+        Assert.True(seo.Follow);
+    }
+
+    [Theory]
+    [InlineData("el", false)]
+    [InlineData("en", true)]
+    public void Robots_ReadTheGreekValue(string locale, bool isFallback)
+    {
+        var seo = Seo(locale, new()
+        {
+            ["home.seo.index"] = new("false", ContentType.Text, isFallback),
+            ["home.seo.follow"] = new("true", ContentType.Text, isFallback),
+        });
+
+        Assert.False(seo.Index);
+        Assert.True(seo.Follow);
+        var json = JsonDocument.Parse(CmsEditorConfig.Create(
+            Content(locale, new() { ["home.seo.index"] = new("false", ContentType.Text, isFallback) }), "token", Home).ToJson());
+        Assert.False(json.RootElement.GetProperty("seo").GetProperty("index").GetBoolean());
+        Assert.True(json.RootElement.GetProperty("seo").GetProperty("follow").GetBoolean());
+    }
+
+    [Fact]
     public void NoSeoImage_IsEmpty()
     {
         var seo = Seo();

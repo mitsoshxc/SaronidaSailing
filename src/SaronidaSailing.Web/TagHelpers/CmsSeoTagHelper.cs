@@ -50,6 +50,13 @@ public sealed class CmsSeoTagHelper(
             Append(output, Meta("name", "description", description));
         }
 
+        var index = PageRobots.IsEnabled(ReadText(content, $"{page.Key}.seo.index"));
+        var follow = PageRobots.IsEnabled(ReadText(content, $"{page.Key}.seo.follow"));
+        if (!index || !follow)
+        {
+            Append(output, Meta("name", "robots", string.Join(", ", new[] { index ? null : "noindex", follow ? null : "nofollow" }.OfType<string>())));
+        }
+
         Append(output, Meta("property", "og:title", title));
         if (description is not null)
         {

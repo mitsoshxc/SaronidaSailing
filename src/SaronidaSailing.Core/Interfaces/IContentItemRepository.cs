@@ -7,6 +7,9 @@ public interface IContentItemRepository
     Task<IReadOnlyList<ContentItem>> GetForPagesAsync(
         IReadOnlyCollection<string> pageKeys, IReadOnlyCollection<string> locales, CancellationToken ct = default);
 
+    Task<IReadOnlyList<ContentItem>> GetStandaloneFieldAsync(
+        IReadOnlyCollection<string> pageKeys, string sectionKey, string fieldKey, string locale, CancellationToken ct = default);
+
     Task<ContentItem?> FindStandaloneAsync(
         string pageKey, string sectionKey, string fieldKey, string locale, CancellationToken ct = default);
 

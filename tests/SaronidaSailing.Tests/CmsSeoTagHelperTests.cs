@@ -44,6 +44,43 @@ public sealed class CmsSeoTagHelperTests
     private static PageContent BoatContent(string locale, Dictionary<string, ContentValue> fields) =>
         new("boat", locale, fields, new Dictionary<string, IReadOnlyList<ContentListEntry>>(), new Dictionary<string, bool>());
 
+    [Theory]
+    [InlineData("el", "false", "true", "noindex")]
+    [InlineData("el", "true", "false", "nofollow")]
+    [InlineData("el", "false", "false", "noindex, nofollow")]
+    [InlineData("en", "false", "true", "noindex")]
+    [InlineData("en", "true", "false", "nofollow")]
+    [InlineData("en", "false", "false", "noindex, nofollow")]
+    public async Task SitePage_RobotsOff_EmitsRobotsMeta(string locale, string index, string follow, string expected)
+    {
+        var html = await Run(BoatContent(locale, new()
+        {
+            ["boat.seo.index"] = new(index, ContentType.Text, locale == "en"),
+            ["boat.seo.follow"] = new(follow, ContentType.Text, locale == "en"),
+        }));
+
+        Assert.Contains($"<meta name=\"robots\" content=\"{expected}\" />", html);
+        Assert.Equal(1, html.Split("name=\"robots\"").Length - 1);
+        Assert.Contains("<link rel=\"canonical\"", html);
+        Assert.Contains("hreflang=\"x-default\"", html);
+    }
+
+    [Theory]
+    [InlineData("el")]
+    [InlineData("en")]
+    public async Task SitePage_RobotsOnOrMissing_EmitsNoRobotsMeta(string locale)
+    {
+        var withRows = await Run(BoatContent(locale, new()
+        {
+            ["boat.seo.index"] = Text("true"),
+            ["boat.seo.follow"] = Text("true"),
+        }));
+        var withoutRows = await Run(BoatContent(locale, []));
+
+        Assert.DoesNotContain("robots", withRows);
+        Assert.DoesNotContain("robots", withoutRows);
+    }
+
     [Fact]
     public async Task SitePage_Greek_EmitsAllTagsInOrder()
     {

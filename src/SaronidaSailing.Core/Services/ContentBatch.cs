@@ -240,6 +240,11 @@ internal sealed class ContentBatch(
             return;
         }
 
+        if (PageRobots.IsRobotsKey(change.Key, out var robotsPage) && !IsValidRobots(change, robotsPage))
+        {
+            return;
+        }
+
         if (change.ListItemId is { } listItemId)
         {
             var listItem = await FindListItemAsync(listItemId, ct);
@@ -332,6 +337,29 @@ internal sealed class ContentBatch(
         {
             _errors.Add(
                 $"The number of Instagram posts must be a whole number from {InstagramPostCount.Min} to {InstagramPostCount.Max}.");
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool IsValidRobots(SetField change, string page)
+    {
+        if (!SitePageKeys.IsKnown(page))
+        {
+            _errors.Add($"'{change.Key}': '{page}' is not a site page.");
+            return false;
+        }
+
+        if (change.Locale != ContentLocales.Default)
+        {
+            _errors.Add("The search engine settings are shared by both languages; set them in Greek.");
+            return false;
+        }
+
+        if (change.Type != ContentType.Text || !PageRobots.IsValidValue(change.Value))
+        {
+            _errors.Add($"'{change.Key}' must be {PageRobots.On} or {PageRobots.Off}.");
             return false;
         }
 

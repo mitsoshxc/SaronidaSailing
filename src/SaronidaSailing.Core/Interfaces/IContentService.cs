@@ -24,6 +24,8 @@ public interface IContentService
 {
     Task<PageContent> GetPageContentAsync(string pageKey, string locale, CancellationToken ct = default);
 
+    Task<IReadOnlySet<string>> GetNoIndexPagesAsync(CancellationToken ct = default);
+
     Task<ContentSaveResult> ApplyChangesAsync(
         IReadOnlyList<ContentChange> changes, ContentEditor editor, CancellationToken ct = default);
 

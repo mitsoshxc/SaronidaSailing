@@ -88,6 +88,9 @@ public sealed class PageContentAccessorTests
                 new Dictionary<string, bool>()));
         }
 
+        public Task<IReadOnlySet<string>> GetNoIndexPagesAsync(CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
         public Task<ContentSaveResult> ApplyChangesAsync(
             IReadOnlyList<ContentChange> changes, ContentEditor editor, CancellationToken ct = default) =>
             throw new NotSupportedException();

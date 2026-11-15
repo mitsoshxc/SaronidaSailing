@@ -2,6 +2,7 @@ using System.Text;
 using System.Xml;
 using System.Xml.Linq;
 using Microsoft.Extensions.Options;
+using SaronidaSailing.Core.Interfaces;
 using SaronidaSailing.Web.Localization;
 
 namespace SaronidaSailing.Web.Endpoints;
@@ -30,28 +31,33 @@ public static class SeoEndpoints
             return Results.Text(text, "text/plain; charset=utf-8");
         });
 
-        app.MapMethods(SitemapPath, ["GET", "HEAD"], (
-            HttpContext http, IHostEnvironment environment, IOptions<SiteOptions> site, ILocalizedUrlService urls) =>
+        app.MapMethods(SitemapPath, ["GET", "HEAD"], async (
+            HttpContext http,
+            IHostEnvironment environment,
+            IOptions<SiteOptions> site,
+            ILocalizedUrlService urls,
+            IContentService content) =>
         {
             if (environment.IsPreview())
             {
                 return Results.NotFound();
             }
 
+            var noIndex = await content.GetNoIndexPagesAsync(http.RequestAborted);
             http.Response.Headers.CacheControl = CacheControl;
-            return Results.Bytes(BuildSitemap(site.Value.BaseUrl, urls), "application/xml; charset=utf-8");
+            return Results.Bytes(BuildSitemap(site.Value.BaseUrl, urls, noIndex), "application/xml; charset=utf-8");
         });
 
         return app;
     }
 
-    private static byte[] BuildSitemap(string baseUrl, ILocalizedUrlService urls)
+    private static byte[] BuildSitemap(string baseUrl, ILocalizedUrlService urls, IReadOnlySet<string> noIndex)
     {
         var root = new XElement(
             SitemapNamespace + "urlset",
             new XAttribute(XNamespace.Xmlns + "xhtml", XhtmlNamespace));
 
-        foreach (var page in SitePages.All)
+        foreach (var page in SitePages.All.Where(p => !noIndex.Contains(p.Key)))
         {
             foreach (var culture in SiteCultures.Supported)
             {

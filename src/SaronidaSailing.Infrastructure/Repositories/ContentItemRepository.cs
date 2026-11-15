@@ -14,6 +14,17 @@ public sealed class ContentItemRepository(AppDbContext db) : IContentItemReposit
             .Where(x => pageKeys.Contains(x.PageKey) && locales.Contains(x.Locale))
             .ToListAsync(ct);
 
+    public async Task<IReadOnlyList<ContentItem>> GetStandaloneFieldAsync(
+        IReadOnlyCollection<string> pageKeys, string sectionKey, string fieldKey, string locale, CancellationToken ct = default) =>
+        await db.Set<ContentItem>()
+            .AsNoTracking()
+            .Where(x => x.ListItemId == null
+                && pageKeys.Contains(x.PageKey)
+                && x.SectionKey == sectionKey
+                && x.FieldKey == fieldKey
+                && x.Locale == locale)
+            .ToListAsync(ct);
+
     public Task<ContentItem?> FindStandaloneAsync(
         string pageKey, string sectionKey, string fieldKey, string locale, CancellationToken ct = default) =>
         db.Set<ContentItem>().FirstOrDefaultAsync(

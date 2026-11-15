@@ -78,6 +78,41 @@ const addImageRow = ({ parent, staged, choose }) => {
     };
 };
 
+const addSearchEngines = ({ parent, index, follow }) => {
+    counter += 1;
+    const group = el('div', 'cms-field');
+    group.setAttribute('role', 'group');
+    const legend = el('span', 'cms-label', 'Search engines');
+    legend.id = `cms-setting-robots-${counter}`;
+    group.setAttribute('aria-labelledby', legend.id);
+    group.append(legend);
+
+    const makeSwitch = (text, checked) => {
+        const label = el('label', 'cms-switch');
+        const input = el('input');
+        input.type = 'checkbox';
+        input.checked = checked;
+        label.append(input, el('span', null, text));
+        group.append(label);
+        return input;
+    };
+    const indexInput = makeSwitch('Show this page in search results', index);
+    const followInput = makeSwitch('Let search engines follow this page’s links', follow);
+
+    const both = el('p', 'cms-hint', 'Applies to both languages.');
+    const note = el('p', 'cms-hint', 'This page is left out of the sitemap and search results.');
+    note.setAttribute('role', 'status');
+    const updateNote = () => {
+        note.hidden = indexInput.checked;
+    };
+    indexInput.addEventListener('change', updateNote);
+    updateNote();
+    group.append(both, note);
+    parent.append(group);
+
+    return { indexInput, followInput };
+};
+
 export const openSettingsWindow = ({ config, pending, returnFocus, openImage }) => {
     const seo = config.seo;
     const language = config.locale === 'en' ? 'English' : 'Greek';
@@ -154,19 +189,32 @@ export const openSettingsWindow = ({ config, pending, returnFocus, openImage }) 
         }, () => imageRow.button.focus())
     });
     imageRow.render();
+
+    const robotsField = (name) => ({ key: `${seo.pageKey}.seo.${name}`, locale: 'el', type: 'text', listItemId: null });
+    const indexField = robotsField('index');
+    const followField = robotsField('follow');
+    const originalIndex = seo.index ? 'true' : 'false';
+    const originalFollow = seo.follow ? 'true' : 'false';
+    const indexStart = (pending.get(indexField) ?? originalIndex) === 'true';
+    const followStart = (pending.get(followField) ?? originalFollow) === 'true';
+    const robots = addSearchEngines({ parent: form, index: indexStart, follow: followStart });
     win.body.append(form);
 
     win.isDirty = () => titleInput.value !== titleStart
         || descriptionInput.value !== descriptionStart
         || staged.id !== imageStart.id
         || staged.alt !== imageStart.alt
-        || staged.altEl !== imageStart.altEl;
+        || staged.altEl !== imageStart.altEl
+        || robots.indexInput.checked !== indexStart
+        || robots.followInput.checked !== followStart;
 
     const apply = () => {
         const title = normalize(titleInput.value);
         const description = normalize(descriptionInput.value);
         pending.setField(titleField, title, seo.title.value);
         pending.setField(descriptionField, description, seo.description.value);
+        pending.setField(indexField, robots.indexInput.checked ? 'true' : 'false', originalIndex);
+        pending.setField(followField, robots.followInput.checked ? 'true' : 'false', originalFollow);
         recordImage({
             pending,
             config,

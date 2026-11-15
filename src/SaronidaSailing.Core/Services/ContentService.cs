@@ -66,6 +66,13 @@ public sealed class ContentService(
         return new PageContent(pageKey, locale, fields, lists, sectionStates, images);
     }
 
+    public async Task<IReadOnlySet<string>> GetNoIndexPagesAsync(CancellationToken ct = default)
+    {
+        var rows = await items.GetStandaloneFieldAsync(
+            SitePageKeys.All, PageRobots.Section, PageRobots.IndexField, ContentLocales.Default, ct);
+        return rows.Where(r => !PageRobots.IsEnabled(r.Value)).Select(r => r.PageKey).ToHashSet();
+    }
+
     private async Task<IReadOnlyDictionary<Guid, PageImage>> LoadImagesAsync(
         IReadOnlyList<ContentItem> itemRows, CancellationToken ct)
     {

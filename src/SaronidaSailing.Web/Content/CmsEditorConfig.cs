@@ -13,7 +13,13 @@ public sealed record CmsSeoImage(string Value, string PreviewUrl);
 public sealed record CmsSeoAlt(string Value, string Greek);
 
 public sealed record CmsSeoConfig(
-    string PageKey, CmsSeoValue Title, CmsSeoValue Description, CmsSeoImage Image, CmsSeoAlt ImageAlt);
+    string PageKey,
+    CmsSeoValue Title,
+    CmsSeoValue Description,
+    CmsSeoImage Image,
+    CmsSeoAlt ImageAlt,
+    bool Index,
+    bool Follow);
 
 public sealed record CmsSitePage(string Key, string Path, string El, string En);
 
@@ -47,7 +53,9 @@ public sealed record CmsEditorConfig(
                 ReadSeo(content, $"{page.Key}.seo.title"),
                 ReadSeo(content, $"{page.Key}.seo.description"),
                 ReadImage(content, $"{page.Key}.seo.image"),
-                ReadAlt(content, $"{page.Key}.seo.image-alt")),
+                ReadAlt(content, $"{page.Key}.seo.image-alt"),
+                ReadSwitch(content, $"{page.Key}.seo.{PageRobots.IndexField}"),
+                ReadSwitch(content, $"{page.Key}.seo.{PageRobots.FollowField}")),
         [.. SitePages.All.Select(p => new CmsSitePage(
             p.Key,
             LocalizedUrlService.PathFor(p.Key, content.Locale),
@@ -55,6 +63,12 @@ public sealed record CmsEditorConfig(
             UiText.PageTitle(p.Key).English))]);
 
     public string ToJson() => JsonSerializer.Serialize(this, JsonOptions);
+
+    private static bool ReadSwitch(PageContent content, string key)
+    {
+        var value = content.GetField(key);
+        return value is null || value.Type != ContentType.Text || PageRobots.IsEnabled(value.Value);
+    }
 
     private static CmsSeoValue ReadSeo(PageContent content, string key)
     {

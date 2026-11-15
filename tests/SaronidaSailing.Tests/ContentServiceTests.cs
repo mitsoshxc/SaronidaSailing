@@ -1371,6 +1371,78 @@ public sealed class ContentServiceTests : IAsyncLifetime
         Assert.Equal("The map location is shared by both languages; set it in Greek.", Assert.Single(result.Errors));
     }
 
+    [Theory]
+    [InlineData("home.seo.index", "true")]
+    [InlineData("home.seo.index", "false")]
+    [InlineData("trips.seo.follow", "true")]
+    [InlineData("accessibility.seo.follow", "false")]
+    public async Task Write_PageRobots_TrueOrFalseInGreek_IsAccepted(string key, string value)
+    {
+        var result = await Apply(Field(key, "el", value));
+
+        Assert.True(result.Succeeded, string.Join("; ", result.Errors));
+        Assert.Equal(value, (await Read(key.Split('.')[0], "el")).GetField(key)?.Value);
+    }
+
+    [Theory]
+    [InlineData("home.seo.index", "TRUE")]
+    [InlineData("home.seo.index", "")]
+    [InlineData("home.seo.follow", "1")]
+    [InlineData("home.seo.follow", "no")]
+    public async Task Write_PageRobots_OtherValues_AreRejected(string key, string value)
+    {
+        var result = await Apply(Field(key, "el", value));
+
+        Assert.False(result.Succeeded);
+        Assert.Equal($"'{key}' must be true or false.", Assert.Single(result.Errors));
+    }
+
+    [Theory]
+    [InlineData("home.seo.index")]
+    [InlineData("home.seo.follow")]
+    public async Task Write_PageRobots_InEnglish_IsRejected(string key)
+    {
+        var result = await Apply(Field(key, "en", "false"));
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(
+            "The search engine settings are shared by both languages; set them in Greek.", Assert.Single(result.Errors));
+    }
+
+    [Theory]
+    [InlineData("shared.seo.index")]
+    [InlineData("unknown.seo.follow")]
+    public async Task Write_PageRobots_UnknownPage_IsRejected(string key)
+    {
+        var result = await Apply(Field(key, "el", "false"));
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("is not a site page", Assert.Single(result.Errors));
+    }
+
+    [Fact]
+    public async Task Write_PageRobots_AsRichText_IsRejected()
+    {
+        var result = await Apply(new SetField("home.seo.index", "el", ContentType.RichText, "false"));
+
+        Assert.False(result.Succeeded);
+    }
+
+    [Fact]
+    public async Task GetNoIndexPages_ListsOnlyPagesWithIndexOff()
+    {
+        Assert.Empty(await GetNoIndexPages());
+        await Apply(
+            Field("home.seo.index", "el", "false"),
+            Field("trips.seo.index", "el", "true"),
+            Field("boat.seo.follow", "el", "false"),
+            Field("contact.seo.index", "el", "false"));
+
+        var pages = await GetNoIndexPages();
+
+        Assert.Equal(["contact", "home"], pages.Order());
+    }
+
     private static SetField Field(string key, string locale, string value, Guid? listItemId = null) =>
         new(key, locale, ContentType.Text, value, listItemId);
 
@@ -1380,6 +1452,12 @@ public sealed class ContentServiceTests : IAsyncLifetime
     {
         await using var context = CreateContext();
         return await CreateService(context).ApplyChangesAsync(changes, editor);
+    }
+
+    private async Task<IReadOnlySet<string>> GetNoIndexPages()
+    {
+        await using var context = CreateContext();
+        return await CreateService(context).GetNoIndexPagesAsync();
     }
 
     private async Task<PageContent> Read(string pageKey, string locale)

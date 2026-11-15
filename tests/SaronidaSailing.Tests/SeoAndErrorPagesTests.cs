@@ -140,6 +140,42 @@ public class RobotsAndSitemapTests(TempDatabaseWebApplicationFactory factory) : 
 }
 
 [Collection(WebHostCollection.Name)]
+public class SitemapNoIndexTests(TempDatabaseWebApplicationFactory factory) : IClassFixture<TempDatabaseWebApplicationFactory>
+{
+    private static readonly XNamespace Sitemap = "http://www.sitemaps.org/schemas/sitemap/0.9";
+
+    [Fact]
+    public async Task NoIndexPage_LeavesTheSitemapInBothLanguages_AndRendersRobotsMeta()
+    {
+        using (var scope = factory.Services.CreateScope())
+        {
+            var result = await scope.ServiceProvider.GetRequiredService<IContentService>().ApplyChangesAsync(
+                [
+                    new SetField("boat.seo.index", "el", ContentType.Text, "false"),
+                    new SetField("contact.seo.follow", "el", ContentType.Text, "false"),
+                ],
+                new ContentEditor("test@example.com", null));
+            Assert.True(result.Succeeded, string.Join("; ", result.Errors));
+        }
+
+        var client = factory.CreateClient();
+        var document = XDocument.Parse(await client.GetStringAsync("/sitemap.xml"));
+        var locations = document.Root!.Elements(Sitemap + "url").Select(u => u.Element(Sitemap + "loc")!.Value).ToList();
+
+        Assert.Equal(12, locations.Count);
+        Assert.DoesNotContain("https://localhost/skafos", locations);
+        Assert.DoesNotContain("https://localhost/en/boat", locations);
+        Assert.Contains("https://localhost/epikoinonia", locations);
+        Assert.Contains("https://localhost/en/contact", locations);
+
+        Assert.Contains("<meta name=\"robots\" content=\"noindex\" />", await client.GetStringAsync("/skafos"));
+        Assert.Contains("<meta name=\"robots\" content=\"noindex\" />", await client.GetStringAsync("/en/boat"));
+        Assert.Contains("<meta name=\"robots\" content=\"nofollow\" />", await client.GetStringAsync("/en/contact"));
+        Assert.DoesNotContain("name=\"robots\"", await client.GetStringAsync("/en/trips"));
+    }
+}
+
+[Collection(WebHostCollection.Name)]
 public class PreviewSeoTests(PreviewWebApplicationFactory factory) : IClassFixture<PreviewWebApplicationFactory>
 {
     [Fact]
