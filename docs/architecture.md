@@ -204,15 +204,17 @@ Middleware order in `Web/Program.cs` (after the startup work: migration check, `
 
 | Order | Middleware | Note |
 |---|---|---|
-| 1 | `UseForwardedHeaders`, `UseRequestDiagnostics` | Real client IP first |
-| 2 | `UsePreviewNoIndex` | Preview only: `X-Robots-Tag` on every response |
-| 3 | Development media files | Development only |
-| 4 | `UseExceptionHandler("/error/500")` | Not in Development |
-| 5 | `UseStatusCodePagesWithReExecute("/error/{0}")` + the per-path rule (`ErrorPageStatus`) | Error page only for 404 / 410 outside the plain paths |
-| 6 | `UseOldSiteRedirects` | Not in Preview |
-| 7 | `UseRequestLocalization` | Culture from the URL prefix |
-| 8 | `UseRouting`, `UseRateLimiter`, `UseAuthentication`, `UseAuthorization`, `UseOutputCache` | Output cache after authentication |
-| 9 | Endpoints | Hangfire dashboard, `/health`, static assets, content / media / admin / SEO endpoints, Razor Pages |
+| 1 | `UseSecurityHeaders` (`Web/Security/SecurityHeaders.cs`) | First, so every response carries the headers (see Security → Security headers) |
+| 2 | `UseHealthDirectOnly` (`Web/Health/HealthEndpointAccess.cs`) | Before `UseForwardedHeaders` on purpose: it must see the raw `X-Forwarded-For` header (see Health Check) |
+| 3 | `UseForwardedHeaders`, `UseRequestDiagnostics` | Real client IP first |
+| 4 | `UsePreviewNoIndex` | Preview only: `X-Robots-Tag` on every response |
+| 5 | Development media files | Development only |
+| 6 | `UseExceptionHandler("/error/500")` | Not in Development |
+| 7 | `UseStatusCodePagesWithReExecute("/error/{0}")` + the per-path rule (`ErrorPageStatus`) | Error page only for 404 / 410 outside the plain paths |
+| 8 | `UseOldSiteRedirects` | Not in Preview |
+| 9 | `UseRequestLocalization` | Culture from the URL prefix |
+| 10 | `UseRouting`, `UseRateLimiter`, `UseAuthentication`, `UseAuthorization`, `UseOutputCache` | Output cache after authentication |
+| 11 | Endpoints | Hangfire dashboard, `/health`, static assets, content / media / admin / SEO endpoints, Razor Pages |
 
 The redirects sit before localization and routing so an old URL is answered without any content or routing work, and after the status-code block so a 410 gets the not-found page.
 
@@ -460,7 +462,7 @@ Self-hosted in `wwwroot/lib/`, each folder with a `README.md` (version, source, 
 | Quill (BSD-3-Clause) | 2.0.3 | `lib/quill/quill.js` (UMD, sets `window.Quill`), `quill.snow.css` | `quill-loader.js`, the first time a rich-text window opens |
 | SortableJS (MIT) | 1.15.6 | `lib/sortablejs/sortable.core.esm.js` (core ES module, no plugins) | `lists.js`, `import()` when the page has a list. No auto-scroll while dragging; the up/down buttons cover long lists |
 
-The CSP is own-origin only (`docs/deployment.md`), so admin JS never adds `style=""` attributes or `<style>` elements; setting `element.style` through the CSSOM is allowed.
+The app's CSP (see Security → Security headers) is own-origin only for visitors, and for admins it adds only `style-src 'unsafe-inline'` and `img-src data:` (for pasted rich text and the Hangfire dashboard). Admin JS written for this project still never adds `style=""` attributes or `<style>` elements; setting `element.style` through the CSSOM is allowed.
 
 ### Dev sandbox
 
@@ -666,7 +668,7 @@ POST /admin/instagram?handler=Connect                         │
 - A typed `HttpClient` (`AddInstagram`), 30 second timeout. Tokens and the secret travel as `access_token` / `client_secret` query parameters or form fields; the `HttpClient` log lines do not contain the token or the secret (`InstagramOptionsTests.HttpClientLogs_NeverContainTheTokenOrTheSecret`) and NLog drops `System.*` up to Info, so a token never reaches a log.
 - Errors are `InstagramApiException` with a kind: `TokenInvalid` (code 190), `Transient` (codes 1, 2, 4, 17, 341, HTTP 5xx, timeouts, network errors) or `Other`. The message carries the HTTP status, the code and Meta's message with the token, the secret and every URL replaced (`[redacted]`, `[url]`), cut at 300 characters.
 - Media mapping: `IMAGE` uses `media_url`; `VIDEO` its `thumbnail_url`; `CAROUSEL_ALBUM` the first child (image `media_url`, video `thumbnail_url`), else the post's own `media_url`. A post with `media_product_type` `REELS` is stored as `REELS`. A post with no usable image or a missing field (id, permalink, type, timestamp) is skipped with a Warning.
-- `DownloadImageAsync` accepts only absolute `https` URLs and refuses more than `MediaLimits.MaxUploadBytes`.
+- `DownloadImageAsync` accepts only absolute `https` URLs whose host is an Instagram CDN host and refuses more than `MediaLimits.MaxUploadBytes`. Allowed hosts: `InstagramOptions.ImageHosts` (`Instagram:ImageHosts`); when empty, `InstagramOptions.DefaultImageHosts` = `cdninstagram.com` and `fbcdn.net`. A host matches when it equals an entry or ends with `.` + the entry, case-insensitively. The URL is checked before the request and the final URI is checked again after redirects, before the body is read; both fail with `InstagramApiErrorKind.Other` ("Image URL host is not an Instagram image host."). Known accepted limit: a redirect target is still requested before it is rejected (the URLs come from the Instagram API over TLS).
 - `ExchangeCodeAsync`, `ExchangeForLongLivedAsync` and `BuildAuthorizeUrl` take an `InstagramAppCredentials` argument (the client has no `IsConfigured` and reads no secret itself) and throw `ArgumentException` for a blank App ID or secret; callers get the credentials from `IInstagramAppSettingsService.GetCredentialsAsync` and stop when it returns null. `ExchangeCodeAsync` strips a trailing `#_` from the code.
 
 ### OAuth state and `SameSite=Strict`
@@ -748,7 +750,7 @@ The media and originals folders are created at startup **only in Development** (
 
 **Not checked:** Instagram (an outage there must not fail health and roll back a good deploy) and maintenance mode (handled by nginx, see `docs/deployment.md`).
 
-Reachable only from the droplet itself — nginx denies `/health` from the internet (nginx config planned, Phase 8). Used by `deploy.ps1` after every deploy and, planned, by the pod's readiness and liveness probes.
+Reachable only for direct requests: `UseHealthDirectOnly` (`Web/Health/HealthEndpointAccess.cs`) answers a plain **404** for `/health` and anything below it (path matched case-insensitively) when the request carries `X-Forwarded-For` or `X-Original-For`, i.e. when it came through nginx. The middleware runs before `UseForwardedHeaders`, which would otherwise consume the header. nginx also denies `/health` from the internet with a case-insensitive `location` (nginx config planned, Phase 8), so the two guards cover each other. Used by `deploy.ps1` after every deploy and, planned, by the pod's readiness and liveness probes.
 
 A health-check publisher also runs the checks every 30 s and logs state changes (see Logging → Diagnostics).
 
@@ -780,7 +782,7 @@ A health-check publisher also runs the checks every 30 s and logs state changes 
 | `/admin/login/code` | TOTP code (second step) |
 | `/admin/login/recovery` | Recovery code instead of a TOTP code |
 | `/admin/two-factor/setup` | Mandatory authenticator setup |
-| `/admin/logout` | The GET page only shows a confirm form; signing out is a POST |
+| `/admin/logout` | The GET page only shows a confirm form; signing out is a POST. The POST renews the admin's security stamp (`UpdateSecurityStampAsync`) before signing out, so the admin's sessions in other browsers end at their next stamp check (within a minute) |
 | `/admin/instagram` | Instagram connection and status (Admin policy; see Instagram Feed → Admin pages) |
 | `/admin/settings` | Site settings (Admin policy, linked as "Settings" in the toolbar). One text area, "robots.txt contents", saved to `IntegrationSettings` `site.robots-txt` through `ISiteSettingsService` (`Core/Services/SiteSettingsService.cs`): line endings become `\n`, trailing spaces and blank lines are trimmed, at most 10,000 characters, empty removes the row (= generated default). Shows the default text and what is "served now", **Save** and **Use default**, a note that a preview server always blocks all crawlers, and a link to `/robots.txt`. Audit `robots-txt-saved` (`characters=N` or `default`, never the text). A save evicts no cache: `robots.txt` is not output-cached |
 | `/admin/instagram/callback` | OAuth return from Instagram; **anonymous**, because the `SameSite=Strict` admin cookie is not sent on the cross-site return (see Instagram Feed → OAuth state and `SameSite=Strict`) |
@@ -790,8 +792,8 @@ password ──► 2FA on?  yes ─► /admin/login/code ─► signed in (amr=m
                       no  ─► signed in WITHOUT amr ─► /admin/two-factor/setup ─► code ─► signed in (amr=mfa)
 ```
 
-1. `/admin/login` checks the password with lockout counting. Failures show one generic message ("Invalid email or password, or the account is temporarily locked.") whether the user is unknown, the password is wrong or the account is locked.
-2. With 2FA on, the user goes to `/admin/login/code`; until the code is accepted the user is held only in the Identity two-factor cookie (`Secure`, `HttpOnly`, `SameSite=Strict`, `Web/Identity/ConfigureTwoFactorUserIdCookie.cs`). A wrong TOTP or recovery code shows a generic message too and counts toward lockout.
+1. `/admin/login` checks the password with `lockoutOnFailure: false` (`Web/Pages/Admin/Login.cshtml.cs`): a wrong password never counts toward lockout, so someone who only knows an admin's email cannot keep that admin locked out; the per-IP rate limiter and the 12-character minimum guard the password. An account that is already locked is still refused here. Failures show one generic message ("Invalid email or password, or the account is temporarily locked.") whether the user is unknown, the password is wrong or the account is locked.
+2. With 2FA on, the user goes to `/admin/login/code`; until the code is accepted the user is held only in the Identity two-factor cookie (`Secure`, `HttpOnly`, `SameSite=Strict`, `Web/Identity/ConfigureTwoFactorUserIdCookie.cs`). A wrong TOTP or recovery code shows a generic message too and counts toward lockout (only someone who already has the password reaches this step).
 3. With 2FA off, the password login signs the user in without the `amr` claim, so the `Admin` policy still fails, and the user lands on `/admin/two-factor/setup` (which is also the `AccessDeniedPath`).
 4. The setup page shows a QR code (QRCoder, inline SVG, `Web/Identity/AuthenticatorQr.cs`) and the same key in groups of 4. A valid code enables 2FA, signs the user in with `amr=mfa`, and the POST response shows **10 recovery codes once**; the page cannot show them again and the app never logs them.
 5. No "remember this browser" and no "remember me": the sign-in is never persistent. `returnUrl` is honoured only when it is a local URL, otherwise `/`.
@@ -801,11 +803,14 @@ password ──► 2FA on?  yes ─► /admin/login/code ─► signed in (amr=m
 
 **Session:** cookie `saronida.auth`, `Secure` (always), `HttpOnly`, `SameSite=Strict`, 12 hours, sliding. The antiforgery cookie uses the same flags. The security stamp is re-validated every **1 minute**, so a password reset or removal takes effect quickly. A refresh builds a new principal from the user store, which would drop the `amr` claim and lock the admin out of the `Admin` policy; `MfaClaimPreserver` (`OnRefreshingPrincipal`) copies `amr` from the old principal.
 
-**Lockout:** 5 failed attempts → 15 minutes (also for new users). Wrong TOTP and recovery codes count like wrong passwords.
+**Lockout:** 5 failed attempts → 15 minutes (also for new users), counted **only at the 2FA step**: wrong TOTP and recovery codes count, wrong passwords do not (see step 1).
+
+**Endpoint authorization guard:** `AdminEndpointAuthorizationTests` enumerates every `/admin…` endpoint (Razor Pages, minimal APIs, the Hangfire dashboard) and fails if one does not declare its authorization. Anonymous is allowed only for `/admin` (the redirect, `.AllowAnonymous()`), login, login/code, login/recovery and instagram/callback; plain `[Authorize]` only for logout and two-factor/setup; everything else must use the `Admin` policy. Both allowlists are checked for stale routes.
 
 **Data Protection keys** are persisted to `DataProtection:KeysPath` (`/var/saronida/data/keys`; Development `data/keys`), application name `SaronidaSailing` — otherwise every deploy logs admins out and invalidates antiforgery tokens. The keys are **not encrypted at rest** (file permissions only). When a key is created, `XmlKeyManager` logs a warning that reaches the app log.
 
-- The Instagram access token is protected with these same keys (purpose `SaronidaSailing.Instagram.AccessToken.v1`), as is the Meta App secret (same `ISecretProtector`) and the Instagram OAuth `state`; the keys must therefore be backed up with the database (see `docs/deployment.md` → Backups), or after a restore the admin must enter the App secret again and reconnect.
+- **2FA secrets are encrypted at rest** with the same keys. `Infrastructure/Identity/ProtectedTokenUserStore` (registered with `.AddUserStore<ProtectedTokenUserStore>()` in `Infrastructure/DependencyInjection.cs`, so the web app and the CLI both use it) overrides `SetTokenAsync` / `GetTokenAsync` for the `[AspNetUserStore]` tokens `AuthenticatorKey` and `RecoveryCodes` only, with purpose `SaronidaSailing.Identity.Tokens.v1`; other `AspNetUserTokens` rows are stored as Identity writes them. A stored value that cannot be unprotected (an old plain-text row, or lost keys) reads as **not set**, with a Warning that names the token and the user id and never the value; there is no plain-text fallback. Consequence: a database dump alone no longer bypasses 2FA, and losing the keys (or restoring a database without them) means every admin is re-created with `admin remove` + `admin add` and enrols 2FA again.
+- The Instagram access token is protected with these same keys (purpose `SaronidaSailing.Instagram.AccessToken.v1`), as is the Meta App secret (same `ISecretProtector`) and the Instagram OAuth `state`; the keys must therefore be backed up, **apart from the database dumps** (see `docs/deployment.md` → Backups), or after a restore the admin must enter the App secret again, reconnect, and every admin must be re-created (2FA secrets, see above).
 - Several admins may edit at once; concurrent saves to the same field: last save wins. `ContentHistory` records who changed what.
 - Hangfire dashboard `/admin/jobs`: see Background Jobs.
 
@@ -841,7 +846,7 @@ Implemented. Configuration is the `NLog` section of `appsettings.json`, loaded i
 | `login-2fa-required` | Password correct, 2FA on |
 | `login-2fa-setup-required` | Password correct, 2FA not set up yet |
 | `login-failed` | Wrong password or unknown user |
-| `login-locked-out` | A password, TOTP or recovery attempt hit lockout |
+| `login-locked-out` | A TOTP or recovery attempt hit lockout, or any attempt reached an account that is already locked (a wrong password alone never locks) |
 | `login-2fa-failed` | Wrong TOTP or recovery code |
 | `login-succeeded` | Login complete (details `totp` or `recovery`) |
 | `recovery-code-used` | Recovery code accepted (details `remaining=N`) |
@@ -951,15 +956,37 @@ Code in `Web/Diagnostics/`. Goal: find out afterwards what went wrong. A pod kil
 | Admin login | Identity cookie auth + mandatory TOTP 2FA; lockout; per-IP rate limiter on login (see Admin Accounts) |
 | Real client IP | nginx `realip` module sets the client IP from `CF-Connecting-IP` (Cloudflare ranges only) and forwards it in `X-Forwarded-For`. The app (`UseForwardedHeaders`, `Web/ForwardedHeadersSetup.cs`) reads `X-Forwarded-For` and `X-Forwarded-Proto` with `ForwardLimit = 1`, and trusts them **only** from the networks in `ForwardedHeaders:KnownNetworks`. It is not `127.0.0.1`: host nginx reaches the pod through the Service NodePort, so the app sees the request coming from the cluster network. `appsettings.json` still carries the compose-era value `172.30.0.0/24`; Phase 8 sets it to the k3s network (see `docs/deployment.md`) |
 | Rate limiting | `UseRateLimiter` with one global partitioned limiter (`Web/Identity/AdminLoginRateLimit.cs`): only **POSTs** to `/admin/login`, `/admin/login/code`, `/admin/login/recovery` and `/admin/two-factor/setup` are limited, 10 per minute per client IP, fixed window, no queue. Rejection: 429, `Retry-After: 60`, plain-text message, audit event `login-rate-limited`. GETs and all other paths are not limited |
-| Lockout | 5 failed attempts → 15 minutes, per account; TOTP and recovery failures count |
+| Lockout | 5 failed attempts → 15 minutes, per account; counted only at the 2FA step (TOTP and recovery failures), never for wrong passwords |
+| 2FA secrets | The authenticator key and recovery codes are stored encrypted (Data Protection, `ProtectedTokenUserStore`), so a database dump alone cannot be used to bypass 2FA; see Admin Accounts |
+| Sessions | Logout renews the security stamp, ending the admin's other sessions at the next 1-minute stamp check |
+| Security headers | Sent by the app on every response, see Security headers below |
+| `/health` | Refused (404) for requests that came through the proxy (`X-Forwarded-For` / `X-Original-For`), see Health Check |
+| Admin endpoint authorization | Every `/admin…` endpoint must declare it; enforced by `AdminEndpointAuthorizationTests` (see Admin Accounts) |
 | CSRF | Antiforgery tokens on all admin write endpoints (the save API reads the `RequestVerificationToken` header, token from `#cms-config`); antiforgery cookie `Secure`, `HttpOnly`, `SameSite=Strict` |
 | Admin API | `/admin/api/*` requires the `Admin` policy, answers 401 / 403 instead of a login redirect, sends `Cache-Control: no-store`, and rejects bodies over 256 KB with 413 |
 | Admin pages in caches | Pages rendered for an admin carry `Cache-Control: no-store` and are never stored by the output cache |
 | XSS | Razor encoding by default; rich text sanitized with HtmlSanitizer on save, inside `ContentService` (see CMS Editing Flow); link URLs restricted to `https:`, `tel:`, `mailto:` and validated on save |
 | Transport | Cloudflare SSL mode **Full (strict)**; Let's Encrypt cert on the origin |
+| Instagram image downloads | Only from Instagram CDN hosts (`Instagram:ImageHosts`), checked before the request and after redirects (see Instagram Feed → API client rules) |
 | Instagram access token | Stored only encrypted (ASP.NET Data Protection, keys on the file volume, so a database dump holds no usable token); never logged; API error messages and HttpClient logs have token, secret and URLs removed. The Meta App secret is entered by the admin, stored only encrypted (Data Protection), never shown again and never audited |
 | Instagram OAuth | Connect issues a Data-Protection-protected `state` (admin id, nonce, 10 minute expiry) plus a short-lived `SameSite=Lax` cookie with the nonce; the anonymous callback accepts only a matching pair and an admin who still exists with 2FA and no lockout. The callback never echoes `code` or `state`. See Instagram Feed → OAuth state and `SameSite=Strict` |
 | Uploads | `POST /admin/api/media` is admin-only with antiforgery; the file is validated by decoding (not by extension or content type), limited to 25 MB and 50 megapixels, one at a time per pod; re-encoding strips all metadata; originals are kept outside the served folder, and startup fails if they would be inside it. Only `.webp` is served from the media folder in Development; file names are generated from a slug and the content hash, never from the raw upload name |
+
+### Security headers
+
+`Web/Security/SecurityHeaders.cs` (`UseSecurityHeaders()`, the first middleware) sets the headers in `Response.OnStarting`, so every response the app serves carries them (nginx adds only HSTS and, for the `/media/` files it serves itself, `nosniff`; see `docs/deployment.md`). The same in every environment.
+
+| Header | Value |
+|---|---|
+| `Content-Security-Policy` (Public) | `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; frame-src https://www.google.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self' <origin of Instagram:AuthorizeUrl>; object-src 'none'` |
+| `Content-Security-Policy` (Admin) | Identical, except `style-src 'self' 'unsafe-inline'` and `img-src 'self' data:` |
+| `X-Content-Type-Options` | `nosniff` |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` |
+
+- **Which policy:** the Admin CSP only for an authenticated user who has the MFA claim (`amr=mfa`, the same test as the `Admin` policy). Visitors, password-only users in 2FA setup and responses produced before authentication (429 from the rate limiter, proxied `/health`) get the Public one.
+- **Why admins are relaxed (decided 2026-11-20):** pasted rich text carries inline styles (Google Docs `<span style="font-weight:700">`), which Quill needs to turn into bold / italic and which the strict CSP blocked; the Hangfire dashboard uses a `data:` favicon and chart-injected `<style>` elements. Scripts stay `'self'` only for everyone.
+- **Safe with caching:** the output cache never serves or stores authenticated requests and admin-rendered pages are `no-store`, so the relaxed policy cannot reach a visitor.
+- `form-action` includes the Instagram origin because the Connect POST redirects to Instagram's authorize page.
 
 ## Cookies & Privacy
 

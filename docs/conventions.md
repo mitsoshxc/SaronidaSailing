@@ -226,7 +226,7 @@ The database is PostgreSQL (Npgsql provider). The data layer stays provider-neut
 - Plain JS, no framework. Keep scripts small and scoped; no globals.
 - `cms-edit.js` (entry module) and the modules in `wwwroot/js/cms/` are loaded only for the authenticated admin. ES modules, one factory or window function per file, wired in `cms-edit.js`; no globals.
 - Build DOM with `createElement` / `textContent`. Rich-text HTML is only parsed into an inert `<template>` and rebuilt through the allowed-tag filter (`rich-html.js`) before it reaches a live element; no `innerHTML` assignment on live elements.
-- **CSP:** no `style=""` attributes and no `<style>` elements, in markup or created from JS (the CSP is own-origin only). Set `element.style` through the CSSOM, or use classes.
+- **CSP:** no `style=""` attributes and no `<style>` elements, in markup or created from JS (the app's Public CSP is own-origin only, and visitors get it; the relaxed Admin CSP exists only for pasted rich text and the Hangfire dashboard, not as room for new inline styles). Set `element.style` through the CSSOM, or use classes. **New `/admin` endpoints must declare their authorization** (the `Admin` policy unless there is a reason): `AdminEndpointAuthorizationTests` fails for an undeclared one, and for an anonymous or plain-`[Authorize]` endpoint that is not on its allowlist.
 - Third-party libraries are vendored into `wwwroot/lib/{name}/` with a `README.md` (version, source, files copied, date) and the license; never loaded from a CDN, and loaded lazily when only the editor needs them (Quill, SortableJS).
 - Admin editing CSS lives in `wwwroot/css/cms-edit.css` (loaded only for the admin, same mobile-first rule and 720 px / 960 px breakpoints as `site.css`).
 

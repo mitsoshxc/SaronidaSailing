@@ -93,7 +93,8 @@ Defaults are in `src/SaronidaSailing.Web/appsettings.json`; environment variable
 | `Logs:Path` | `/var/saronida/logs` | NLog folder (`audit-*`, `app-*`, `metrics-*`); must be writable for UID 1654; startup fails if the key is missing |
 | `Logs:Instance` | not set | Name written as the 2nd field of every log line. Defaults to the machine name, which in Kubernetes is the pod name. An empty value or one containing `\|` or control characters fails startup. As an environment variable: `Logs__Instance` |
 | `Diagnostics:*` | not set (defaults in code) | Thresholds and intervals of the runtime diagnostics; values must be greater than 0. Keys and defaults: `docs/architecture.md` → Logging → Diagnostics |
-| `DataProtection:KeysPath` | `/var/saronida/data/keys` | Data Protection keys (unencrypted at rest); created if missing, must be writable for UID 1654; startup fails if the key is missing |
+| `DataProtection:KeysPath` | `/var/saronida/data/keys` | Data Protection keys (unencrypted at rest). They protect the admins' 2FA secrets, the Instagram token and secret and the OAuth state: losing them means every admin is re-created (`admin remove` + `admin add`) and Instagram is set up again. Created if missing, must be writable for UID 1654; startup fails if the key is missing |
+| `Instagram:ImageHosts` | not set (default: `cdninstagram.com`, `fbcdn.net`) | Hosts (and their subdomains) the feed may download images from; any other host or a non-https URL is refused. Leave unset in production |
 | `Instagram:AuthorizeUrl`, `ApiBaseUrl`, `GraphBaseUrl` | not set (defaults are the real Instagram endpoints) | Overridable, absolute http(s) URLs (an invalid value fails startup); used by the tests to point at a stub. Do not set them in production |
 | `ForwardedHeaders:KnownNetworks` | `["172.30.0.0/24"]` in `appsettings.json` | CIDR networks allowed to set `X-Forwarded-For` / `X-Forwarded-Proto`; an invalid value fails startup. As an environment variable: `ForwardedHeaders__KnownNetworks__0`. The value in the file is the old Docker Compose subnet; Phase 8 sets it to the k3s network (see below) |
 
@@ -109,7 +110,7 @@ A missing `ConnectionStrings:Content`, `Media:RootPath`, `Media:OriginalsPath`, 
 
 - **Meta app redirect URIs:** `{Site:BaseUrl}/admin/instagram/callback`, one per host that will connect: `https://saronida.visualpivot.net/admin/instagram/callback` (preview) and `https://www.saronidasailing.gr/admin/instagram/callback` (production). The path must match exactly (`InstagramPaths.Callback`). nginx must pass `/admin/instagram/callback` through like any other path (it is reached without an admin cookie).
 - **App ID and App secret:** not configuration and not a Kubernetes Secret. The admin enters them on `/admin/instagram` (stored in the database, the secret encrypted with the Data Protection keys); no pod restart is needed, and user secrets are no longer read for Instagram. Without them **Connect Instagram** is disabled. After a restore without the keys, the secret must be entered again.
-- **Token and keys:** the access token is encrypted with the Data Protection keys in `/var/saronida/data/keys`. Those keys are in the backup (see Backups); after a restore without them, or if they are lost, the admin sees "Instagram disconnected — reconnect" and presses Reconnect.
+- **Token and keys:** the access token is encrypted with the Data Protection keys in `/var/saronida/data/keys`. Those keys are in the backup, kept apart from the database dumps (see Backups); after a restore without them, or if they are lost, the admin sees "Instagram disconnected — reconnect" and presses Reconnect.
 - **Time zone data:** the app resolves the IANA zone `Europe/Athens` (`TimeZoneInfo.FindSystemTimeZoneById`) for the job schedules (`InstagramJobScheduler`) and for the times shown on `/admin/instagram` (`AthensTime`). On Linux this needs the zone database (the `tzdata` package) inside the image. The `Dockerfile` does not install anything and nothing in the repo checks it, so **whether the `aspnet:10.0.14-noble` image has it is unverified**: check on the first Linux run (the Phase 8 preview); if the zone is missing, startup fails when `home.instagram` is active (the schedule sync registers the jobs with that zone), and the times on `/admin/instagram` and the date in a tile's fallback alt text cannot be computed.
 - **Jobs:** Hangfire runs in every pod; the recurring jobs (`instagram-fetch` 06:00 and 18:00, `instagram-token-refresh` Mondays 04:00, Europe/Athens) are visible in the dashboard at `/admin/jobs`.
 
@@ -130,7 +131,7 @@ A missing `ConnectionStrings:Content`, `Media:RootPath`, `Media:OriginalsPath`, 
 - Everything else → `proxy_pass` to the app Service's NodePort on the host, with `X-Forwarded-For` / `X-Forwarded-Proto`. This includes `/index.php/...` (answered by the app's old-site redirects), `/robots.txt`, `/sitemap.xml` and the error paths: nginx must not serve or rewrite them.
 - Real client IP: `real_ip_header CF-Connecting-IP;` plus `set_real_ip_from` for each Cloudflare IP range (published at cloudflare.com/ips; update when they change).
 - `client_max_body_size` set for image uploads: the admin upload `POST /admin/api/media` takes files up to 25 MB, and the app counts the whole multipart body (limit 25 MB + 64 KB), so nginx must allow at least **26 MB** on that path (nginx's default of 1 MB would turn every photo into a 413 before the app sees it). Cloudflare Free allows 100 MB, so it is not the limit. The rest of the site can keep a small limit (the content save API caps its body at 256 KB itself).
-- `location /health` → `deny all;` from the internet (only reachable on the droplet itself).
+- `location ~* ^/health` → `deny all;` from the internet (only reachable on the droplet itself). The location is **case-insensitive** because the app matches `/HEALTH` too; the app also answers 404 to a proxied `/health` request (`X-Forwarded-For` present), see `docs/architecture.md` → Health Check.
 - nginx access and error logs are kept **30 days** (logrotate).
 
 ### Maintenance Mode
@@ -140,10 +141,10 @@ A missing `ConnectionStrings:Content`, `Media:RootPath`, `Media:OriginalsPath`, 
 - 503 tells search engines the outage is temporary, so rankings are not affected.
 - Independent of `/health` and the app: you can deploy and test against the NodePort on the droplet while maintenance mode is on.
 
-## Security Headers (nginx)
+## Security Headers
 
-- `Content-Security-Policy`: own origin only, plus `frame-src https://www.google.com` for the Maps embed (after consent). No other third-party sources.
-- `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `frame-ancestors 'self'` (in the CSP) so other sites can't frame ours.
+- **The app owns the headers** (`Web/Security/SecurityHeaders.cs`, decided 2026-11-20, Phase 7.6): `Content-Security-Policy` (own origin only, plus `frame-src https://www.google.com` for the Maps embed after consent, and `frame-ancestors 'self'`; a relaxed variant for signed-in admins), `X-Content-Type-Options: nosniff` and `Referrer-Policy: strict-origin-when-cross-origin` on every response it serves. Details: `docs/architecture.md` → Security → Security headers. nginx must **not** add its own CSP, `nosniff` or `Referrer-Policy` for proxied locations (a second header would conflict with the app's, especially the admin variant).
+- nginx adds `X-Content-Type-Options: nosniff` only on `location /media/`, because nginx serves those files itself and the app never sees them.
 - `Strict-Transport-Security`: enabled **after launch is verified**, starting with a short `max-age` (e.g. 1 day), raised step by step (to 6–12 months). No preload list for now.
 
 ## Server Hardening
@@ -227,7 +228,8 @@ Agreed design (Phase 8). There are **no DigitalOcean backups**; the copies live 
 | Layer | What |
 |---|---|
 | Nightly `pg_dump` CronJob | Writes to `/var/saronida/backup/`; the last 7 dumps are kept on the droplet |
-| PC pull script (`deploy/backup.ps1`) | Run by Windows Task Scheduler (also when a run was missed). Over SSH, with a dedicated read-only backup user, it pulls the dumps, new files in `/var/saronida/data/originals/` and the Data Protection keys into the Proton Drive sync folder. Keeps 30 daily and 12 monthly copies. Warns when the newest backup is more than 3 days old |
+| PC pull script (`deploy/backup.ps1`) | Run by Windows Task Scheduler (also when a run was missed). Over SSH, with a dedicated read-only backup user, it pulls the dumps, new files in `/var/saronida/data/originals/` and the Data Protection keys into the Proton Drive sync folder, storing the keys in a **separate location from the dumps**: the keys decrypt the 2FA secrets and Instagram secrets that sit in the dumps, so dumps and keys together must not be one copy-able folder. Keeps 30 daily and 12 monthly copies. Warns when the newest backup is more than 3 days old |
 | Restore runbook | Written, and a restore tested once |
+| Restore without the keys | The database restores, but the 2FA secrets (and the Instagram token and App secret) cannot be decrypted: every admin is re-created with `admin remove` + `admin add` and enrols 2FA again, and Instagram is reconnected. The runbook starts from the keys, not from the dump |
 
 Not backed up because they can be regenerated: the generated images under `/var/saronida/media/` (rebuilt from the originals). Worst case data loss is the edits since the last successful pull (the droplet keeps the last 7 dumps, but they are on the same disk as the database).

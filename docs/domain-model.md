@@ -206,3 +206,5 @@ Related content key: `home.instagram.post-count` is an ordinary `ContentItem` (T
 ### ApplicationUser
 
 Extends `IdentityUser` (string PK) in `Core/Entities/ApplicationUser.cs`; implemented with no extra fields. The Identity `AspNet*` tables live in the same database as the content tables (migration `InitialCreate`). One or more admins, created only with the `admin add` command (see `docs/architecture.md` → Admin Accounts). No registration page, no seeding from configuration.
+
+`AspNetUserTokens`: the rows with login provider `[AspNetUserStore]` and names `AuthenticatorKey` and `RecoveryCodes` hold **Data Protection ciphertext**, not the plain key and codes (`Infrastructure/Identity/ProtectedTokenUserStore`, purpose `SaronidaSailing.Identity.Tokens.v1`; no schema change, no migration). A row that cannot be decrypted reads as not set. See `docs/architecture.md` → Admin Accounts.
