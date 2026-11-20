@@ -65,14 +65,15 @@ public class AdminAuthTests(TempDatabaseWebApplicationFactory factory) : IClassF
     public async Task LockedOutAccount_ShowsTheSameMessage_AndAuditsLockout()
     {
         var client = NewClient(factory);
-        await AddAdminAsync(factory, "lockout@example.com");
+        var admin = await AddTwoFactorAdminAsync(factory, "lockout@example.com");
+        await LoginAsync(client, admin.Email);
 
         for (var i = 0; i < 5; i++)
         {
-            await LoginAsync(client, "lockout@example.com", "wrong-password-" + i);
+            await PostFormAsync(client, "/admin/login/code", ("Code", Totp.Invalid(admin.Key)));
         }
 
-        var response = await LoginAsync(client, "lockout@example.com");
+        var response = await LoginAsync(NewClient(factory), admin.Email);
 
         Assert.Contains("Invalid email or password, or the account is temporarily locked.", await response.Content.ReadAsStringAsync());
         Assert.Contains(ReadLogLines(factory.LogsPath, "audit"), l => l.Contains("|login-locked-out|user=lockout@example.com|"));

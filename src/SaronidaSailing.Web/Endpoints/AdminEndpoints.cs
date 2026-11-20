@@ -8,7 +8,7 @@ public static class AdminEndpoints
         {
             http.Response.Headers.CacheControl = "no-store";
             return Results.Redirect("/admin/login");
-        });
+        }).AllowAnonymous();
 
         return app;
     }

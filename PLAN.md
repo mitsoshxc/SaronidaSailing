@@ -217,6 +217,21 @@ Tech-lead details to settle in the briefs (propose → confirm with the develope
     - The Instagram page's redirect URI wraps at 320 px.
   - 1405 tests.
 
+## Phase 7.6 — Security Review Fixes
+
+Opened on 2026-11-20 after a whole-project security review by the tech lead (no critical findings; 3 medium, several low). Built **before** Phase 8 so the preview starts hardened. Decided by the developer (2026-11-20):
+
+- **Lockout only at the 2FA step.** Wrong passwords no longer lock an account (anyone who knows an admin's email could keep them locked out forever); the per-IP login rate limit and the 12-character minimum guard the password. Wrong TOTP / recovery codes still count toward the lockout (5 → 15 minutes), and only someone who already has the password reaches that step.
+- **2FA secrets encrypted at rest.** The authenticator key and the recovery codes (Identity stores both in plain text in `AspNetUserTokens` by default) are encrypted with Data Protection, so a database dump alone no longer bypasses 2FA. Consequences: losing the Data Protection keys now also means re-enrolling every admin (`admin remove` + `admin add`); the PC backup keeps the keys **apart from** the database dumps (Phase 8 backup task). Admins in existing dev databases re-enrol once.
+- **The app owns the security headers** (CSP with `frame-ancestors`, `X-Content-Type-Options`, `Referrer-Policy`) on every response it serves; nginx adds only HSTS (staged at launch, as planned) and `nosniff` on the `/media/` files it serves itself. Replaces the Phase 8 "security headers in nginx" design.
+- Tech-lead fixes that follow the review directly (no design change): `/health` refused for requests that came through nginx, plus a case-insensitive nginx `location`; every `/admin` endpoint must declare its authorization (guard test); logout ends the admin's other sessions (security stamp); Instagram images downloaded only from Instagram's CDN hosts.
+
+- [x] Auth hardening: `/health` only for direct (non-proxied) requests; `/admin` authorization guard test; logout renews the security stamp; lockout only at the 2FA step. Done 2026-11-20: `Web/Health/HealthEndpointAccess` (`UseHealthDirectOnly()`, placed **before** `UseForwardedHeaders` so it sees the raw header): `/health` and below, any case, answers a plain 404 when the request has `X-Forwarded-For` or `X-Original-For`. `AdminEndpointAuthorizationTests` enumerates every `/admin…` endpoint (pages, minimal APIs, Hangfire): anonymous only for `/admin`, login, login/code, login/recovery, instagram/callback; plain `[Authorize]` only for logout and two-factor/setup; everything else the `Admin` policy; allowlists checked for stale routes (`/admin` redirect now `.AllowAnonymous()`). Logout calls `UpdateSecurityStampAsync` before signing out (test: another client of the same admin is rejected after the 1-minute stamp check). Password step `lockoutOnFailure: false`; wrong TOTP / recovery codes still lock (5 → 15 min). 1413 tests
+- [ ] Encrypt the Identity authenticator key and recovery codes with Data Protection
+- [ ] Security headers sent by the app (CSP, nosniff, Referrer-Policy)
+- [ ] Instagram image downloads limited to Instagram CDN hosts
+- [ ] `/doc` for the phase
+
 ## Phase 8 — Preview & Production
 
 - [ ] Preview on the future production droplet at `https://saronida.visualpivot.net`: Basic Auth (one owner login, htpasswd on the droplet), `X-Robots-Tag: noindex, nofollow`, `robots.txt` disallow-all, no sitemap, `Site:BaseUrl` = preview URL; PC backups run from the start (changed 2026-11-11: no DO backups)
@@ -224,11 +239,11 @@ Tech-lead details to settle in the briefs (propose → confirm with the develope
 Infrastructure as agreed on 2026-11-11 (see Phase 4.5); replaces the Docker Compose tasks.
 
 - [ ] `deploy/k8s/` manifests: namespace, app Deployment (`replicas: 1`, readiness/liveness probes) + NodePort Service, PostgreSQL StatefulSet, `migrate` Job, `pg_dump` CronJob, Secrets (DB password; the Instagram app secret is entered on the admin page since 2026-11-15), host-folder mounts under `/var/saronida`
-- [ ] `deploy/nginx/` site config proxying to the NodePort (incl. `/health` denied externally); `ForwardedHeaders:KnownNetworks` set to the k3s network
+- [ ] `deploy/nginx/` site config proxying to the NodePort (incl. `/health` denied externally with a **case-insensitive** `location ~* ^/health`, since the app matches `/HEALTH` too); `ForwardedHeaders:KnownNetworks` set to the k3s network; `AllowedHosts` set to the real host names (keeping the probes, the home-page health check and `deploy.ps1` working)
 - [ ] nginx maintenance mode: `/var/saronida/maintenance.on` → 503 + `deploy/nginx/maintenance.html`
 - [ ] `deploy/deploy.ps1`: build on the PC → `docker save | ssh k3s ctr images import` → `migrate` Job → rollout → `/health` check
 - [ ] Droplet setup: hardening, swap, k3s (Traefik disabled), nginx, certbot, firewall (NodePorts closed), read-only backup user, `saronida-admin` wrapper script (`kubectl exec`)
-- [ ] PC backup script (`deploy/backup.ps1`) + Task Scheduler entry + restore runbook, restore tested once
+- [ ] PC backup script (`deploy/backup.ps1`) + Task Scheduler entry + restore runbook, restore tested once; the Data Protection keys are stored **apart from** the database dumps (decided 2026-11-20, Phase 7.6: the keys decrypt the 2FA secrets and Instagram secrets in the dumps)
 - [ ] Kubernetes event recorder: a small service on the droplet writes cluster events (`OOMKilled`, failed liveness checks, restarts, evictions) to `/var/saronida/logs/k8s-events-YYYY-MM-DD.log` (Kubernetes forgets events after about an hour)
 - [ ] Memory requests/limits on the app pod and PostgreSQL, so .NET's GC works within the limit and a kill is recorded as `OOMKilled`
 - [ ] nginx access and error logs kept 30 days (logrotate)
@@ -238,7 +253,7 @@ Infrastructure as agreed on 2026-11-11 (see Phase 4.5); replaces the Docker Comp
 - [ ] Two-pod rehearsal on the preview: `replicas: 2` → cache eviction across pods, jobs run once, admin login, both pods in the shared log files, a forced pod kill shows up in `k8s-events` → back to 1; write the scale-up runbook (resize droplet → `replicas: 2`)
 - [ ] Cloudflare: DNS (apex + www, proxied), Full (strict) SSL, Always Use HTTPS, Web Analytics
 - [ ] Canonical redirects: http → https and no-www → `https://www.saronidasailing.gr` in one hop (nginx); certificate for both names
-- [ ] Security headers (CSP incl. Google Maps frame, nosniff, Referrer-Policy, frame-ancestors); HSTS after launch, short max-age first
+- [ ] Security headers: sent by the app since Phase 7.6 (check them on the preview, including `/admin/jobs` and the Instagram Connect redirect); nginx adds `nosniff` on `/media/` and HSTS after launch, short max-age first
 - [ ] `unattended-upgrades` with nightly auto-reboot; k3s and the pods come back on boot
 - [ ] UptimeRobot monitor (alerts to the developer's email)
 - [ ] Go-live: remove preview features (Basic Auth, noindex, Preview mode) → test via hosts file → copy all DNS records to Cloudflare → lower TTL → switch → verify → keep old site a few days → submit sitemap

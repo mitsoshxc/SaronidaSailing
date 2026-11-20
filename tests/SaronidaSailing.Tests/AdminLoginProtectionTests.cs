@@ -157,57 +157,84 @@ public class AdminLoginProtectionTests(TempDatabaseWebApplicationFactory factory
     }
 
     [Fact]
-    public async Task Lockout_FiveWrongPasswords_LockEvenTheCorrectPassword_UntilItExpires()
+    public async Task Lockout_WrongPasswords_NeverLockTheAccount()
     {
         const string email = "lock-password@example.com";
         using var client = NewClient(factory);
         await AddAdminAsync(factory, email);
 
-        for (var i = 0; i < 5; i++)
+        for (var i = 0; i < 7; i++)
         {
-            await LoginAsync(client, email, "wrong-password-" + i);
+            var wrong = await LoginAsync(client, email, "wrong-password-" + i);
+            Assert.Contains(Generic, await wrong.Content.ReadAsStringAsync());
         }
 
-        var locked = await LoginAsync(client, email);
+        var correct = await LoginAsync(client, email);
+
+        Assert.Equal(HttpStatusCode.Redirect, correct.StatusCode);
+        Assert.Equal("/admin/two-factor/setup", Location(correct));
+        Assert.Equal(7, ReadLogLines(factory.LogsPath, "audit").Count(l => l.Contains($"|login-failed|user={email}|")));
+        Assert.DoesNotContain(ReadLogLines(factory.LogsPath, "audit"), l => l.Contains($"|login-locked-out|user={email}|"));
+        using var scope = factory.Services.CreateScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        Assert.False(await users.IsLockedOutAsync((await users.FindByEmailAsync(email))!));
+    }
+
+    [Fact]
+    public async Task Lockout_AfterFiveWrongTotpCodes_EvenTheCorrectPasswordIsRejected_UntilItExpires()
+    {
+        using var client = NewClient(factory);
+        var admin = await AddTwoFactorAdminAsync(factory, "lock-expiry@example.com");
+        Assert.Equal(HttpStatusCode.Redirect, (await LoginAsync(client, admin.Email)).StatusCode);
+        for (var i = 0; i < 5; i++)
+        {
+            await PostFormAsync(client, "/admin/login/code", ("Code", Totp.Invalid(admin.Key)));
+        }
+
+        var lockedOutBefore = ReadLogLines(factory.LogsPath, "audit").Count(l => l.Contains($"|login-locked-out|user={admin.Email}|"));
+        using var fresh = NewClient(factory);
+        var locked = await LoginAsync(fresh, admin.Email);
+
         Assert.Equal(HttpStatusCode.OK, locked.StatusCode);
         Assert.Contains(Generic, await locked.Content.ReadAsStringAsync());
-        Assert.Contains(ReadLogLines(factory.LogsPath, "audit"), l => l.Contains($"|login-locked-out|user={email}|"));
+        Assert.Equal(lockedOutBefore + 1, ReadLogLines(factory.LogsPath, "audit").Count(l => l.Contains($"|login-locked-out|user={admin.Email}|")));
 
         using (var scope = factory.Services.CreateScope())
         {
             var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-            var user = (await users.FindByEmailAsync(email))!;
+            var user = (await users.FindByEmailAsync(admin.Email))!;
             Assert.True(user.LockoutEnd > DateTimeOffset.UtcNow.AddMinutes(14));
             await users.SetLockoutEndDateAsync(user, DateTimeOffset.UtcNow.AddMinutes(-1));
         }
 
-        var afterExpiry = await LoginAsync(client, email);
+        var afterExpiry = await LoginAsync(fresh, admin.Email);
         Assert.Equal(HttpStatusCode.Redirect, afterExpiry.StatusCode);
-        Assert.Equal("/admin/two-factor/setup", Location(afterExpiry));
+        Assert.Equal("/admin/login/code", Location(afterExpiry));
     }
 
     [Fact]
     public async Task Lockout_IsClearedByAdminResetPassword()
     {
-        const string email = "lock-reset@example.com";
         const string newPassword = "another-long-passphrase-42";
         using var client = NewClient(factory);
-        await AddAdminAsync(factory, email);
+        var admin = await AddTwoFactorAdminAsync(factory, "lock-reset@example.com");
+        Assert.Equal(HttpStatusCode.Redirect, (await LoginAsync(client, admin.Email)).StatusCode);
         for (var i = 0; i < 5; i++)
         {
-            await LoginAsync(client, email, "wrong-password-" + i);
+            await PostFormAsync(client, "/admin/login/code", ("Code", Totp.Invalid(admin.Key)));
         }
 
         using (var scope = factory.Services.CreateScope())
         {
-            var result = await scope.ServiceProvider.GetRequiredService<IAdminAccountService>().ResetPasswordAsync(email, newPassword);
+            var result = await scope.ServiceProvider.GetRequiredService<IAdminAccountService>().ResetPasswordAsync(admin.Email, newPassword);
             Assert.True(result.Succeeded);
         }
 
-        var response = await LoginAsync(client, email, newPassword);
+        using var fresh = NewClient(factory);
+        var response = await LoginAsync(fresh, admin.Email, newPassword);
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-        Assert.Equal("/admin/two-factor/setup", Location(response));
+        Assert.Equal("/admin/login/code", Location(response));
     }
 
     [Fact]

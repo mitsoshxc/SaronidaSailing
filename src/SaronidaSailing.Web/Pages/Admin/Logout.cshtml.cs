@@ -8,7 +8,7 @@ namespace SaronidaSailing.Web.Pages.Admin;
 
 [Authorize]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-public class LogoutModel(SignInManager<ApplicationUser> signInManager, IAuditLog audit) : AdminPageModel
+public class LogoutModel(SignInManager<ApplicationUser> signInManager, UserManager<ApplicationUser> userManager, IAuditLog audit) : AdminPageModel
 {
     public void OnGet()
     {
@@ -17,6 +17,12 @@ public class LogoutModel(SignInManager<ApplicationUser> signInManager, IAuditLog
     public async Task<IActionResult> OnPostAsync()
     {
         var userName = User.Identity?.Name;
+        var user = await userManager.GetUserAsync(User);
+        if (user is not null)
+        {
+            await userManager.UpdateSecurityStampAsync(user);
+        }
+
         await signInManager.SignOutAsync();
         audit.Record("logout", userName, ClientIp);
         return LocalRedirect("/");

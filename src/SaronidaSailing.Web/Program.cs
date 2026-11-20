@@ -198,6 +198,7 @@ try
         MediaFolder.EnsureExists(app.Services.GetRequiredService<IOptions<MediaOptions>>().Value);
     }
 
+    app.UseHealthDirectOnly();
     app.UseForwardedHeaders();
     app.UseRequestDiagnostics();
 

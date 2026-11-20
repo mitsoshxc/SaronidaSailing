@@ -21,6 +21,32 @@ public class HealthTests(TempDatabaseWebApplicationFactory factory) : IClassFixt
         Assert.Equal("Healthy", await response.Content.ReadAsStringAsync());
     }
 
+    [Theory]
+    [InlineData("/health")]
+    [InlineData("/HEALTH")]
+    [InlineData("/health/")]
+    public async Task Get_Health_ThroughTheProxy_Returns404(string path)
+    {
+        var client = AdminTestHelpers.NewClient(factory);
+        client.DefaultRequestHeaders.Add("X-Forwarded-For", "203.0.113.9");
+
+        var response = await client.GetAsync(path);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.NotEqual("Healthy", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Get_Health_WithForwardedHeaderAndNoRemoteIp_Returns404()
+    {
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Forwarded-For", "203.0.113.9");
+
+        var response = await client.GetAsync("/health");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     [Fact]
     public async Task Get_Health_SendsNoCacheHeaders()
     {

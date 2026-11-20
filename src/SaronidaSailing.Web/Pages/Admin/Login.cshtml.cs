@@ -35,7 +35,7 @@ public class LoginModel(SignInManager<ApplicationUser> signInManager, IAuditLog 
             return Page();
         }
 
-        var result = await signInManager.PasswordSignInAsync(email, Password!, isPersistent: false, lockoutOnFailure: true);
+        var result = await signInManager.PasswordSignInAsync(email, Password!, isPersistent: false, lockoutOnFailure: false);
 
         if (result.RequiresTwoFactor)
         {
