@@ -26,6 +26,7 @@ using SaronidaSailing.Web.Identity;
 using SaronidaSailing.Web.Instagram;
 using SaronidaSailing.Web.Localization;
 using SaronidaSailing.Web.Redirects;
+using SaronidaSailing.Web.Security;
 
 var isAdminCommand = AdminCommandRunner.IsAdminCommand(args);
 var isMigrateCommand = MigrateCommand.IsMigrateCommand(args);
@@ -198,6 +199,7 @@ try
         MediaFolder.EnsureExists(app.Services.GetRequiredService<IOptions<MediaOptions>>().Value);
     }
 
+    app.UseSecurityHeaders();
     app.UseHealthDirectOnly();
     app.UseForwardedHeaders();
     app.UseRequestDiagnostics();
