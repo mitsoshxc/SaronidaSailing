@@ -13,6 +13,11 @@ public class SecurityHeadersTests(TempDatabaseWebApplicationFactory factory) : I
         + "frame-src https://www.google.com; frame-ancestors 'self'; base-uri 'self'; "
         + "form-action 'self' https://www.instagram.com; object-src 'none'";
 
+    private const string ExpectedAdminCsp =
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; "
+        + "frame-src https://www.google.com; frame-ancestors 'self'; base-uri 'self'; "
+        + "form-action 'self' https://www.instagram.com; object-src 'none'";
+
     public Task InitializeAsync() => HomeContentTestData.EnsureGreekHomeContentAsync(factory.ContentConnectionString);
 
     public Task DisposeAsync() => Task.CompletedTask;
@@ -114,7 +119,55 @@ public class SecurityHeadersTests(TempDatabaseWebApplicationFactory factory) : I
         var response = await client.GetAsync("/admin/jobs");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        AssertSecurityHeaders(response, ExpectedAdminCsp);
+    }
+
+    [Fact]
+    public async Task AdminLoginPage_AsVisitor_GetsThePublicPolicy()
+    {
+        var response = await NewClient(factory).GetAsync("/admin/login");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         AssertSecurityHeaders(response);
+    }
+
+    [Fact]
+    public async Task HomePage_AsTwoFactorAdmin_GetsTheAdminPolicy()
+    {
+        var client = NewClient(factory);
+        var admin = await AddTwoFactorAdminAsync(factory, "headers-home@example.com");
+        await LoginWithTotpAsync(client, admin);
+
+        var response = await client.GetAsync("/");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        AssertSecurityHeaders(response, ExpectedAdminCsp);
+    }
+
+    [Fact]
+    public async Task TwoFactorSetupPage_AsPasswordOnlyUser_GetsThePublicPolicy()
+    {
+        var client = NewClient(factory);
+        await AddAdminAsync(factory, "headers-setup@example.com");
+        var login = await LoginAsync(client, "headers-setup@example.com");
+        Assert.Equal("/admin/two-factor/setup", Location(login));
+
+        var response = await client.GetAsync("/admin/two-factor/setup");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        AssertSecurityHeaders(response);
+    }
+
+    [Fact]
+    public void AdminPolicy_DiffersFromPublic_OnlyInStyleSrcAndImgSrc()
+    {
+        const string url = "https://www.instagram.com/oauth/authorize";
+
+        Assert.Equal(ExpectedCsp, SecurityHeaders.BuildContentSecurityPolicy(url, admin: false));
+        Assert.Equal(ExpectedAdminCsp, SecurityHeaders.BuildContentSecurityPolicy(url, admin: true));
+        Assert.Equal(
+            ExpectedAdminCsp,
+            ExpectedCsp.Replace("style-src 'self';", "style-src 'self' 'unsafe-inline';").Replace("img-src 'self';", "img-src 'self' data:;"));
     }
 
     [Theory]
