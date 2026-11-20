@@ -11,6 +11,7 @@ using SaronidaSailing.Core.Entities;
 using SaronidaSailing.Infrastructure.Caching;
 using SaronidaSailing.Infrastructure.Content;
 using SaronidaSailing.Infrastructure.Data;
+using SaronidaSailing.Infrastructure.Identity;
 using SaronidaSailing.Core.Interfaces;
 using SaronidaSailing.Infrastructure.Logging;
 using SaronidaSailing.Infrastructure.Instagram;
@@ -112,6 +113,6 @@ public static class DependencyInjection
                 options.SignIn.RequireConfirmedEmail = false;
                 options.SignIn.RequireConfirmedAccount = false;
             })
-            .AddEntityFrameworkStores<AppDbContext>();
+            .AddUserStore<ProtectedTokenUserStore>();
     }
 }
