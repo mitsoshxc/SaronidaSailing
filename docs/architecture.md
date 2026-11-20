@@ -771,6 +771,7 @@ A health-check publisher also runs the checks every 30 s and logs state changes 
 - Passwords are never arguments (shell history). They are typed twice with hidden input (`ConsolePasswordPrompt`), which needs an interactive terminal: with redirected input the command fails with a message. Run on the droplet through the host script `saronida-admin`, which wraps `kubectl exec` into the app pod (no `-T`/non-TTY mode; agreed design, Phase 8).
 - Every command writes an audit line (user `cli`).
 - The first admin is created with `admin add` after the first deploy — no passwords in config or environment variables.
+- A new admin's 2FA is enrolled by whoever logs in first with that password: a password-only login redirects to `/admin/two-factor/setup` (`Pages/Admin/Login.cshtml.cs`), and the first correct code there turns 2FA on (`Pages/Admin/TwoFactorSetup.cshtml.cs`). So hand the password over through a safe channel and do the first login straight away.
 - **Password policy** (`AddInfrastructureIdentity` in `Infrastructure/DependencyInjection.cs`): minimum 12 characters, no character-class rules. Email is the user name and must be unique.
 
 **Pages** (all under `Web/Pages/Admin/`, layout `Pages/Shared/_AdminLayout.cshtml`): English only and not localized, `noindex, nofollow` meta, and `[ResponseCache(NoStore = true)]`. Not linked from the public site.
@@ -987,6 +988,11 @@ Code in `Web/Diagnostics/`. Goal: find out afterwards what went wrong. A pod kil
 - **Why admins are relaxed (decided 2026-11-20):** pasted rich text carries inline styles (Google Docs `<span style="font-weight:700">`), which Quill needs to turn into bold / italic and which the strict CSP blocked; the Hangfire dashboard uses a `data:` favicon and chart-injected `<style>` elements. Scripts stay `'self'` only for everyone.
 - **Safe with caching:** the output cache never serves or stores authenticated requests and admin-rendered pages are `no-store`, so the relaxed policy cannot reach a visitor.
 - `form-action` includes the Instagram origin because the Connect POST redirects to Instagram's authorize page.
+
+### Accepted limits
+
+- **TOTP code reuse.** A TOTP code can be used again within its validity window (about 30 seconds, plus Identity's tolerance). ASP.NET Core Identity does not track used codes, and the admin login does not add that check (`Pages/Admin/LoginCode.cshtml.cs`). The password, the per-IP login rate limit and the 2FA-step lockout still apply. Accepted 2026-11-20.
+- **Instagram image redirects.** `InstagramApiClient.DownloadImageAsync` checks the final URI after redirects before it reads the body, but a redirect target is still requested before the check rejects it. Accepted 2026-11-20 because the image URLs come from the Instagram API over TLS. See Instagram Feed, API client rules.
 
 ## Cookies & Privacy
 
