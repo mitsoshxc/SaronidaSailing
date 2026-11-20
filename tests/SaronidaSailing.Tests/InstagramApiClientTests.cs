@@ -322,12 +322,53 @@ public sealed class InstagramApiClientTests
     {
         var (client, handler) = NewClient(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent([1, 2, 3, 4]) });
 
-        await using var stream = await client.DownloadImageAsync("https://cdn.test/a.jpg");
+        await using var stream = await client.DownloadImageAsync("https://scontent.cdninstagram.com/a.jpg");
 
         using var copy = new MemoryStream();
         await stream.CopyToAsync(copy);
         Assert.Equal([1, 2, 3, 4], copy.ToArray());
-        Assert.Equal("https://cdn.test/a.jpg", handler.Requests[0].Uri.ToString());
+        Assert.Equal("https://scontent.cdninstagram.com/a.jpg", handler.Requests[0].Uri.ToString());
+    }
+
+    [Fact]
+    public async Task DownloadImage_FromAnotherHost_IsRejectedWithoutARequest()
+    {
+        var (client, handler) = NewClient(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent([1]) });
+
+        var ex = await Assert.ThrowsAsync<InstagramApiException>(() => client.DownloadImageAsync("https://evil.example.test/a.jpg"));
+
+        Assert.Equal(InstagramApiErrorKind.Other, ex.Kind);
+        Assert.Equal("Image URL host is not an Instagram image host.", ex.Message);
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task DownloadImage_RedirectToAnotherHost_IsRejectedWithoutReadingTheBody()
+    {
+        var (client, _) = NewClient(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent([1, 2, 3]),
+            RequestMessage = new HttpRequestMessage(HttpMethod.Get, "https://evil.example.test/a.jpg"),
+        });
+
+        var ex = await Assert.ThrowsAsync<InstagramApiException>(() => client.DownloadImageAsync("https://scontent.cdninstagram.com/a.jpg"));
+
+        Assert.Equal(InstagramApiErrorKind.Other, ex.Kind);
+        Assert.Equal("Image URL host is not an Instagram image host.", ex.Message);
+    }
+
+    [Fact]
+    public async Task DownloadImage_RedirectToPlainHttp_IsRejected()
+    {
+        var (client, _) = NewClient(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent([1]),
+            RequestMessage = new HttpRequestMessage(HttpMethod.Get, "http://scontent.cdninstagram.com/a.jpg"),
+        });
+
+        var ex = await Assert.ThrowsAsync<InstagramApiException>(() => client.DownloadImageAsync("https://scontent.cdninstagram.com/a.jpg"));
+
+        Assert.Equal(InstagramApiErrorKind.Other, ex.Kind);
     }
 
     [Fact]
@@ -338,7 +379,7 @@ public sealed class InstagramApiClientTests
             Content = new ByteArrayContent(new byte[MediaLimits.MaxUploadBytes + 1]),
         });
 
-        var ex = await Assert.ThrowsAsync<InstagramApiException>(() => client.DownloadImageAsync("https://cdn.test/a.jpg"));
+        var ex = await Assert.ThrowsAsync<InstagramApiException>(() => client.DownloadImageAsync("https://scontent.cdninstagram.com/a.jpg"));
 
         Assert.Equal(InstagramApiErrorKind.Other, ex.Kind);
     }
@@ -351,7 +392,7 @@ public sealed class InstagramApiClientTests
             Content = new UnknownLengthContent(new byte[MediaLimits.MaxUploadBytes + 1]),
         });
 
-        var ex = await Assert.ThrowsAsync<InstagramApiException>(() => client.DownloadImageAsync("https://cdn.test/a.jpg"));
+        var ex = await Assert.ThrowsAsync<InstagramApiException>(() => client.DownloadImageAsync("https://scontent.cdninstagram.com/a.jpg"));
 
         Assert.Equal(InstagramApiErrorKind.Other, ex.Kind);
     }
@@ -364,7 +405,7 @@ public sealed class InstagramApiClientTests
             Content = new UnknownLengthContent(new byte[MediaLimits.MaxUploadBytes]),
         });
 
-        await using var stream = await client.DownloadImageAsync("https://cdn.test/a.jpg");
+        await using var stream = await client.DownloadImageAsync("https://scontent.cdninstagram.com/a.jpg");
 
         Assert.Equal(MediaLimits.MaxUploadBytes, stream.Length);
     }
@@ -391,7 +432,7 @@ public sealed class InstagramApiClientTests
     {
         var (client, _) = NewClient(_ => new HttpResponseMessage((HttpStatusCode)status));
 
-        var ex = await Assert.ThrowsAsync<InstagramApiException>(() => client.DownloadImageAsync("https://cdn.test/a.jpg"));
+        var ex = await Assert.ThrowsAsync<InstagramApiException>(() => client.DownloadImageAsync("https://scontent.cdninstagram.com/a.jpg"));
 
         Assert.Equal(expected, ex.Kind);
     }

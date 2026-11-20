@@ -48,6 +48,35 @@ public sealed class InstagramOptionsTests
         provider.GetRequiredService<IStartupValidator>().Validate();
     }
 
+    [Theory]
+    [InlineData("scontent-ath2-1.cdninstagram.com")]
+    [InlineData("cdninstagram.com")]
+    [InlineData("scontent.xx.fbcdn.net")]
+    [InlineData("SCONTENT.CDNINSTAGRAM.COM")]
+    public void ImageHost_DefaultList_AllowsInstagramCdnHosts(string host)
+    {
+        Assert.True(InstagramOptions.IsImageHost(host, []));
+    }
+
+    [Theory]
+    [InlineData("evilcdninstagram.com")]
+    [InlineData("cdninstagram.com.evil.net")]
+    [InlineData("evil.example.test")]
+    [InlineData("fbcdn.net.evil.test")]
+    [InlineData("")]
+    [InlineData(null)]
+    public void ImageHost_DefaultList_RejectsEverythingElse(string? host)
+    {
+        Assert.False(InstagramOptions.IsImageHost(host, []));
+    }
+
+    [Fact]
+    public void ImageHost_ConfiguredList_ReplacesTheDefaults()
+    {
+        Assert.True(InstagramOptions.IsImageHost("img.example.test", ["example.test"]));
+        Assert.False(InstagramOptions.IsImageHost("scontent.cdninstagram.com", ["example.test"]));
+    }
+
     [Fact]
     public async Task HttpClientLogs_NeverContainTheTokenOrTheSecret()
     {

@@ -141,10 +141,20 @@ public sealed partial class InstagramApiClient(
             throw new InstagramApiException(InstagramApiErrorKind.Other, "Image URL must be an absolute https URL.");
         }
 
+        if (!IsImageHost(uri))
+        {
+            throw NotAnImageHost();
+        }
+
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, uri);
             using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+            if (!IsImageHost(response.RequestMessage?.RequestUri ?? uri))
+            {
+                throw NotAnImageHost();
+            }
+
             if (!response.IsSuccessStatusCode)
             {
                 var kind = (int)response.StatusCode >= 500 ? InstagramApiErrorKind.Transient : InstagramApiErrorKind.Other;
@@ -331,6 +341,12 @@ public sealed partial class InstagramApiClient(
 
     private static InstagramApiException Unreadable() =>
         new(InstagramApiErrorKind.Other, "Instagram API returned an unreadable response.");
+
+    private bool IsImageHost(Uri uri) =>
+        uri.Scheme == Uri.UriSchemeHttps && InstagramOptions.IsImageHost(uri.Host, Options.ImageHosts);
+
+    private static InstagramApiException NotAnImageHost() =>
+        new(InstagramApiErrorKind.Other, "Image URL host is not an Instagram image host.");
 
     private static InstagramApiException TooLarge() =>
         new(InstagramApiErrorKind.Other, $"Image is larger than {MediaLimits.MaxUploadBytes / (1024 * 1024)} MB.");
